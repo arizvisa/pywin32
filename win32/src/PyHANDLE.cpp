@@ -342,9 +342,13 @@ int PyHANDLE::print(FILE *fp, int flags)
 
 PyObject * PyHANDLE::asStr(void)
 {
-	TCHAR resBuf[160];
-	wsprintf(resBuf, _T("<%s:%Id>"), GetTypeName(), m_handle);
-	return PyString_FromTCHAR(resBuf);
+	char resBuf[160];
+	snprintf(resBuf, 160, "<%s:%Id>", GetTypeName(), m_handle);
+#if (PY_VERSION_HEX < 0x03000000)
+	return PyString_FromString(resBuf);
+#else
+	return PyUnicode_FromString(resBuf);
+#endif
 }
 
 char *failMsg = "bad operand type";
