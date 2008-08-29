@@ -39,7 +39,7 @@ class Enumerator:
 		return self.__GetIndex(index)
 	
 	def __GetIndex(self, index):
-		if type(index)!=type(0): raise TypeError, "Only integer indexes are supported for enumerators"
+		if type(index)!=type(0): raise TypeError("Only integer indexes are supported for enumerators")
 		# NOTE
 		# In this context, self.index is users purely as a flag to say 
 		# "am I still in sequence".  The user may call Next() or Reset() if they
@@ -53,7 +53,7 @@ class Enumerator:
 		result = self._oleobj_.Next(1)
 		if len(result):
 			return self._make_retval_(result[0])
-		raise IndexError, "list index out of range"
+		raise IndexError("list index out of range")
 	def Next(self, count=1):
 		ret = self._oleobj_.Next(count)
 		realRets = []
@@ -80,5 +80,5 @@ class Iterator:
 		self._iter_ = iter(enum.QueryInterface(pythoncom.IID_IEnumVARIANT))
 	def __iter__(self):
 		return self
-	def next(self):
-		return _get_good_object_(self._iter_.next(), resultCLSID = self.resultCLSID)
+	def __next__(self):
+		return _get_good_object_(next(self._iter_), resultCLSID = self.resultCLSID)

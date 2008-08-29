@@ -5,15 +5,16 @@
 # Note that if the unknown dispatch object then returns a known
 # dispatch object, the known class will be used.  This contrasts
 # with dynamic.Dispatch behaviour, where dynamic objects are always used.
-import __builtin__
+import builtins
 # For some bizarre reason, __builtins__ fails with attribute error on __dict__ here?
-NeedUnicodeConversions = not hasattr(__builtin__, "unicode")
+NeedUnicodeConversions = not hasattr(builtins, "unicode")
 
-import dynamic, gencache, pythoncom
+
+import pythoncom
+from . import dynamic, gencache
 import sys
 import pywintypes
-from types import TupleType
-from pywintypes import UnicodeType
+
 _PyIDispatchType = pythoncom.TypeIIDs[pythoncom.IID_IDispatch]
 
 
@@ -32,7 +33,7 @@ def __WrapDispatch(dispatch, userName = None, resultCLSID = None, typeinfo = Non
     except (pythoncom.com_error, AttributeError):
       pass
   if resultCLSID is not None:
-    import gencache
+    from . import gencache
     # Attempt to load generated module support
     # This may load the module, and make it available
     klass = gencache.GetClassForCLSID(resultCLSID)
@@ -65,7 +66,7 @@ def GetObject(Pathname = None, Class = None, clsctx = None):
     
   if (Pathname is None and Class is None) or \
      (Pathname is not None and Class is not None):
-    raise ValueError, "You must specify a value for Pathname or Class, but not both."
+    raise ValueError
 
   if Class is not None:
     return GetActiveObject(Class, clsctx)
@@ -127,11 +128,11 @@ def CastTo(ob, target):
     # todo - should support target being an IID
     if hasattr(target, "index"): # string like
     # for now, we assume makepy for this to work.
-        if not ob.__class__.__dict__.has_key("CLSID"):
+        if "CLSID" not in ob.__class__.__dict__:
             # Eeek - no makepy support - try and build it.
             ob = gencache.EnsureDispatch(ob)
-        if not ob.__class__.__dict__.has_key("CLSID"):
-            raise ValueError, "Must be a makepy-able object for this to work"
+        if "CLSID" not in ob.__class__.__dict__:
+            raise ValueError
         clsid = ob.CLSID
         # Lots of hoops to support "demand-build" - ie, generating
         # code for an interface first time it is used.  We assume the
@@ -147,14 +148,13 @@ def CastTo(ob, target):
         # Find the CLSID of the target
         target_clsid = mod.NamesToIIDMap.get(target)
         if target_clsid is None:
-            raise ValueError, "The interface name '%s' does not appear in the " \
-                              "same library as object '%r'" % (target, ob)
+            raise ValueError
         mod = gencache.GetModuleForCLSID(target_clsid)
         target_class = getattr(mod, target)
         # resolve coclass to interface
         target_class = getattr(target_class, "default_interface", target_class)
         return target_class(ob) # auto QI magic happens
-    raise ValueError, "This object can not be cast"
+    raise ValueError
 
 class Constants:
   """A container for generated COM constants.
@@ -163,9 +163,9 @@ class Constants:
     self.__dicts__ = [] # A list of dictionaries
   def __getattr__(self, a):
     for d in self.__dicts__:
-      if d.has_key(a):
+      if a in d:
         return d[a]
-    raise AttributeError, a
+    raise AttributeError
 
 # And create an instance.
 constants = Constants()
@@ -251,7 +251,7 @@ def DispatchWithEvents(clsid, user_event_class):
       # Get the class from the module.
       disp_class = gencache.GetClassForProgID(str(disp_clsid))
     except pythoncom.com_error:
-      raise TypeError, "This COM object can not automate the makepy process - please run makepy manually for this object"
+      raise TypeError
   else:
     disp_class = disp.__class__
   # If the clsid was an object, get the clsid
@@ -260,7 +260,7 @@ def DispatchWithEvents(clsid, user_event_class):
   import new
   events_class = getevents(clsid)
   if events_class is None:
-    raise ValueError, "This COM object does not support events."
+    raise ValueError
   result_class = new.classobj("COMEventClass", (disp_class, events_class, user_event_class), {"__setattr__" : _event_setattr_})
   instance = result_class(disp._oleobj_) # This only calls the first base class __init__.
   events_class.__init__(instance, instance)
@@ -303,7 +303,7 @@ def WithEvents(disp, user_event_class):
       # Get the class from the module.
       disp_class = gencache.GetClassForProgID(str(disp_clsid))
     except pythoncom.com_error:
-      raise TypeError, "This COM object can not automate the makepy process - please run makepy manually for this object"
+      raise TypeError
   else:
     disp_class = disp.__class__
   # Get the clsid
@@ -313,7 +313,7 @@ def WithEvents(disp, user_event_class):
   import new
   events_class = getevents(clsid)
   if events_class is None:
-    raise ValueError, "This COM object does not support events."
+    raise ValueError
   result_class = new.classobj("COMEventClass", (events_class, user_event_class), {})
   instance = result_class(disp) # This only calls the first base class __init__.
   if hasattr(user_event_class, "__init__"):
@@ -387,8 +387,7 @@ def Record(name, object):
     point.y = 0
     app.MoveTo(point)
   """
-  # XXX - to do - probably should allow "object" to already be a module object.
-  import gencache
+  from . import gencache
   object = gencache.EnsureDispatch(object)
   module = sys.modules[object.__class__.__module__]
   # to allow us to work correctly with "demand generated" code,
@@ -400,7 +399,7 @@ def Record(name, object):
   try:
     struct_guid = package.RecordMap[name]
   except KeyError:
-    raise ValueError, "The structure '%s' is not defined in module '%s'" % (name, package)
+    raise ValueError
 
   return pythoncom.GetRecordFromGuids(module.CLSID, module.MajorVersion, module.MinorVersion, module.LCID, struct_guid)
 
@@ -415,7 +414,7 @@ class DispatchBaseClass:
 		elif type(self) == type(oobj): # An instance
 			try:
 				oobj = oobj._oleobj_.QueryInterface(self.CLSID, pythoncom.IID_IDispatch) # Must be a valid COM instance
-			except pythoncom.com_error, details:
+			except pythoncom.com_error as details:
 				import winerror
 				# Some stupid objects fail here, even tho it is _already_ IDispatch!!??
 				# Eg, Lotus notes.
@@ -451,15 +450,15 @@ class DispatchBaseClass:
 	def __getattr__(self, attr):
 		args=self._prop_map_get_.get(attr)
 		if args is None:
-			raise AttributeError, "'%s' object has no attribute '%s'" % (repr(self), attr)
+			raise AttributeError
 		return self._ApplyTypes_(*args)
 
 	def __setattr__(self, attr, value):
-		if self.__dict__.has_key(attr): self.__dict__[attr] = value; return
+		if attr in self.__dict__: self.__dict__[attr] = value; return
 		try:
 			args, defArgs=self._prop_map_put_[attr]
 		except KeyError:
-			raise AttributeError, "'%s' object has no attribute '%s'" % (repr(self), attr)
+			raise AttributeError
 		self._oleobj_.Invoke(*(args + (value,) + defArgs))
 	def _get_good_single_object_(self, obj, obUserName=None, resultCLSID=None):
 		return _get_good_single_object_(obj, obUserName, resultCLSID)
@@ -470,14 +469,14 @@ class DispatchBaseClass:
 def _get_good_single_object_(obj, obUserName=None, resultCLSID=None):
 	if _PyIDispatchType==type(obj):
 		return Dispatch(obj, obUserName, resultCLSID, UnicodeToString=NeedUnicodeConversions)
-	elif NeedUnicodeConversions and UnicodeType==type(obj):
-		return str(obj)
+	## elif NeedUnicodeConversions and UnicodeType==type(obj):
+	##	return str(obj)
 	return obj
 
 def _get_good_object_(obj, obUserName=None, resultCLSID=None):
 	if obj is None:
 		return None
-	elif type(obj)==TupleType:
+	elif isinstance(obj, tuple):
 		obUserNameTuple = (obUserName,) * len(obj)
 		resultCLSIDTuple = (resultCLSID,) * len(obj)
 		return tuple(map(_get_good_object_, obj, obUserNameTuple, resultCLSIDTuple))
@@ -494,9 +493,9 @@ class CoClassBaseClass:
 	def __getattr__(self, attr):
 		d=self.__dict__["_dispobj_"]
 		if d is not None: return getattr(d, attr)
-		raise AttributeError, attr
+		raise AttributeError
 	def __setattr__(self, attr, value):
-		if self.__dict__.has_key(attr): self.__dict__[attr] = value; return
+		if attr in self.__dict__: self.__dict__[attr] = value; return
 		try:
 			d=self.__dict__["_dispobj_"]
 			if d is not None:

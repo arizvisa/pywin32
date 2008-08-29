@@ -39,7 +39,7 @@ def RegisterCLSIDsFromDict( dict ):
 	try:
 		mapCLSIDToClass.update(dict)
 	except AttributeError: # Python 1.4?
-		for clsid, pythonClass in dict.items():
+		for clsid, pythonClass in list(dict.items()):
 			mapCLSIDToClass[clsid] = pythonClass
 		
 def GetClass(clsid):
@@ -54,4 +54,4 @@ def HasClass(clsid):
 	
 	clsid -- the string CLSID to check
 	"""
-	return mapCLSIDToClass.has_key(clsid)
+	return clsid in mapCLSIDToClass

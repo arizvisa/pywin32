@@ -21,7 +21,7 @@ class TypelibSpec:
 	def __getitem__(self, item):
 		if item==0:
 			return self.ver_desc
-		raise IndexError, "Cant index me!"
+		raise IndexError("Cant index me!")
 	def __cmp__(self, other):
 		rc = cmp(string.lower(self.ver_desc or ""), string.lower(other.ver_desc or ""))
 		if rc==0:
@@ -155,4 +155,4 @@ def SelectTlb(title="Select Library", excludeFlags = 0):
 
 # Test code.
 if __name__=='__main__':
-	print SelectTlb().__dict__
+	print(SelectTlb().__dict__)

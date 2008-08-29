@@ -20,12 +20,12 @@ Hacks, to do, etc
   Currently just uses a pickled dictionary, but should used some sort of indexed file.
   Maybe an OLE2 compound file, or a bsddb file?
 """
-import pywintypes, os, string, sys
+import pywintypes, os, sys
 import pythoncom
 import win32com, win32com.client
 import glob
 import traceback
-import CLSIDToClass
+from . import CLSIDToClass
 import operator
 
 bForDemandDefault = 0 # Default value of bForDemand - toggle this to change the world - see also makepy.py
@@ -58,22 +58,22 @@ def __init__():
 pickleVersion = 1
 def _SaveDicts():
 	if is_readonly:
-		raise RuntimeError, "Trying to write to a readonly gencache ('%s')!" \
-		                    % win32com.__gen_path__
-	import cPickle
+		raise RuntimeError("Trying to write to a readonly gencache ('%s')!" \
+		                    % win32com.__gen_path__)
+	import pickle
 	f = open(os.path.join(GetGeneratePath(), "dicts.dat"), "wb")
 	try:
-		p = cPickle.Pickler(f)
+		p = pickle.Pickler(f)
 		p.dump(pickleVersion)
 		p.dump(clsidToTypelib)
 	finally:
 		f.close()
 
 def _LoadDicts():
-	import cPickle
+	import pickle
 	# Load the dictionary from a .zip file if that is where we live.
 	if hasattr(win32com, "__loader__"):
-		import cStringIO
+		import io
 		loader = win32com.__loader__
 		arc_path = loader.archive
 		dicts_path = os.path.join(win32com.__gen_path__, "dicts.dat")
@@ -100,12 +100,12 @@ def _LoadDicts():
 			# for these apps is to call EnsureModule, rather than freezing
 			# the dict)
 			return
-		f = cStringIO.StringIO(data)
+		f = io.StringIO(data)
 	else:
 		# NOTE: IOError on file open must be caught by caller.
 		f = open(os.path.join(win32com.__gen_path__, "dicts.dat"), "rb")
 	try:
-		p = cPickle.Unpickler(f)
+		p = pickle.Unpickler(f)
 		version = p.load()
 		global clsidToTypelib
 		clsidToTypelib = p.load()
@@ -117,12 +117,12 @@ def GetGeneratedFileName(clsid, lcid, major, minor):
 	"""Given the clsid, lcid, major and  minor for a type lib, return
 	the file name (no extension) providing this support.
 	"""
-	return string.upper(str(clsid))[1:-1] + "x%sx%sx%s" % (lcid, major, minor)
+	return str(clsid).upper()[1:-1] + "x%sx%sx%s" % (lcid, major, minor)
 
 def SplitGeneratedFileName(fname):
 	"""Reverse of GetGeneratedFileName()
 	"""
-	return tuple(string.split(fname,'x',4))
+	return tuple(fname.split('x',4))
 	
 def GetGeneratePath():
 	"""Returns the name of the path to generate to.
@@ -234,9 +234,9 @@ def GetModuleForCLSID(clsid):
 				info = typelibCLSID, lcid, major, minor
 				# Force the generation.  If this typelibrary has explicitly been added,
 				# use it (it may not be registered, causing a lookup by clsid to fail)
-				if demandGeneratedTypeLibraries.has_key(info):
+				if info in demandGeneratedTypeLibraries:
 					info = demandGeneratedTypeLibraries[info]
-				import makepy
+				from . import makepy
 				makepy.GenerateChildFromTypeLibSpec(sub_mod, info)
 				# Generate does an import...
 			mod = sys.modules[sub_mod_name]
@@ -258,9 +258,9 @@ def GetModuleForTypelib(typelibCLSID, lcid, major, minor):
 	mod = _GetModule(modName)
 	# If the import worked, it doesn't mean we have actually added this
 	# module to our cache though - check that here.
-	if not mod.__dict__.has_key("_in_gencache_"):
+	if "_in_gencache_" not in mod.__dict__:
 		AddModuleToCache(typelibCLSID, lcid, major, minor)
-		assert mod.__dict__.has_key("_in_gencache_")
+		assert "_in_gencache_" in mod.__dict__
 	return mod
 
 def MakeModuleForTypelib(typelibCLSID, lcid, major, minor, progressInstance = None, bGUIProgress = None, bForDemand = bForDemandDefault, bBuildHidden = 1):
@@ -280,9 +280,9 @@ def MakeModuleForTypelib(typelibCLSID, lcid, major, minor, progressInstance = No
 	                    use the GUI progress bar.
 	"""
 	if bGUIProgress is not None:
-		print "The 'bGuiProgress' param to 'MakeModuleForTypelib' is obsolete."
+		print("The 'bGuiProgress' param to 'MakeModuleForTypelib' is obsolete.")
 
-	import makepy
+	from . import makepy
 	try:
 		makepy.GenerateFromTypeLibSpec( (typelibCLSID, lcid, major, minor), progressInstance=progressInstance, bForDemand = bForDemand, bBuildHidden = bBuildHidden)
 	except pywintypes.com_error:
@@ -303,7 +303,7 @@ def MakeModuleForTypelibInterface(typelib_ob, progressInstance = None, bForDeman
 	progressInstance -- Instance to use as progress indicator, or None to
 	                    use the GUI progress bar.
 	"""
-	import makepy
+	from . import makepy
 	try:
 		makepy.GenerateFromTypeLibSpec( typelib_ob, progressInstance=progressInstance, bForDemand = bForDemandDefault, bBuildHidden = bBuildHidden)
 	except pywintypes.com_error:
@@ -359,9 +359,9 @@ def ForgetAboutTypelibInterface(typelib_ob):
 		del demandGeneratedTypeLibraries[info]
 	except KeyError:
 		# Not worth raising an exception - maybe they dont know we only remember for demand generated, etc.
-		print "ForgetAboutTypelibInterface:: Warning - type library with info %s is not being remembered!" % (info,)
+		print("ForgetAboutTypelibInterface:: Warning - type library with info %s is not being remembered!" % (info,))
 	# and drop any version redirects to it
-	for key, val in versionRedirectMap.items():
+	for key, val in list(versionRedirectMap.items()):
 		if val==info:
 			del versionRedirectMap[key]
 
@@ -445,7 +445,7 @@ def EnsureModule(typelibCLSID, lcid, major, minor, progressInstance = None, bVal
 				filePathPyc = filePathPyc + "o"
 			# Verify that type library is up to date.
 			# If we have a differing MinorVersion or genpy has bumped versions, update the file
-			import genpy
+			from . import genpy
 			if module.MinorVersion != tlbAttributes[4] or genpy.makepy_version != module.makepy_version:
 				#print "Version skew: %d, %d" % (module.MinorVersion, tlbAttributes[4])
 				# try to erase the bad file from the cache
@@ -473,13 +473,13 @@ def EnsureModule(typelibCLSID, lcid, major, minor, progressInstance = None, bVal
 				try:
 					pyModTime = os.stat(filePath)[8]
 					fModTimeSet = 1
-				except os.error, e:
+				except os.error as e:
 					# If .py file fails, try .pyc file
 					#print "Trying pyc stat", filePathPyc
 					try:
 						pyModTime = os.stat(filePathPyc)[8]
 						fModTimeSet = 1
-					except os.error, e:
+					except os.error as e:
 						pass
 				#print "Trying stat typelib", pyModTime
 				#print str(typLibPath)
@@ -535,12 +535,11 @@ def EnsureDispatch(prog_id, bForDemand = 1): # New fn, so we default the new dem
 			tla = tlb.GetLibAttr()
 			mod = EnsureModule(tla[0], tla[1], tla[3], tla[4], bForDemand=bForDemand)
 			GetModuleForCLSID(disp_clsid)
-			# Get the class from the module.
-			import CLSIDToClass
+			from . import CLSIDToClass
 			disp_class = CLSIDToClass.GetClass(str(disp_clsid))
 			disp = disp_class(disp._oleobj_)
 		except pythoncom.com_error:
-			raise TypeError, "This COM object can not automate the makepy process - please run makepy manually for this object"
+			raise TypeError("This COM object can not automate the makepy process - please run makepy manually for this object")
 	return disp
 
 def AddModuleToCache(typelibclsid, lcid, major, minor, verbose = 1, bFlushNow = not is_readonly):
@@ -553,23 +552,23 @@ def AddModuleToCache(typelibclsid, lcid, major, minor, verbose = 1, bFlushNow = 
 	mod._in_gencache_ = 1
 	dict = mod.CLSIDToClassMap
 	info = str(typelibclsid), lcid, major, minor
-	for clsid, cls in dict.items():
+	for clsid, cls in list(dict.items()):
 		clsidToTypelib[clsid] = info
 
 	dict = mod.CLSIDToPackageMap
-	for clsid, name in dict.items():
+	for clsid, name in list(dict.items()):
 		clsidToTypelib[clsid] = info
 
 	dict = mod.VTablesToClassMap
-	for clsid, cls in dict.items():
+	for clsid, cls in list(dict.items()):
 		clsidToTypelib[clsid] = info
 
 	dict = mod.VTablesToPackageMap
-	for clsid, cls in dict.items():
+	for clsid, cls in list(dict.items()):
 		clsidToTypelib[clsid] = info
 
 	# If this lib was previously redirected, drop it
-	if versionRedirectMap.has_key(info):
+	if info in versionRedirectMap:
 		del versionRedirectMap[info]
 	if bFlushNow:
 		_SaveDicts()
@@ -577,7 +576,7 @@ def AddModuleToCache(typelibclsid, lcid, major, minor, verbose = 1, bFlushNow = 
 def GetGeneratedInfos():
 	zip_pos = win32com.__gen_path__.find(".zip\\")
 	if zip_pos >= 0:
-		import zipfile, cStringIO
+		import zipfile, io
 		zip_file = win32com.__gen_path__[:zip_pos+4]
 		zip_path = win32com.__gen_path__[zip_pos+5:].replace("\\", "/")
 		zf = zipfile.ZipFile(zip_file)
@@ -599,7 +598,7 @@ def GetGeneratedInfos():
 				continue
 			infos[(iid, lcid, major, minor)] = 1
 		zf.close()
-		return infos.keys()
+		return list(infos.keys())
 	else:
 		# on the file system
 		files = glob.glob(win32com.__gen_path__+ "\\*")
@@ -609,7 +608,7 @@ def GetGeneratedInfos():
 				continue
 			name = os.path.splitext(os.path.split(file)[1])[0]
 			try:
-				iid, lcid, major, minor = string.split(name, "x")
+				iid, lcid, major, minor = name.split("x")
 				iid = pywintypes.IID("{" + iid + "}")
 				lcid = int(lcid)
 				major = int(major)
@@ -635,28 +634,28 @@ def Rebuild(verbose = 1):
 	clsidToTypelib.clear()
 	infos = GetGeneratedInfos()
 	if verbose and len(infos): # Dont bother reporting this when directory is empty!
-		print "Rebuilding cache of generated files for COM support..."
+		print("Rebuilding cache of generated files for COM support...")
 	for info in infos:
 		iid, lcid, major, minor = info
 		if verbose:
-			print "Checking", GetGeneratedFileName(*info)
+			print("Checking", GetGeneratedFileName(*info))
 		try:
 			AddModuleToCache(iid, lcid, major, minor, verbose, 0)
 		except:
-			print "Could not add module %s - %s: %s" % (info, sys.exc_info()[0],sys.exc_info()[1])
+			print("Could not add module %s - %s: %s" % (info, sys.exc_info()[0],sys.exc_info()[1]))
 	if verbose and len(infos): # Dont bother reporting this when directory is empty!
-		print "Done."
+		print("Done.")
 	_SaveDicts()
 
 def _Dump():
-	print "Cache is in directory", win32com.__gen_path__
+	print("Cache is in directory", win32com.__gen_path__)
 	# Build a unique dir
 	d = {}
-	for clsid, (typelibCLSID, lcid, major, minor) in clsidToTypelib.items():
+	for clsid, (typelibCLSID, lcid, major, minor) in list(clsidToTypelib.items()):
 		d[typelibCLSID, lcid, major, minor] = None
-	for typelibCLSID, lcid, major, minor in d.keys():
+	for typelibCLSID, lcid, major, minor in list(d.keys()):
 		mod = GetModuleForTypelib(typelibCLSID, lcid, major, minor)
-		print "%s - %s" % (mod.__doc__, typelibCLSID)
+		print("%s - %s" % (mod.__doc__, typelibCLSID))
 
 # Boot up
 __init__()
@@ -669,20 +668,20 @@ def usage():
 			 -d         - Dump the cache (typelibrary description and filename).
 			 -r         - Rebuild the cache dictionary from the existing .py files
 	"""
-	print usageString
+	print(usageString)
 	sys.exit(1)
 
 if __name__=='__main__':
 	import getopt
 	try:
 		opts, args = getopt.getopt(sys.argv[1:], "qrd")
-	except getopt.error, message:
-		print message
+	except getopt.error as message:
+		print(message)
 		usage()
 
 	# we only have options - complain about real args, or none at all!
 	if len(sys.argv)==1 or args:
-		print usage()
+		print(usage())
 		
 	verbose = 1
 	for opt, val in opts:

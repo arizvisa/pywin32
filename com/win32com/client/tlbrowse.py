@@ -192,7 +192,7 @@ class TypeBrowseDialog(TypeBrowseDialog_Parent):
 		elif pos >= 0:
 			return pos, 0
 		else:
-			raise error, "The position is not valid"
+			raise error("The position is not valid")
 			
 	def CmdMemberListbox(self, id, code):
 		if code == win32con.LBN_SELCHANGE:

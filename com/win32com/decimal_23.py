@@ -506,7 +506,7 @@ class Decimal(object):
             return self
 
         # From an integer
-        if isinstance(value, (int,long)):
+        if isinstance(value, (int,int)):
             if value >= 0:
                 self._sign = 0
             else:
@@ -518,12 +518,12 @@ class Decimal(object):
         # tuple/list conversion (possibly from as_tuple())
         if isinstance(value, (list,tuple)):
             if len(value) != 3:
-                raise ValueError, 'Invalid arguments'
+                raise ValueError('Invalid arguments')
             if value[0] not in (0,1):
-                raise ValueError, 'Invalid sign'
+                raise ValueError('Invalid sign')
             for digit in value[1]:
-                if not isinstance(digit, (int,long)) or digit < 0:
-                    raise ValueError, "The second value in the tuple must be composed of non negative integer elements."
+                if not isinstance(digit, (int,int)) or digit < 0:
+                    raise ValueError("The second value in the tuple must be composed of non negative integer elements.")
 
             self._sign = value[0]
             self._int  = tuple(value[1])
@@ -544,7 +544,7 @@ class Decimal(object):
 
         # From a string
         # REs insist on real strings, so we can too.
-        if isinstance(value, basestring):
+        if isinstance(value, str):
             if _isinfinity(value):
                 self._exp = 'F'
                 self._int = (0,)
@@ -637,7 +637,7 @@ class Decimal(object):
             return other
         return 0
 
-    def __nonzero__(self):
+    def __bool__(self):
         """Is the number non-zero?
 
         0 if self == 0
@@ -699,12 +699,12 @@ class Decimal(object):
         return 1
 
     def __eq__(self, other):
-        if not isinstance(other, (Decimal, int, long)):
+        if not isinstance(other, (Decimal, int, int)):
             return False
         return self.__cmp__(other) == 0
 
     def __ne__(self, other):
-        if not isinstance(other, (Decimal, int, long)):
+        if not isinstance(other, (Decimal, int, int)):
             return True
         return self.__cmp__(other) != 0
 
@@ -776,7 +776,7 @@ class Decimal(object):
         if context is None:
             context = getcontext()
 
-        tmp = map(str, self._int)
+        tmp = list(map(str, self._int))
         numdigits = len(self._int)
         leftdigits = self._exp + numdigits
         if eng and not self: #self = 0eX wants 0[.0[0]]eY, not [[0]0]0eY
@@ -1119,7 +1119,7 @@ class Decimal(object):
         op1 = _WorkRep(self)
         op2 = _WorkRep(other)
 
-        ans = Decimal( (resultsign, map(int, str(op1.int * op2.int)), resultexp))
+        ans = Decimal( (resultsign, list(map(int, str(op1.int * op2.int))), resultexp))
         if shouldround:
             ans = ans._fix(context)
 
@@ -1428,7 +1428,7 @@ class Decimal(object):
                 context = getcontext()
                 return context._raise_error(InvalidContext)
             elif self._isinfinity():
-                raise OverflowError, "Cannot convert infinity to long"
+                raise OverflowError("Cannot convert infinity to long")
         if self._exp >= 0:
             s = ''.join(map(str, self._int)) + '0'*self._exp
         else:
@@ -1443,7 +1443,7 @@ class Decimal(object):
 
         Equivalent to long(int(self))
         """
-        return long(self.__int__())
+        return int(self.__int__())
 
     def _fix(self, context):
         """Round if it is necessary to keep self within prec precision.
@@ -2131,7 +2131,7 @@ class Decimal(object):
 
 
 # get rounding method function:
-rounding_functions = [name for name in Decimal.__dict__.keys() if name.startswith('_round_')]
+rounding_functions = [name for name in list(Decimal.__dict__.keys()) if name.startswith('_round_')]
 for name in rounding_functions:
     #name is like _round_half_even, goes to the global ROUND_HALF_EVEN value.
     globalname = name[1:].upper()
@@ -2176,7 +2176,7 @@ class Context(object):
         if traps is not None and not isinstance(traps, dict):
             traps = dict([(s,s in traps) for s in _signals])
             del s
-        for name, val in locals().items():
+        for name, val in list(locals().items()):
             if val is None:
                 setattr(self, name, copy.copy(getattr(DefaultContext, name)))
             else:
@@ -2187,8 +2187,8 @@ class Context(object):
         """Show the current context."""
         s = []
         s.append('Context(prec=%(prec)d, rounding=%(rounding)s, Emin=%(Emin)d, Emax=%(Emax)d, capitals=%(capitals)d' % vars(self))
-        s.append('flags=[' + ', '.join([f.__name__ for f, v in self.flags.items() if v]) + ']')
-        s.append('traps=[' + ', '.join([t.__name__ for t, v in self.traps.items() if v]) + ']')
+        s.append('flags=[' + ', '.join([f.__name__ for f, v in list(self.flags.items()) if v]) + ']')
+        s.append('traps=[' + ', '.join([t.__name__ for t, v in list(self.traps.items()) if v]) + ']')
         return ', '.join(s) + ')'
 
     def clear_flags(self):
@@ -2231,7 +2231,7 @@ class Context(object):
 
         # Errors should only be risked on copies of the context
         #self._ignored_flags = []
-        raise error, explanation
+        raise error(explanation)
 
     def _ignore_all_flags(self):
         """Ignore all flags, if they are raised"""
@@ -2254,7 +2254,7 @@ class Context(object):
     def __hash__(self):
         """A Context cannot be hashed."""
         # We inherit object.__hash__, so we must deny this explicitly
-        raise TypeError, "Cannot hash a Context."
+        raise TypeError("Cannot hash a Context.")
 
     def Etiny(self):
         """Returns Etiny (= Emin - prec + 1)"""
@@ -2876,10 +2876,10 @@ def _convert_other(other):
     """
     if isinstance(other, Decimal):
         return other
-    if isinstance(other, (int, long)):
+    if isinstance(other, (int, int)):
         return Decimal(other)
 
-    raise TypeError, "You can interact Decimal only with int, long or Decimal data types."
+    raise TypeError("You can interact Decimal only with int, long or Decimal data types.")
 
 _infinity_map = {
     'inf' : 1,
@@ -3027,7 +3027,7 @@ def _string2exact(s):
     exp -= len(fracpart)
 
     mantissa = intpart + fracpart
-    tmp = map(int, mantissa)
+    tmp = list(map(int, mantissa))
     backup = tmp
     while tmp and tmp[0] == 0:
         del tmp[0]

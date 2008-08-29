@@ -66,10 +66,10 @@ Examples:
 
 """
 
-import genpy, string, sys, os, types, pythoncom
-import codecs
-import selecttlb
-import gencache
+import sys, os, types, pythoncom
+from win32com.client import genpy
+from . import selecttlb
+from . import gencache
 from win32com.client import NeedUnicodeConversions, Dispatch
 
 bForDemandDefault = 0 # Default value of bForDemand - toggle this to change the world - see also gencache.py
@@ -101,11 +101,11 @@ def ShowInfo(spec):
 				desc = "<Could not load typelib %s>" % (tlbSpec.dll)
 			else:
 				desc = tlb.GetDocumentation(-1)[0]
-		print desc
-		print " %s, lcid=%s, major=%s, minor=%s" % (tlbSpec.clsid, tlbSpec.lcid, tlbSpec.major, tlbSpec.minor)
-		print " >>> # Use these commands in Python code to auto generate .py support"
-		print " >>> from win32com.client import gencache"
-		print " >>> gencache.EnsureModule('%s', %s, %s, %s)" % (tlbSpec.clsid, tlbSpec.lcid, tlbSpec.major, tlbSpec.minor)
+		print(desc)
+		print(" %s, lcid=%s, major=%s, minor=%s" % (tlbSpec.clsid, tlbSpec.lcid, tlbSpec.major, tlbSpec.minor))
+		print(" >>> # Use these commands in Python code to auto generate .py support")
+		print(" >>> from win32com.client import gencache")
+		print(" >>> gencache.EnsureModule('%s', %s, %s, %s)" % (tlbSpec.clsid, tlbSpec.lcid, tlbSpec.major, tlbSpec.minor))
 
 class SimpleProgress(genpy.GeneratorProgress):
 	"""A simple progress class prints its output to stderr
@@ -189,7 +189,7 @@ def GetTypeLibsForSpec(arg):
 				except pythoncom.com_error:
 					pass
 			if len(tlbs)==0:
-				print "Could not locate a type library matching '%s'" % (arg)
+				print("Could not locate a type library matching '%s'" % (arg))
 			for spec in tlbs:
 				# Version numbers not always reliable if enumerated from registry.
 				# (as some libs use hex, other's dont.  Both examples from MS, of course.)
@@ -217,7 +217,7 @@ def GenerateFromTypeLibSpec(typelibInfo, file = None, verboseLevel = None, progr
 		verboseLevel = 0 # By default, we use no gui and no verbose level!
 
 	if bForDemand and file is not None:
-		raise RuntimeError, "You can only perform a demand-build when the output goes to the gen_py directory"
+		raise RuntimeError("You can only perform a demand-build when the output goes to the gen_py directory")
 	if type(typelibInfo)==type(()):
 		# Tuple
 		typelibCLSID, lcid, major, minor  = typelibInfo
@@ -266,15 +266,7 @@ def GenerateFromTypeLibSpec(typelibInfo, file = None, verboseLevel = None, progr
 				outputName = os.path.join(full_name, "__init__.py")
 			else:
 				outputName = full_name + ".py"
-			# generate to a temp file (so errors don't leave a 1/2
-			# generated file) and one which can handle unicode!
-			try:
-				os.unlink(outputName)
-			except os.error:
-				pass
-			encoding = 'mbcs' # could make this a param.
-			fileUse = codecs.open(outputName + ".temp", "wt",
-			                      encoding)
+			fileUse = open(outputName, "wt")
 			progress.LogBeginGenerate(outputName)
 		else:
 			fileUse = file
@@ -285,7 +277,6 @@ def GenerateFromTypeLibSpec(typelibInfo, file = None, verboseLevel = None, progr
 		
 		if file is None:
 			fileUse.close()
-			os.rename(outputName + ".temp", outputName)
 		
 		if bToGenDir:
 			progress.SetDescription("Importing module")
@@ -356,7 +347,7 @@ def main():
 			elif o=='-d':
 				bForDemand = not bForDemand
 
-	except (getopt.error, error), msg:
+	except (getopt.error, error) as msg:
 		sys.stderr.write (str(msg) + "\n")
 		usage()
 
