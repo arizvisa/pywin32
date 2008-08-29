@@ -30,7 +30,7 @@ _better_names = [
 ]
 def _fillmap():
     # Pull the VK_names from win32con
-    names = filter(lambda entry: entry[:3]=="VK_", win32con.__dict__.keys())
+    names = [entry for entry in list(win32con.__dict__.keys()) if entry[:3]=="VK_"]
     for name in names:
         n = name[3:].lower()
         val = getattr(win32con, name)
@@ -125,7 +125,7 @@ def make_key_name(scancode, flags):
 
 def _psc(char):
     sc = get_scan_code(char)
-    print "Char %s -> %d -> %s" % (`char`, sc, key_code_to_name.get(sc))
+    print("Char %s -> %d -> %s" % (repr(char), sc, key_code_to_name.get(sc)))
 
 def test1():
     for ch in """aA0/?[{}];:'"`~_-+=\\|,<.>/?""":
@@ -135,7 +135,7 @@ def test1():
 
 def _pkn(n):
     scancode, flags = parse_key_name(n)
-    print "%s -> %s,%s -> %s" % (n, scancode, flags, make_key_name(scancode, flags))
+    print("%s -> %s,%s -> %s" % (n, scancode, flags, make_key_name(scancode, flags)))
 
 def test2():
     _pkn("ctrl+alt-shift+x")

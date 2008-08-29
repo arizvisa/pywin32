@@ -1,5 +1,5 @@
 from pywin.mfc import dialog
-import document
+from . import document
 import win32ui
 import win32con
 import win32api
@@ -44,7 +44,6 @@ class EditorPropertyPage(dialog.PropertyPage):
 		self.AddDDX(win32ui.IDC_VSS_INTEGRATE, "bVSS")
 		self.AddDDX(win32ui.IDC_KEYBOARD_CONFIG, "Configs", "l")
 		self["Configs"] = pywin.scintilla.config.find_config_files()
-
 
 
 	def _AddEditorOption(self, idd, typ, optionName, defaultVal):

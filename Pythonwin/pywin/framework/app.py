@@ -12,7 +12,7 @@ import string
 import os
 from pywin.mfc import window, dialog, thread, afxres
 import traceback
-from pywin.framework import scriptutils
+from . import scriptutils
 
 ## NOTE: App and AppBuild should NOT be used - instead, you should contruct your
 ## APP class manually whenever you like (just ensure you leave these 2 params None!)
@@ -24,10 +24,10 @@ App = None	# default - if used, must end up a CApp derived class.
 
 # Helpers that should one day be removed!
 def AddIdleHandler(handler):
-	print "app.AddIdleHandler is deprecated - please use win32ui.GetApp().AddIdleHandler() instead."
+	print("app.AddIdleHandler is deprecated - please use win32ui.GetApp().AddIdleHandler() instead.")
 	return win32ui.GetApp().AddIdleHandler(handler)
 def DeleteIdleHandler(handler):
-	print "app.DeleteIdleHandler is deprecated - please use win32ui.GetApp().DeleteIdleHandler() instead."
+	print("app.DeleteIdleHandler is deprecated - please use win32ui.GetApp().DeleteIdleHandler() instead.")
 	return win32ui.GetApp().DeleteIdleHandler(handler)
 
 # Helper for writing a Window position by name, and later loading it.
@@ -168,9 +168,9 @@ class CApp(thread.WinApp):
 				try:
 					thisRet = handler(handler, count)
 				except:
-					print "Idle handler %s failed" % (`handler`)
+					print("Idle handler %s failed" % (repr(handler)))
 					traceback.print_exc()
-					print "Idle handler removed from list"
+					print("Idle handler removed from list")
 					try:
 						self.DeleteIdleHandler(handler)
 					except ValueError: # Item not in list.
@@ -205,7 +205,7 @@ class CApp(thread.WinApp):
 			if helpFile is None:
 				win32ui.MessageBox("The help file is not registered!")
 			else:
-				import help
+				from . import help
 				help.OpenHelpFile(helpFile, helpCmd)
 		except:
 			t, v, tb = sys.exc_info()
@@ -364,26 +364,30 @@ def Win32RawInput(prompt=None):
 	if prompt is None: prompt = ""
 	ret=dialog.GetSimpleInput(prompt)
 	if ret==None:
-		raise KeyboardInterrupt, "operation cancelled"
+		raise KeyboardInterrupt("operation cancelled")
 	return ret
 
 def Win32Input(prompt=None):
 	"Provide input() for gui apps"
-	return eval(raw_input(prompt))
+	return eval(input(prompt))
 
-sys.modules['__builtin__'].raw_input=Win32RawInput
-sys.modules['__builtin__'].input=Win32Input
+
+## sys.modules['__builtin__'].raw_input=Win32RawInput
+## sys.modules['__builtin__'].input=Win32Input
+import code
+code.InteractiveConsole.raw_input=Win32RawInput
+code.InteractiveConsole.input=Win32Input
 
 def HaveGoodGUI():
 	"""Returns true if we currently have a good gui available.
 	"""
-	return sys.modules.has_key("pywin.framework.startup")
+	return "pywin.framework.startup" in sys.modules
 
 def CreateDefaultGUI( appClass = None):
 	"""Creates a default GUI environment
 	"""
 	if appClass is None:
-		import intpyapp # Bring in the default app - could be param'd later.
+		from . import intpyapp # Bring in the default app - could be param'd later.
 		appClass = intpyapp.InteractivePythonApp
 	# Create and init the app.
 	appClass().InitInstance()

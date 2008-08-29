@@ -27,8 +27,7 @@ ID_EDIT_COPY_CODE = 0xe2002
 ID_EDIT_EXEC_CLIPBOARD = 0x2003
 
 trace=pywin.scintilla.formatter.trace
-
-import winout
+from . import winout
 
 import re
 # from IDLE.
@@ -228,7 +227,7 @@ class InteractiveFormatter(FormatterParent):
 		else:
 			styleStart = STYLE_INTERACTIVE_BANNER
 		self.scintilla.SCIStartStyling(start, 31)
-		self.style_buffer = array.array("c", chr(0)*len(stringVal))
+		self.style_buffer = array.array("b", (0,)*len(stringVal))
 		self.ColorizeInteractiveCode(stringVal, styleStart, stylePyStart)
 		self.scintilla.SCISetStylingEx(self.style_buffer)
 		self.style_buffer = None
@@ -254,7 +253,7 @@ class PythonwinInteractiveInterpreter(code.InteractiveInterpreter):
 		code.InteractiveInterpreter.showsyntaxerror(self, filename)
 	def runcode(self, code):
 		try:
-			exec code in self.globals, self.locals
+			exec(code, self.globals, self.locals)
 		except SystemExit:
 			raise
 		except:
@@ -304,12 +303,12 @@ class InteractiveCore:
 		line = self.GetLine(line)
 		if pywin.is_platform_unicode:
 			try:
-				line = unicode(line, pywin.default_scintilla_encoding).encode(pywin.default_platform_encoding)
+				line = str(line, pywin.default_scintilla_encoding).encode(pywin.default_platform_encoding)
 			except:
 				# We should fix the underlying problem rather than always masking errors
 				# so make it complain.
-				print "Unicode error converting", repr(line)
-				line = unicode(line, pywin.default_scintilla_encoding, "ignore").encode(pywin.default_platform_encoding)
+				print("Unicode error converting", repr(line))
+				line = str(line, pywin.default_scintilla_encoding, "ignore").encode(pywin.default_platform_encoding)
 
 		while line and line[-1] in ['\r', '\n']:
 			line = line[:-1]
@@ -330,7 +329,7 @@ class InteractiveCore:
 		if not bufLines:
 			return
 		terms = (["\n" + sys.ps2] * (len(bufLines)-1)) + ['']
-		for bufLine, term in map(None, bufLines, terms):
+		for bufLine, term in zip(bufLines, terms):
 			if bufLine.strip():
 				self.write( bufLine + term )
 		self.flush()
@@ -540,7 +539,7 @@ class InteractiveCore:
 		out_code=os.linesep.join(out_lines)
 		win32clipboard.OpenClipboard()
 		try:
-			win32clipboard.SetClipboardData(win32clipboard.CF_UNICODETEXT, unicode(out_code))
+			win32clipboard.SetClipboardData(win32clipboard.CF_UNICODETEXT, out_code)
 		finally:
 			win32clipboard.CloseClipboard()
 
@@ -555,7 +554,7 @@ class InteractiveCore:
 		code=code.replace('\r\n','\n')+'\n'
 		try:
 			o=compile(code, '<clipboard>', 'exec')
-			exec o in __main__.__dict__
+			exec(o, __main__.__dict__)
 		except:
 			traceback.print_exc()
 
@@ -605,7 +604,7 @@ class InteractiveCore:
 					lastActive = self.GetParentFrame().lastActive = None
 					win32ui.SetStatusText("The last active Window has been closed.")
 			except AttributeError:
-				print "Can't find the last active window!"
+				print("Can't find the last active window!")
 				lastActive = None
 			if lastActive is not None:
 				lastActive.MDIActivate()

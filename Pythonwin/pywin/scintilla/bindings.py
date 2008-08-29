@@ -1,10 +1,11 @@
-import IDLEenvironment
+from . import IDLEenvironment
 import string
 import win32ui
 import win32api
 import win32con
-import keycodes
+from . import keycodes
 import sys
+import traceback
 
 HANDLER_ARGS_GUESS=0
 HANDLER_ARGS_NATIVE=1
@@ -49,7 +50,7 @@ class BindingsManager:
 		self.keymap = {}
 
 	def complete_configure(self):
-		for id in command_to_events.keys():
+		for id in list(command_to_events.keys()):
 			self.parent_view.HookCommand(self._OnCommand, id)
 
 	def close(self):
@@ -60,7 +61,7 @@ class BindingsManager:
 			win32ui.SetStatusText(problem, 1)
 		except win32ui.error:
 			# No status bar!
-			print problem
+			print(problem)
 
 	def update_keymap(self, keymap):
 		self.keymap.update(keymap)
@@ -80,7 +81,7 @@ class BindingsManager:
 		id = event_to_commands.get(event)
 		if id is None:
 			# See if we even have an event of that name!?
-			if not self.bindings.has_key(event):
+			if event not in self.bindings:
 				return None
 			id = self.bind_command(event)
 		return id
@@ -138,7 +139,7 @@ class BindingsManager:
 				args = self.parent_view.idle, event_param
 			else:
 				args = (event_param,)
-			rc = apply(binding.handler, args)
+			rc = binding.handler(*args)
 			if handler_args_type==HANDLER_ARGS_IDLE:
 				# Convert to our return code.
 				if rc in [None, "break"]:
@@ -146,10 +147,10 @@ class BindingsManager:
 				else:
 					rc = 1
 		except:
-			import traceback
+			traceback.print_exc(chain=False)
 			message = "Firing event '%s' failed." % event
-			print message
-			traceback.print_exc()
+			print(message)
+			
 			self.report_error(message)
 			rc = 1 # Let any default handlers have a go!
 		return rc

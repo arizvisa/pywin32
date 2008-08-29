@@ -100,7 +100,7 @@ def _find_constructor(class_ob):
     # Given a class object, return a function object used for the
     # constructor (ie, __init__() ) or None if we can't find one.
     try:
-        return class_ob.__init__.im_func
+        return class_ob.__init__.__func__
     except AttributeError:
         for base in class_ob.__bases__:
             rc = _find_constructor(base)
@@ -112,7 +112,7 @@ def get_arg_text(ob):
     argText = ""
     if ob is not None:
         argOffset = 0
-        if type(ob)==types.ClassType:
+        if type(ob)==type:
             # Look for the highest __init__ in the class chain.
             fob = _find_constructor(ob)
             if fob is None:
@@ -122,21 +122,21 @@ def get_arg_text(ob):
         elif type(ob)==types.MethodType:
             # bit of a hack for methods - turn it into a function
             # but we drop the "self" param.
-            fob = ob.im_func
+            fob = ob.__func__
             argOffset = 1
         else:
             fob = ob
         # Try and build one for Python defined functions
         if type(fob) in [types.FunctionType, types.LambdaType]:
             try:
-                realArgs = fob.func_code.co_varnames[argOffset:fob.func_code.co_argcount]
-                defaults = fob.func_defaults or []
-                defaults = list(map(lambda name: "=%s" % name, defaults))
+                realArgs = fob.__code__.co_varnames[argOffset:fob.__code__.co_argcount]
+                defaults = fob.__defaults__ or []
+                defaults = list(["=%s" % name for name in defaults])
                 defaults = [""] * (len(realArgs)-len(defaults)) + defaults
-                items = map(lambda arg, dflt: arg+dflt, realArgs, defaults)
-                if fob.func_code.co_flags & 0x4:
+                items = list(map(lambda arg, dflt: arg+dflt, realArgs, defaults))
+                if fob.__code__.co_flags & 0x4:
                     items.append("...")
-                if fob.func_code.co_flags & 0x8:
+                if fob.__code__.co_flags & 0x8:
                     items.append("***")
                 argText = ", ".join(items)
                 argText = "(%s)" % argText
@@ -187,8 +187,8 @@ if __name__=='__main__':
             expected = t.__doc__ + "\n" + t.__doc__
             if get_arg_text(t) != expected:
                 failed.append(t)
-                print "%s - expected %s, but got %s" % (t, `expected`, `get_arg_text(t)`)
-        print "%d of %d tests failed" % (len(failed), len(tests))
+                print("%s - expected %s, but got %s" % (t, repr(expected), repr(get_arg_text(t))))
+        print("%d of %d tests failed" % (len(failed), len(tests)))
 
     tc = TC()
     tests = t1, t2, t3, t4, t5, t6, \

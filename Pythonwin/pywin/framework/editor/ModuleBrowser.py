@@ -18,12 +18,12 @@ class HierListCLBRModule(hierlist.HierListItem):
         return self.modName
     def GetSubList(self):
         ret = []
-        for item in self.clbrdata.values():
+        for item in list(self.clbrdata.values()):
             if item.__class__ != pyclbr.Class: # ie, it is a pyclbr Function instance (only introduced post 1.5.2)
                 ret.append(HierListCLBRFunction( item ) )
             else:
                 ret.append(HierListCLBRClass( item) )
-        ret.sort()
+        ## ret.sort() - Py3k will not compare objects of different types
         return ret
     def IsExpandable(self):
         return 1
@@ -76,7 +76,7 @@ class HierListCLBRClass(HierListCLBRItem):
             r1.append(HierListCLBRClass(c, " (Parent class)"))
         r1.sort()
         r2=[]
-        for meth, lineno in self.methods.items():
+        for meth, lineno in list(self.methods.items()):
             r2.append(HierListCLBRMethod(meth, self.file, lineno))
         r2.sort()
         return r1+r2

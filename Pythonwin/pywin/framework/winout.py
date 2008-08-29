@@ -23,9 +23,9 @@
 import sys, string, re
 from pywin.mfc import docview
 from pywin.framework import app, window
-from pywintypes import UnicodeType
+## from pywintypes import UnicodeType
 import win32ui, win32api, win32con
-import Queue
+import queue
 
 debug = lambda msg: None
 
@@ -108,7 +108,7 @@ class WindowOutputViewImpl:
 		for appendParams in paramsList:
 			if type(appendParams)!=type(()):
 				appendParams = (appendParams,)
-			apply(menu.AppendMenu, appendParams)
+			menu.AppendMenu(*appendParams)
 		menu.TrackPopupMenu(params[5]) # track at mouse position.
 		return 0
 
@@ -117,7 +117,7 @@ class WindowOutputViewImpl:
 	# Returns TRUE if the current line is an error message line, and will
 	# jump to it.  FALSE if no error (and no action taken)
 	def HandleSpecialLine(self):
-		import scriptutils
+		from . import scriptutils
 		line = self.GetLine()
 		if line[:11]=="com_error: ":
 			# An OLE Exception - pull apart the exception
@@ -126,10 +126,10 @@ class WindowOutputViewImpl:
 				import win32api, win32con
 				det = eval(line[line.find(":")+1:].strip())
 				win32ui.SetStatusText("Opening help file on OLE error...");
-				import help
+				from . import help
 				help.OpenHelpFile(det[2][3],win32con.HELP_CONTEXT, det[2][4])
 				return 1
-			except win32api.error, details:
+			except win32api.error as details:
 				try:
 					msg = details[2]
 				except:
@@ -217,7 +217,7 @@ class WindowOutputViewRTF(docview.RichEditView, WindowOutputViewImpl):
 			item = self.template.killBuffer[0]
 			self.template.killBuffer.remove(item)
 			if bytes < len(item):
-				print "Warning - output buffer not big enough!"
+				print("Warning - output buffer not big enough!")
 			return item
 		except IndexError:
 			return None
@@ -321,7 +321,7 @@ class WindowOutput(docview.DocTemplate):
 			self.iniSizeSection = None
 			self.defSize=defSize
 		self.currentView = None
-		self.outputQueue = Queue.Queue(-1)
+		self.outputQueue = queue.Queue(-1)
 		self.mainThreadId = win32api.GetCurrentThreadId()
 		self.idleHandlerSet = 0
 		self.SetIdleHandler()
@@ -401,8 +401,8 @@ class WindowOutput(docview.DocTemplate):
 			self.interruptCount = self.interruptCount + 1
 			if self.interruptCount > 1:
 				# Drop the queue quickly as the user is already annoyed :-)
-				self.outputQueue = Queue.Queue(-1)
-				print "Interrupted."
+				self.outputQueue = queue.Queue(-1)
+				print("Interrupted.")
 				bEmpty = 1
 			else:
 				raise # re-raise the error so the users exception filters up.
@@ -427,7 +427,7 @@ class WindowOutput(docview.DocTemplate):
 				return 1
 		return 0
 
-	def QueueFlush(self, max = sys.maxint):
+	def QueueFlush(self, max = sys.maxsize):
 		# Returns true if the queue is empty after the flush
 #		debug("Queueflush - %d, %d\n" % (max, self.outputQueue.qsize()))
 		if self.bCreating: return 1
@@ -436,17 +436,17 @@ class WindowOutput(docview.DocTemplate):
 		while max > 0:
 			try:
 				item = self.outputQueue.get_nowait()
-				if is_platform_unicode:
-					# Note is_platform_unicode is never true any more!
-					if not isinstance(item, UnicodeType):
-						item = unicode(item, default_platform_encoding)
-					item = item.encode(default_scintilla_encoding) # What scintilla uses.
-				else:
-					# try and display using mbcs encoding
-					if isinstance(item, UnicodeType):
-						item = item.encode("mbcs")
+##				if is_platform_unicode:
+##					# Note is_platform_unicode is never true any more!
+##					if not isinstance(item, UnicodeType):
+##						item = str(item, default_platform_encoding)
+##					item = item.encode(default_scintilla_encoding) # What scintilla uses.
+##				else:
+##					# try and display using mbcs encoding
+##					if isinstance(item, UnicodeType):
+##						item = item.encode("mbcs")
 				items.append(item)
-			except Queue.Empty:
+			except queue.Empty:
 				rc = 1
 				break
 			max = max - 1
@@ -497,7 +497,7 @@ class WindowOutput(docview.DocTemplate):
 
 def RTFWindowOutput(*args, **kw):
 	kw['makeView'] = WindowOutputViewRTF
-	return apply( WindowOutput, args, kw )
+	return WindowOutput(*args, **kw)
 
 
 def thread_test(o):
@@ -508,10 +508,10 @@ def thread_test(o):
 def test():
 	w = WindowOutput(queueing=flags.WQ_IDLE)
 	w.write("First bit of text\n")
-	import thread
+	import _thread
 	for i in range(5):
 		w.write("Hello from the main thread\n")
-		thread.start_new(thread_test, (w,))
+		_thread.start_new(thread_test, (w,))
 	for i in range(2):
 		w.write("Hello from the main thread\n")
 		win32api.Sleep(50)

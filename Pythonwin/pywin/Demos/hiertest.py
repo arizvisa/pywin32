@@ -16,7 +16,7 @@ class DirHierList(hierlist.HierList):
 		return os.path.basename(item)
 	def GetSubList(self, item):
 		if os.path.isdir(item):
-			ret = map(lambda path, base=item: os.path.join(base, path), os.listdir(item))
+			ret = [os.path.join(item, fname) for fname in os.listdir(item)]
 		else:
 			ret = None
 		return ret
@@ -79,7 +79,7 @@ class HLIFileDir(hierlist.HierListItem):
 	def GetText(self):
 		try:
 			return "%-20s %d bytes" % (os.path.basename(self.filename), os.stat(self.filename)[6])
-		except os.error, details:
+		except os.error as details:
 			return "%-20s - %s" % (self.filename, details[1])
 
 	def IsExpandable(self):

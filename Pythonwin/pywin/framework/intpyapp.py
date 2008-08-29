@@ -6,11 +6,11 @@ import win32ui
 import __main__
 import sys
 import string
-import app
+from . import app
 import traceback
 from pywin.mfc import window, afxres, dialog
 import commctrl
-import dbgcommands
+from . import dbgcommands
 
 lastLocateFileName = ".py" # used in the "File/Locate" dialog...
 
@@ -46,7 +46,7 @@ class MainFrame(app.MainFrame):
 
 		# And a "Tools" menu on the main frame.
 		menu = self.GetMenu()
-		import toolmenu
+		from . import toolmenu
 		toolmenu.SetToolsMenu(menu, 2)
 		# And fix the "Help" menu on the main frame
 		from pywin.framework import help
@@ -127,8 +127,9 @@ class InteractivePythonApp(app.CApp):
 		# Use DDE to connect to an existing instance
 		# Return None if no existing instance
 		try:
-			import intpydde
+			from . import intpydde
 		except ImportError:
+			traceback.print_exc()
 			# No dde support!
 			return None
 		conv = intpydde.CreateConversation(self.ddeServer)
@@ -143,7 +144,7 @@ class InteractivePythonApp(app.CApp):
 		# Returns TRUE if we have pumped the arguments to our
 		# remote DDE app, and we should terminate.
 		try:
-			import intpydde
+			from . import intpydde
 		except ImportError:
 			self.ddeServer = None
 			intpydde = None
@@ -176,9 +177,7 @@ class InteractivePythonApp(app.CApp):
 
 		# Allow Pythonwin to host OCX controls.
 		win32ui.EnableControlContainer()
-
-		# Display the interactive window if the user wants it.
-		import interact
+		from . import interact
 		interact.CreateInteractiveWindowUserPreference()
 
 		# Load the modules we use internally.
@@ -205,7 +204,7 @@ class InteractivePythonApp(app.CApp):
 	def ExitInstance(self):
 		win32ui.DestroyDebuggerThread()
 		try:
-			import interact
+			from . import interact
 			interact.DestroyInteractiveWindow()
 		except:
 			pass
@@ -237,28 +236,28 @@ class InteractivePythonApp(app.CApp):
 				argStart = 1
 				argType = args[0]
 			if argStart >= len(args):
-				raise TypeError, "The command line requires an additional arg."
+				raise TypeError("The command line requires an additional arg.")
 			if argType=="/edit":
 				# Load up the default application.
 				if dde:
 					fname = win32api.GetFullPathName(args[argStart])
-					dde.Exec("win32ui.GetApp().OpenDocumentFile(%s)" % (`fname`))
+					dde.Exec("win32ui.GetApp().OpenDocumentFile(%s)" % (repr(fname)))
 				else:
 					win32ui.GetApp().OpenDocumentFile(args[argStart])
 			elif argType=="/rundlg":
 				if dde:
 					dde.Exec("import scriptutils;scriptutils.RunScript('%s', '%s', 1)" % (args[argStart], ' '.join(args[argStart+1:])))
 				else:
-					import scriptutils
+					from . import scriptutils
 					scriptutils.RunScript(args[argStart], ' '.join(args[argStart+1:]))
 			elif argType=="/run":
 				if dde:
 					dde.Exec("import scriptutils;scriptutils.RunScript('%s', '%s', 0)" % (args[argStart], ' '.join(args[argStart+1:])))
 				else:
-					import scriptutils
+					from . import scriptutils
 					scriptutils.RunScript(args[argStart], ' '.join(args[argStart+1:]), 0)
 			elif argType=="/app":
-				raise RuntimeError, "/app only supported for new instances of Pythonwin.exe"
+				raise RuntimeError("/app only supported for new instances of Pythonwin.exe")
 			elif argType=='/new': # Allow a new instance of Pythonwin
 				return 1
 			elif argType=='/dde': # Send arbitary command
@@ -267,12 +266,12 @@ class InteractivePythonApp(app.CApp):
 				else:
 					win32ui.MessageBox("The /dde command can only be used\r\nwhen Pythonwin is already running")
 			else:
-				raise TypeError, "Command line arguments not recognised"
+				raise TypeError("Command line arguments not recognised")
 		except:
 			typ, val, tb = sys.exc_info()
-			print "There was an error processing the command line args"
+			print("There was an error processing the command line args")
 			traceback.print_exception(typ, val, tb, None, sys.stdout)
-			win32ui.OutputDebug("There was a problem with the command line args - %s: %s" % (`typ`,`val`))
+			win32ui.OutputDebug("There was a problem with the command line args - %s: %s" % (repr(typ),repr(val)))
 			tb = None # Prevent a cycle
 
 
@@ -291,23 +290,24 @@ class InteractivePythonApp(app.CApp):
 		modules = moduleNames.split(",")
 		for module in modules:
 			try:
-				exec "import "+module
+				exec("from . import "+module)
 			except: # Catch em all, else the app itself dies! 'ImportError:
 				traceback.print_exc()
 				msg = 'Startup import of user module "%s" failed' % module
-				print msg
+				print(msg)
 				win32ui.MessageBox(msg)
 
 	#
 	# DDE Callback
 	#
 	def OnDDECommand(self, command):
-#		print "DDE Executing", `command`
+		print ("DDE Executing", repr(command))
 		try:
-			exec command + "\n"
+			exec(command + "\n")
 		except:
-			print "ERROR executing DDE command: ", command
-			traceback.print_exc()
+			t,v,tb=sys.exc_info()
+			print("ERROR executing DDE command: ", command)
+			traceback.print_exception(t,v,tb)
 			raise
 
 	#
@@ -332,27 +332,27 @@ class InteractivePythonApp(app.CApp):
 
 	def OnFileImport( self, id, code ):
 		" Called when a FileImport message is received. Import the current or specified file"
-		import scriptutils
+		from . import scriptutils
 		scriptutils.ImportFile()
 
 	def OnFileCheck( self, id, code ):
 		" Called when a FileCheck message is received. Check the current file."
-		import scriptutils
+		from . import scriptutils
 		scriptutils.CheckFile()
 
 	def OnUpdateFileCheck(self, cmdui):
-		import scriptutils
+		from . import scriptutils
 		cmdui.Enable( scriptutils.GetActiveFileName(0) is not None )
 
 	def OnFileRun( self, id, code ):
 		" Called when a FileRun message is received. "
-		import scriptutils
+		from . import scriptutils
 		showDlg = win32api.GetKeyState(win32con.VK_SHIFT) >= 0
 		scriptutils.RunScript(None, None, showDlg)
 
 	def OnFileLocate( self, id, code ):
 		from pywin.mfc import dialog
-		import scriptutils
+		from . import scriptutils
 		import os
 		global lastLocateFileName # save the new version away for next time...
 
@@ -381,8 +381,7 @@ class InteractivePythonApp(app.CApp):
 		# Add property pages we know about that need manual work.
 		from pywin.dialogs import ideoptions
 		sheet.AddPage( ideoptions.OptionsPropPage() )
-
-		import toolmenu
+		from . import toolmenu
 		sheet.AddPage( toolmenu.ToolMenuPropPage() )
 
 		# Get other dynamic pages from templates.
@@ -415,7 +414,7 @@ class InteractivePythonApp(app.CApp):
 
 	def OnInteractiveWindow(self, id, code):
 		# toggle the existing state.
-		import interact
+		from . import interact
 		interact.ToggleInteractiveWindow()
 
 	def OnUpdateInteractiveWindow(self, cmdui):
@@ -430,8 +429,8 @@ class InteractivePythonApp(app.CApp):
 	def OnFileSaveAll(self, id, code):
 		# Only attempt to save editor documents.
 		from pywin.framework.editor import editorTemplate
-		docs = filter(lambda doc: doc.IsModified() and doc.GetPathName(), editorTemplate.GetDocumentList())
-		map(lambda doc: doc.OnSaveDocument(doc.GetPathName()), docs)
+		docs = [doc for doc in editorTemplate.GetDocumentList() if doc.IsModified() and doc.GetPathName()]
+		list(map(lambda doc: doc.OnSaveDocument(doc.GetPathName()), docs))
 		win32ui.SetStatusText("%d documents saved" % len(docs), 1)
 
 	def OnViewToolbarDbg(self, id, code):
@@ -443,7 +442,7 @@ class InteractivePythonApp(app.CApp):
 		cmdui.Enable(1)
 
 	def OnHelpIndex( self, id, code ):
-		import help
+		from . import help
 		help.SelectAndRunHelpFile()
 
 # As per the comments in app.py, this use is depreciated.

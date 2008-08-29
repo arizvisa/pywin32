@@ -46,7 +46,7 @@ class GenericFrame(window.MDIChildWnd):
 		if flags & commctrl.TTF_IDISHWND:
 			return # Not handled
 		if (idFrom==win32ui.ID_APP_ABOUT):
-			return 0, ("It works!", idFrom, code)
+			return 0, ("It Works - in unicode yet!", idFrom, code)
 		return None # not handled.
 			
 	def GetMessageString(self, id):
@@ -56,13 +56,13 @@ class GenericFrame(window.MDIChildWnd):
 			return self._obj_.GetMessageString(id)
 
 	def OnSize (self, params):
-		print 'OnSize called with ', params
+		print('OnSize called with ', params)
 
 	def OnNext (self, id, cmd):
-		print 'OnNext called'
+		print('OnNext called')
 	
 	def OnPrevious (self, id, cmd):
-		print 'OnPrevious called'
+		print('OnPrevious called')
 	
 msg = """\
 This toolbar was dynamically created.\r

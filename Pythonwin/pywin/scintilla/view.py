@@ -1,10 +1,8 @@
-# A general purpose MFC CCtrlView view that uses Scintilla.
-
-import control
-import IDLEenvironment # IDLE emulation.
+from . import control
+from . import IDLEenvironment # IDLE emulation.
 from pywin.mfc import docview
 from pywin.mfc import dialog
-from scintillacon import *
+from .scintillacon import *
 import win32con
 import win32ui
 import afxres
@@ -13,8 +11,8 @@ import array
 import sys
 import types
 import __main__ # for attribute lookup
-import bindings
-import keycodes
+from . import bindings
+from . import keycodes
 import struct
 import re
 import os
@@ -138,7 +136,7 @@ class CScintillaView(docview.CtrlView, control.CScintillaColorEditInterface):
 
 	def _MakeColorizer(self):
 		ext = os.path.splitext(self.GetDocument().GetPathName())[1]
-		import formatter
+		from . import formatter
 		return formatter.BuiltinPythonSourceFormatter(self, ext)
 
 	
@@ -283,7 +281,7 @@ class CScintillaView(docview.CtrlView, control.CScintillaColorEditInterface):
 			cmdid = self.bindings.get_command_id(event)
 			if cmdid is None:
 				# No event of that name - no point displaying it.
-				print 'View.AppendMenu(): Unknown event "%s" specified for menu text "%s" - ignored' % (event, text)
+				print('View.AppendMenu(): Unknown event "%s" specified for menu text "%s" - ignored' % (event, text))
 				return 
 			keyname = configManager.get_key_binding( event, self._GetSubConfigNames() )
 			if keyname is not None:
@@ -349,13 +347,13 @@ class CScintillaView(docview.CtrlView, control.CScintillaColorEditInterface):
 		cmdui.Enable(c is not None)
 
 	def OnCmdEditFind(self, cmd, code):
-		import find
+		from . import find
 		find.ShowFindDialog()
 	def OnCmdEditRepeat(self, cmd, code):
-		import find
+		from . import find
 		find.FindNext()
 	def OnCmdEditReplace(self, cmd, code):
-		import find
+		from . import find
 		find.ShowReplaceDialog()
 
 	def OnCmdFileLocate(self, cmd, id):
@@ -378,7 +376,7 @@ class CScintillaView(docview.CtrlView, control.CScintillaColorEditInterface):
 
 	def OnCmdGotoLine(self, cmd, id):
 		try:
-			lineNo = int(raw_input("Enter Line Number"))-1
+			lineNo = int(input("Enter Line Number"))-1
 		except (ValueError, KeyboardInterrupt):
 			return 0
 		self.SCIEnsureVisible(lineNo)
@@ -389,8 +387,8 @@ class CScintillaView(docview.CtrlView, control.CScintillaColorEditInterface):
 		doc = self.GetDocument()
 		s = self.GetTextRange()
 		if is_platform_unicode:
-			s = unicode(s,"utf-8").encode("mbcs")
-		f  = open(filename, 'wb')
+			s = str(s,"utf-8").encode("mbcs")
+		f  = open(filename, 'w')
 		f.write(s)
 		f.close()
 		doc.SetModifiedFlag(0)
@@ -432,23 +430,23 @@ class CScintillaView(docview.CtrlView, control.CScintillaColorEditInterface):
 				# The object might be a pure COM dynamic dispatch with typelib support - lets see if we can get its props.
 				if hasattr(ob, "_oleobj_"):
 					try:
-						for iTI in xrange(0,ob._oleobj_.GetTypeInfoCount()):
+						for iTI in range(0,ob._oleobj_.GetTypeInfoCount()):
 							typeInfo = ob._oleobj_.GetTypeInfo(iTI)
 							typeAttr = typeInfo.GetTypeAttr()
-							for iFun in xrange(0,typeAttr.cFuncs):
+							for iFun in range(0,typeAttr.cFuncs):
 								funDesc = typeInfo.GetFuncDesc(iFun)
 								funName = typeInfo.GetNames(funDesc.memid)[0]
-								if not items_dict.has_key(funName):
+								if funName not in items_dict:
 									items_dict[funName] = None
 					except:
 						pass
 			except:
-				win32ui.SetStatusText("Error attempting to get object attributes - %s" % (`sys.exc_info()[0]`,))
+				win32ui.SetStatusText("Error attempting to get object attributes - %s" % (repr(sys.exc_info()[0]),))
 
-		# ensure all keys are strings.		
-		items = map(str, items_dict.keys())
+		# ensure all keys are strings.
+		items = [str(k) for k in items_dict.keys()]
 		# All names that start with "_" go!
-		items = filter(lambda word: word[0]!='_', items)
+		items = [k for k in items if not k.startswith('_')]
 
 		if not items:
 			# Heuristics a-la AutoExpand
@@ -465,20 +463,20 @@ class CScintillaView(docview.CtrlView, control.CScintillaColorEditInterface):
 			endpos = self.LineIndex(maxline)
 			text = self.GetTextRange(self.LineIndex(minline),endpos)
 			try:
-				list = re.findall(r"\b"+left+"\.\w+",text)
+				l = re.findall(r"\b"+left+"\.\w+",text)
 			except re.error:
 				# parens etc may make an invalid RE, but this code wouldnt
 				# benefit even if the RE did work :-)
-				list = []
+				l = []
 			prefix = len(left)+1
 			unique = {}
-			for li in list:
+			for li in l:
 				unique[li[prefix:]] = 1
 			# Assuming traditional usage of self...
 			if curclass and left=="self":
 				self._UpdateWithClassMethods(unique,curclass)
 
-			items = filter(lambda word: word[:2]!='__' or word[-2:]!='__', unique.keys())
+			items = [word for word in unique.keys() if word[:2]!='__' or word[-2:]!='__']
 			# Ignore the word currently to the right of the dot - probably a red-herring.
 			try:
 				items.remove(right[1:])
@@ -529,7 +527,7 @@ class CScintillaView(docview.CtrlView, control.CScintillaColorEditInterface):
 		curline = self.LineFromChar(pos)
 		curclass = None
 		# Find out which class we are in
-		for item in clbrdata.values():
+		for item in list(clbrdata.values()):
 			if item.module==curmodule:
 				item_lineno = item.lineno - 1 # Scintilla counts lines from 0, whereas pyclbr - from 1
 				if minline < item_lineno <= curline:
@@ -652,9 +650,9 @@ class CScintillaView(docview.CtrlView, control.CScintillaColorEditInterface):
 		hdcRender = dc.GetHandleOutput()
 		hdcFormat = dc.GetHandleAttrib()
 		fr = struct.pack(fmt, hdcRender, hdcFormat, rc[0], rc[1], rc[2], rc[3], rc[0], rc[1], rc[2], rc[3], pageStart, lengthDoc)
-		frBuff = array.array('c', fr)
-		addressFrBuff = frBuff.buffer_info()[0]
-		nextPageStart = self.SendScintilla(EM_FORMATRANGE, draw, addressFrBuff)
+		## frBuff = array......array('b', fr)
+		## addressFrBuff = frBuff.buffer_info()[0]
+		nextPageStart = self.SendScintilla(EM_FORMATRANGE, draw, fr)
 		return nextPageStart
 
 	def OnPrint(self, dc, pInfo):
@@ -683,7 +681,7 @@ class CScintillaView(docview.CtrlView, control.CScintillaColorEditInterface):
 def LoadConfiguration():
 	global configManager
 	# Bit of a hack I dont kow what to do about?
-	from config import ConfigManager
+	from .config import ConfigManager
 	configName = rc = win32ui.GetProfileVal("Editor", "Keyboard Config", "default")
 	configManager = ConfigManager(configName)
 	if configManager.last_error:

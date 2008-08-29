@@ -18,7 +18,7 @@ win32ui.DoWaitCursor(1)
 serialModule = gencache.EnsureModule("{648A5603-2C6E-101B-82B6-000000000014}", 0, 1, 1)
 win32ui.DoWaitCursor(0)
 if serialModule is None:
-	raise ImportError, "MS COMM Control does not appear to be installed on the PC"
+	raise ImportError("MS COMM Control does not appear to be installed on the PC")
 
 
 def MakeDlgTemplate():
@@ -47,7 +47,7 @@ class MySerialControl(activex.Control, serialModule.MSComm):
 
 class TestSerDialog(dialog.Dialog):
 	def __init__(self, *args):
-		apply( dialog.Dialog.__init__, (self,)+args )
+		dialog.Dialog.__init__(*(self,)+args)
 		self.olectl = None
 	def OnComm(self):
 		event = self.olectl.CommEvent
@@ -78,8 +78,8 @@ class TestSerDialog(dialog.Dialog):
 			self.olectl.RThreshold = 1
 			try:
 				self.olectl.PortOpen = 1
-			except pythoncom.com_error, details:
-				print "Could not open the specified serial port - %s" % (details[2][2])
+			except pythoncom.com_error as details:
+				print("Could not open the specified serial port - %s" % (details[2][2]))
 				self.EndDialog(win32con.IDCANCEL)
 		return rc
 
@@ -87,8 +87,8 @@ class TestSerDialog(dialog.Dialog):
 		if self.olectl:
 			try:
 				self.olectl.PortOpen = 0
-			except pythoncom.com_error, details:
-				print "Error closing port - %s" % (details[2][2])
+			except pythoncom.com_error as details:
+				print("Error closing port - %s" % (details[2][2]))
 		return dialog.Dialog.OnDestroy(self, msg)
 
 def test():
@@ -96,6 +96,6 @@ def test():
     d.DoModal()
 
 if __name__ == "__main__":
-	import demoutils
+	from . import demoutils
 	if demoutils.NeedGoodGUI():
 		test()

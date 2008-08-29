@@ -6,8 +6,8 @@ try:
 	from OpenGL.GL import *
 	from OpenGL.GLU import *
 except ImportError:
-	print "The OpenGL extensions do not appear to be installed."
-	print "This Pythonwin demo can not run"
+	print("The OpenGL extensions do not appear to be installed.")
+	print("This Pythonwin demo can not run")
 	sys.exit(1)
 
 import win32con
@@ -38,7 +38,7 @@ PFD_DOUBLEBUFFER_DONTCARE =  0x40000000
 PFD_STEREO_DONTCARE =        0x80000000
 
 
-threeto8 = [0, 0111>>1, 0222>>1, 0333>>1, 0444>>1, 0555>>1, 0666>>1, 0377]
+threeto8 = [0, 0o111>>1, 0o222>>1, 0o333>>1, 0o444>>1, 0o555>>1, 0o666>>1, 0o377]
 twoto8 = [0, 0x55, 0xaa, 0xff]
 oneto8 = [0, 255]
 

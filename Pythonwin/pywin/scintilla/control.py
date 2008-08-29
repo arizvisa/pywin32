@@ -5,6 +5,7 @@
 # plus many Scintilla specific features (eg control.SCIAddStyledText())
 
 from pywin.mfc import window
+from pywin import default_scintilla_encoding
 import win32con
 import win32ui
 import win32api
@@ -12,7 +13,7 @@ import array
 import struct
 import string
 import os
-from scintillacon import *
+from .scintillacon import *
 
 # Load Scintilla.dll to get access to the control.
 # We expect to find this in the same directory as win32ui.pyd
@@ -57,19 +58,20 @@ class ScintillaControlInterface:
 									 margin = margin)
 
 	def SCIAddText(self, text):
-		self.SendMessage(SCI_ADDTEXT, buffer(text))
+		self.SendMessage(SCI_ADDTEXT, text.encode(default_scintilla_encoding))
 	def SCIAddStyledText(self, text, style = None):
 		# If style is None, text is assumed to be a "native" Scintilla buffer.
 		# If style is specified, text is a normal string, and the style is
 		# assumed to apply to the entire string.
 		if style is not None:
-			text = map(lambda char, style=style: char+chr(style), text)
+			text = list(map(lambda char, style=style: char+chr(style), text))
 			text = ''.join(text)
-		self.SendMessage(SCI_ADDSTYLEDTEXT, buffer(text))
+		self.SendMessage(SCI_ADDSTYLEDTEXT, text.encode(default_scintilla_encoding))
 	def SCIInsertText(self, text, pos=-1):
-		sma = array.array('c', text+"\0")
-		(a,l) = sma.buffer_info()
-		self.SendScintilla(SCI_INSERTTEXT, pos, a)
+		## sma = array.array('u', text+"\0")
+		## (a,l) = sma.buffer_info()
+		buff=(text+'\0').encode(default_scintilla_encoding)
+		self.SendScintilla(SCI_INSERTTEXT, pos, buff)
 	def SCISetSavePoint(self):
 		self.SendScintilla(SCI_SETSAVEPOINT)
 	def SCISetUndoCollection(self, collectFlag):
@@ -106,9 +108,9 @@ class ScintillaControlInterface:
 	def SCIStyleSetEOLFilled(self, num, v):
 		return self.SendScintilla(SCI_STYLESETEOLFILLED, num, v)
 	def SCIStyleSetFont(self, num, name, characterset=0):
-		buff = array.array('c', name + "\0")
-		addressBuffer = buff.buffer_info()[0]
-		self.SendScintilla(SCI_STYLESETFONT, num, addressBuffer)
+		buff = (name + "\0").encode(default_scintilla_encoding)
+		## addressBuffer = buff.buffer_info()[0]
+		self.SendScintilla(SCI_STYLESETFONT, num, buff)
 		self.SendScintilla(SCI_STYLESETCHARACTERSET, num, characterset)
 	def SCIStyleSetBold(self, num, bBold):
 		self.SendScintilla(SCI_STYLESETBOLD, num, bBold)
@@ -179,9 +181,8 @@ class ScintillaControlInterface:
 	def SCIAutoCShow(self, text):
 		if type(text) in [type([]), type(())]:
 			text = ' '.join(text)
-		buff = array.array('c', text + "\0")
-		addressBuffer = buff.buffer_info()[0]
-		return self.SendScintilla(SCI_AUTOCSHOW, 0, addressBuffer)
+		buff = (text + "\0").encode(default_scintilla_encoding)
+		return self.SendScintilla(SCI_AUTOCSHOW, 0, buff)
 	def SCIAutoCCancel(self):
 		self.SendScintilla(SCI_AUTOCCANCEL)
 	def SCIAutoCActive(self):
@@ -189,9 +190,8 @@ class ScintillaControlInterface:
 	def SCIAutoCComplete(self):
 		return self.SendScintilla(SCI_AUTOCCOMPLETE)
 	def SCIAutoCStops(self, stops):
-		buff = array.array('c', stops + "\0")
-		addressBuffer = buff.buffer_info()[0]
-		self.SendScintilla(SCI_AUTOCSTOPS, 0, addressBuffer)
+		buff = (stops + "\0").encode(default_scintilla_encoding)
+		self.SendScintilla(SCI_AUTOCSTOPS, 0, buff)
 	def SCIAutoCSetAutoHide(self, hide):
 		self.SendScintilla(SCI_AUTOCSETAUTOHIDE, hide)
 	def SCIAutoCSetFillups(self, fillups):
@@ -199,14 +199,16 @@ class ScintillaControlInterface:
 	# Call tips
 	def SCICallTipShow(self, text, pos=-1):
 		if pos==-1: pos = self.GetSel()[0]
-		if isinstance(text, unicode):
+		"""
+		if isinstance(text, str):
 			# I'm really not sure what the correct encoding
 			# to use is - but it has gotta be better than total
 			# failure due to the array module
 			text = text.encode("mbcs")
-		buff = array.array('c', text + "\0")
-		addressBuffer = buff.buffer_info()[0]
-		self.SendScintilla(SCI_CALLTIPSHOW, pos, addressBuffer)
+		"""
+		buff = (text + "\0").encode(default_scintilla_encoding)
+		## addressBuffer = buff.buffer_info()[0]
+		self.SendScintilla(SCI_CALLTIPSHOW, pos, buff)
 	def SCICallTipCancel(self):
 		self.SendScintilla(SCI_CALLTIPCANCEL)
 	def SCICallTipActive(self):
@@ -217,12 +219,11 @@ class ScintillaControlInterface:
 		self.SendScintilla(SCI_NEWLINE)
 	# Lexer etc
 	def SCISetKeywords(self, keywords, kw_list_no = 0):
-		ar = array.array('c', keywords+"\0")
-		(a,l) = ar.buffer_info()
-		self.SendScintilla(SCI_SETKEYWORDS, kw_list_no, a)
+		buff = (keywords+"\0").encode(default_scintilla_encoding)
+		self.SendScintilla(SCI_SETKEYWORDS, kw_list_no, buff)
 	def SCISetProperty(self, name, value):
-		name_buff = array.array('c', name + "\0")
-		val_buff = array.array("c", str(value) + "\0")
+		name_buff = array.array('b',  (name + '\0').encode('utf-8'))
+		val_buff = array.array("b", (str(value)+'\0').encode('utf-8'))
 		address_name_buffer = name_buff.buffer_info()[0]
 		address_val_buffer = val_buff.buffer_info()[0]
 		self.SendScintilla(SCI_SETPROPERTY, address_name_buffer, address_val_buffer)
@@ -278,13 +279,13 @@ class CScintillaEditInterface(ScintillaControlInterface):
 			LONG cpMax;} CHARRANGE;
 		"""
 		findtextex_fmt='llPll'
-		buff = array.array('c', findText + "\0")
-		addressBuffer = buff.buffer_info()[0]
-		ft = struct.pack(findtextex_fmt, range[0], range[1], addressBuffer, 0, 0)
-		ftBuff = array.array('c', ft)
-		addressFtBuff = ftBuff.buffer_info()[0]
-		rc = self.SendScintilla(EM_FINDTEXTEX, flags, addressFtBuff)
-		ftUnpacked = struct.unpack(findtextex_fmt, ftBuff.tostring())
+		## Scintilla does not handle unicode in EM_FINDTEXT msg (FINDTEXTEX struct)
+		txt_buff = (findText+'\0').encode('utf-8')
+		txt_array = array.array('b', txt_buff)
+		ft_buff = struct.pack(findtextex_fmt, range[0], range[1], txt_array.buffer_info()[0], 0, 0)
+		ft_array = array.array('b', ft_buff)
+		rc = self.SendScintilla(EM_FINDTEXTEX, flags, ft_array.buffer_info()[0])
+		ftUnpacked = struct.unpack(findtextex_fmt, ft_array)
 		return rc, (ftUnpacked[3], ftUnpacked[4])
 
 	def GetSel(self):
@@ -298,10 +299,10 @@ class CScintillaEditInterface(ScintillaControlInterface):
 
 	def GetSelText(self):
 		start, end = self.GetSel()
-		txtBuf = array.array('c', " " * ((end-start)+1))
+		txtBuf = array.array('u', " " * ((end-start)+1))
 		addressTxtBuf = txtBuf.buffer_info()[0]
 		self.SendScintilla(EM_GETSELTEXT, 0, addressTxtBuf)
-		return txtBuf.tostring()[:-1]
+		return txtBuf.tostring().decode(default_scintilla_encoding)
 
 	def SetSel(self, start=0, end=None):
 		if type(start)==type(()):
@@ -314,7 +315,7 @@ class CScintillaEditInterface(ScintillaControlInterface):
 		assert start <= self.GetTextLength(), "The start postion is invalid (%d/%d)" % (start, self.GetTextLength())
 		assert end <= self.GetTextLength(), "The end postion is invalid (%d/%d)" % (end, self.GetTextLength())
 		cr = struct.pack('ll', start, end)
-		crBuff = array.array('c', cr)
+		crBuff = array.array('b', cr)
 		addressCrBuff = crBuff.buffer_info()[0]
 		rc = self.SendScintilla(EM_EXSETSEL, 0, addressCrBuff)
 
@@ -346,18 +347,18 @@ class CScintillaEditInterface(ScintillaControlInterface):
 		assert start >= 0 and start <= self.GetTextLength(), "The start postion is invalid"
 		assert end >= 0 and end <= self.GetTextLength(), "The end postion is invalid"
 		initer = "=" * (end - start + 1)
-		buff = array.array('c', initer)
+		buff = array.array('u', initer)
 		addressBuffer = buff.buffer_info()[0]
 		tr = struct.pack('llP', start, end, addressBuffer)
-		trBuff = array.array('c', tr)
+		trBuff = array.array('b', tr)
 		addressTrBuff = trBuff.buffer_info()[0]
 		numChars = self.SendScintilla(EM_GETTEXTRANGE, 0, addressTrBuff)
-		return buff.tostring()[:numChars]
-		
+		## return buff.tounicode()[:numChars]
+		return buff.tostring()[:numChars].decode(default_scintilla_encoding)
+
 	def ReplaceSel(self, str):
-		buff = array.array('c', str + "\0")
-		self.SendScintilla(SCI_REPLACESEL, 0, buff.buffer_info()[0]);
-		buff = None
+		buff = (str + "\0").encode(default_scintilla_encoding)
+		self.SendScintilla(SCI_REPLACESEL, 0, buff)
 	
 	def GetLine(self, line=-1):
 		if line == -1: line = self.GetCurLineNumber()
@@ -375,8 +376,8 @@ class CScintillaEditInterface(ScintillaControlInterface):
 		return self.SendScintilla(win32con.EM_GETFIRSTVISIBLELINE)
 
 	def SetWordWrap(self, mode):
-		if mode <> win32ui.CRichEditView_WrapNone:
-			raise ValueError, "We dont support word-wrap (I dont think :-)"
+		if mode != win32ui.CRichEditView_WrapNone:
+			raise ValueError("We dont support word-wrap (I dont think :-)")
 
 class CScintillaColorEditInterface(CScintillaEditInterface):
 	################################
@@ -390,7 +391,7 @@ class CScintillaColorEditInterface(CScintillaEditInterface):
 		parent_func = getattr(self.GetParentFrame(), "_MakeColorizer", None)
 		if parent_func is not None:
 			return parent_func()
-		import formatter
+		from . import formatter
 ##		return formatter.PythonSourceFormatter(self)
 		return formatter.BuiltinPythonSourceFormatter(self)
 

@@ -26,7 +26,7 @@ from pywin.mfc import dialog, window
 def MakeDlgTemplate():
 	style = win32con.DS_MODALFRAME | win32con.WS_POPUP | win32con.WS_VISIBLE | win32con.WS_CAPTION | win32con.WS_SYSMENU | win32con.DS_SETFONT
 	cs = win32con.WS_CHILD | win32con.WS_VISIBLE
-	dlg = [ ["Select Warehouse", (0, 0, 177, 93), style, None, (8, "MS Sans Serif")], ]
+	dlg = [ ["Select Warehouse", (0, 0, 177, 93), style, 0, (8, "MS Sans Serif")], ]
 	dlg.append([130, "Current Warehouse:", -1, (7, 7, 69, 9), cs | win32con.SS_LEFT])
 	dlg.append([130, "ASTORIA", 128, (16, 17, 99, 7), cs | win32con.SS_LEFT])
 	dlg.append([130, "New &Warehouse:", -1, (7, 29, 69, 9), cs | win32con.SS_LEFT])

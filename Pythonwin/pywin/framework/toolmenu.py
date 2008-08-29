@@ -3,7 +3,7 @@
 import win32ui
 import win32con
 import win32api
-import app
+from . import app
 import sys
 import string
 
@@ -100,13 +100,13 @@ def HandleToolCommand(cmd, code):
 		pass
 	
 	try:
-		exec "%s\n" % pyCmd
+		exec("%s\n" % pyCmd)
 		worked=1
 	except SystemExit:
 		# The program raised a SystemExit - ignore it.
 		worked = 1
 	except:
-		print "Failed to execute command:\n%s" % pyCmd
+		print("Failed to execute command:\n%s" % pyCmd)
 		traceback.print_exc()
 		worked=0
 	if oldFlag is not None:
@@ -136,7 +136,7 @@ class ToolMenuPropPage(dialog.PropertyPage):
 		self.HookCommand(self.OnCommandEditControls, win32ui.IDC_EDIT2)
 
 		self.HookNotify(self.OnNotifyListControl, commctrl.LVN_ITEMCHANGED)
-		self.HookNotify(self.OnNotifyListControlEndLabelEdit, commctrl.LVN_ENDLABELEDIT)
+		self.HookNotify(self.OnNotifyListControlEndLabelEdit, commctrl.LVN_ENDLABELEDITW)
 		
 		# Hook the button clicks.
 		self.HookCommand(self.OnButtonNew, win32ui.IDC_BUTTON3) # New Item

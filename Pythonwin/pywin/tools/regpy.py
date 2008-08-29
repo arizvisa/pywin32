@@ -1,6 +1,6 @@
 # (sort-of) Registry editor
 import win32ui
-import dialog
+from pywin.mfc import dialog
 import win32con
 import commctrl
 
@@ -45,9 +45,12 @@ class RegistrySheet(dialog.PropertySheet):
 		dialog.PropertySheet.__init__(self, title)
 		self.HookMessage(self.OnActivate, win32con.WM_ACTIVATE)
 	def OnActivate(self, msg):
-		print "OnAcivate"
+		print("OnAcivate")
 
 def t():
 	ps=RegistrySheet('Registry Settings')
 	ps.AddPage(RegistryPage())
 	ps.DoModal()
+
+if __name__=='__main__':
+	t()

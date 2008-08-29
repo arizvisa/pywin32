@@ -14,7 +14,7 @@ class object_template (docview.DocTemplate):
 	def OpenObject(self, object): # Use this instead of OpenDocumentFile.
 		# Look for existing open document
 		for doc in self.GetDocumentList():
-			print "document is ", doc
+			print("document is ", doc)
 			if doc.object is object:
 				doc.GetFirstView().ActivateFrame()
 				return doc
@@ -31,12 +31,12 @@ class object_document (docview.Document):
 		docview.Document.__init__(self, template)
 		self.object = object
 	def OnOpenDocument (self, name):
-		raise error, "Should not be called if template strings set up correctly"
+		raise error("Should not be called if template strings set up correctly")
 		return 0
 
 class object_view (docview.EditView):
 	def OnInitialUpdate (self):
-		self.ReplaceSel("Object is %s" % `self.GetDocument().object`)
+		self.ReplaceSel("Object is %s" % repr(self.GetDocument().object))
 
 def demo ():
 	t = object_template()		
@@ -44,6 +44,6 @@ def demo ():
 	return (t, d)
 
 if __name__=='__main__':
-	import demoutils
+	from . import demoutils
 	if demoutils.NeedGoodGUI():
 		demo()

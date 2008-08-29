@@ -32,7 +32,7 @@ class HelloWindow(window.Wnd):
             (100, 100, 400, 300), None, 0, None)
 
 # The application object itself.       
-class HelloApp(thread.WinApp):
+class HelloApp(_thread.WinApp):
 
     def InitInstance(self):
         self.frame = HelloWindow()

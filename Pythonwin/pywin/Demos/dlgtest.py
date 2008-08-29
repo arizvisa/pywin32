@@ -21,12 +21,13 @@ from pywin.mfc import dialog
 class TestDialog(dialog.Dialog):
 	def __init__(self, modal=1):
 		dialog.Dialog.__init__(self, IDD_SET_TABSTOPS)
+
 		self.counter=0
 		if modal:
 			self.DoModal()
 		else:
 			self.CreateWindow()
-
+		
 	def OnInitDialog(self):
 		# Set the caption of the dialog itself.
 		self.SetWindowText("Used to be Tab Stops!")
@@ -48,7 +49,7 @@ class TestDialog(dialog.Dialog):
 
 	def OnNotify(self, controlid, code):
 		if code==win32con.EN_CHANGE:
-			print "Edit text changed!"
+			print("Edit text changed!")
 		return 1 # I handled this, so no need to call defaults!
 
 	# kill focus for the edit box.
@@ -81,9 +82,8 @@ class TestPage(dialog.PropertyPage):
 		# Windows WM_NOTIFY messages.
 		# In this case, we are interested in BN_CLICKED messages.
 		self.HookNotify(self.OnNotify, win32con.BN_CLICKED)
-		
 	def OnNotify(self, std, extra):
-		print "OnNotify", std, extra
+		print("OnNotify", std, extra)
 
 # Some code that actually uses these objects.
 def demo(modal = 0):
@@ -129,10 +129,11 @@ def test(modal=1):
 def d():
 	dlg = win32ui.CreateDialog(win32ui.IDD_DEBUGGER)
 	dlg.datalist.append((win32ui.IDC_DBG_RADIOSTACK, "radio"))
-	print "data list is ", dlg.datalist
+	print("data list is ", dlg.datalist)
 	dlg.data['radio']=1
 	dlg.DoModal()
-	print dlg.data['radio']
+	print(dlg.data['radio'])
 
 if __name__=='__main__':
 	demo(1)
+

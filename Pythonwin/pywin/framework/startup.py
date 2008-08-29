@@ -37,15 +37,15 @@ moduleName = "intpyapp"
 sys.appargvoffset = 0
 sys.appargv = sys.argv[:]
 # Must check for /app param here.
-if len(sys.argv)>=2 and sys.argv[0].lower()=='/app':
-	import cmdline
+if len(sys.argv)>=2 and sys.argv[0].lower()=='/app': 
+	from . import cmdline
 	moduleName = cmdline.FixArgFileName(sys.argv[1])
 	sys.appargvoffset = 2
 	newargv=sys.argv[sys.appargvoffset:]
 #	newargv.insert(0, sys.argv[0])
 	sys.argv = newargv
 	
-exec "import %s\n" % moduleName
+from . import intpyapp
 
 try:
 	win32ui.GetApp()._obj_
@@ -54,8 +54,8 @@ except (AttributeError, win32ui.error):
 	# This means either no app object exists at all, or the one
 	# that does exist does not have a Python class (ie, was created
 	# by the host .EXE).  In this case, we do the "old style" init...
-	import app
+	from . import app
 	if app.AppBuilder is None:
-		raise TypeError, "No application object has been registered"
+		raise TypeError("No application object has been registered")
 
 	app.App = app.AppBuilder()

@@ -58,5 +58,5 @@ def t():
 	return t
 	
 if __name__=='__main__':
-	import demoutils
+	from . import demoutils
 	demoutils.NeedApp()

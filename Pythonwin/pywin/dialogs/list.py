@@ -44,9 +44,9 @@ class ListDialog (dialog.Dialog):
 	
 	def OnListItemChange(self,std, extra):
 		(hwndFrom, idFrom, code), (itemNotify, sub, newState, oldState, change, point, lparam) = std, extra
-		oldSel = (oldState & commctrl.LVIS_SELECTED)<>0
-		newSel = (newState & commctrl.LVIS_SELECTED)<>0
-		if oldSel <> newSel:
+		oldSel = (oldState & commctrl.LVIS_SELECTED)!=0
+		newSel = (newState & commctrl.LVIS_SELECTED)!=0
+		if oldSel != newSel:
 			try:
 				self.selecteditem = itemNotify
 				self.butOK.EnableWindow(1)
@@ -116,7 +116,7 @@ def SelectFromLists (title, lists, headings):
 
 def test():
 #	print SelectFromList('Single list',  [1,2,3])
-	print SelectFromLists('Multi-List', [ ('1',1, 'a'), ('2',2, 'b'), ('3',3, 'c' )], ['Col 1', 'Col 2'])
+	print(SelectFromLists('Multi-List', [ ('1',1, 'a'), ('2',2, 'b'), ('3',3, 'c' )], ['Col 1', 'Col 2']))
 
 if __name__=='__main__':	
 	test()

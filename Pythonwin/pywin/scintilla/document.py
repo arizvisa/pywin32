@@ -1,7 +1,7 @@
 import win32ui
 from pywin.mfc import docview
 from pywin import is_platform_unicode, default_platform_encoding, default_scintilla_encoding
-from scintillacon import *
+from .scintillacon import *
 import win32con
 import string
 import array
@@ -22,11 +22,12 @@ class CScintillaDocument(ParentScintillaDocument):
 				import codecs
 				f = codecs.open(filename, 'rb', default_platform_encoding)
 			else:
-				f = open(filename, 'rb')
+				f = open(filename, 'r')
 			try:
 				text = f.read()
 			finally:
 				f.close()
+			text = text.encode('utf-8')
 			if is_platform_unicode:
 				# Translate from locale-specific (MCBS) encoding to UTF-8 for Scintilla
 				text = text.encode(default_scintilla_encoding)
@@ -63,7 +64,7 @@ class CScintillaDocument(ParentScintillaDocument):
 
 			doc = self
 			view.SendScintilla(SCI_CLEARALL)
-			view.SendMessage(SCI_ADDTEXT, buffer(text))
+			view.SendMessage(SCI_ADDTEXT, text)
 			view.SendScintilla(SCI_SETUNDOCOLLECTION, 1, 0)
 			view.SendScintilla(win32con.EM_EMPTYUNDOBUFFER, 0, 0)
 
@@ -125,12 +126,12 @@ class CScintillaDocument(ParentScintillaDocument):
 	def _ApplyToViews(self, funcName, *args):
 		for view in self.GetAllViews():
 			func = getattr(view, funcName)
-			apply(func, args)
+			func(*args)
 	def _ApplyOptionalToViews(self, funcName, *args):
 		for view in self.GetAllViews():
 			func = getattr(view, funcName, None)
 			if func is not None:
-				apply(func, args)
+				func(*args)
 	def GetEditorView(self):
 		# Find the first frame with a view,
 		# then ask it to give the editor view
@@ -150,7 +151,7 @@ class ViewNotifyDelegate:
 		(hwndFrom, idFrom, code) = std
 		for v in self.doc.GetAllViews():
 			if v.GetSafeHwnd() == hwndFrom:
-				return apply(getattr(v, self.name), (std, extra))
+				return getattr(v, self.name)(*(std, extra))
 
 # Delegate to the document, but only from a single view (as each view sends it seperately)
 class DocumentNotifyDelegate:
@@ -160,4 +161,4 @@ class DocumentNotifyDelegate:
 	def __call__(self, std, extra):
 		(hwndFrom, idFrom, code) = std
 		if hwndFrom == self.doc.GetEditorView().GetSafeHwnd():
-				apply(self.delegate, (std, extra))
+				self.delegate(*(std, extra))

@@ -1,4 +1,4 @@
-from dbgcon import *
+from .dbgcon import *
 from pywin.mfc import dialog
 
 class DebuggerOptionsPropPage(dialog.PropertyPage):
@@ -16,8 +16,8 @@ class DebuggerOptionsPropPage(dialog.PropertyPage):
 	def OnOK(self):
 		self.UpdateData()
 		dirty = 0
-		for key, val in self.items():
-			if self.options.has_key(key):
+		for key, val in list(self.items()):
+			if key in self.options:
 				if self.options[key] != val:
 					self.options[key] = val
 					dirty = 1

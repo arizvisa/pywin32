@@ -28,7 +28,7 @@ import traceback
 
 #import win32traceutil
 
-from dbgcon import *
+from .dbgcon import *
 
 error = "pywin.debugger.error"
 
@@ -54,7 +54,7 @@ class HierFrameItem(HierListItem):
 		name = self.myobject.f_code.co_name
 		if not name or name == '?' :
 			# See if locals has a '__name__' (ie, a module)
-			if self.myobject.f_locals.has_key('__name__'):
+			if '__name__' in self.myobject.f_locals:
 				name = self.myobject.f_locals['__name__'] + " module"
 			else:
 				name = '<Debugger Context>'
@@ -236,7 +236,7 @@ class DebuggerListViewWindow(DebuggerWindow):
 			col = col + 1
 			itemDetails = (commctrl.LVCFMT_LEFT, width, title, 0)
 			list.InsertColumn(col, itemDetails)
-		parent.HookNotify( self.OnListEndLabelEdit, commctrl.LVN_ENDLABELEDIT)
+		parent.HookNotify( self.OnListEndLabelEdit, commctrl.LVN_ENDLABELEDITW)
 		parent.HookNotify(self.OnItemRightClick, commctrl.NM_RCLICK)
 		parent.HookNotify(self.OnItemDoubleClick, commctrl.NM_DBLCLK)
 
@@ -294,7 +294,12 @@ class DebuggerBreakpointsWindow(DebuggerListViewWindow):
 	columns = [ ("Condition", 70), ("Location", 1024)]
 
 	def SaveState(self):
-		pass
+		items = []
+		for i in range(self.GetItemCount()):
+			items.append(self.GetItemText(i,0))
+			items.append(self.GetItemText(i,1))
+		win32ui.WriteProfileVal("Debugger Windows\\" + self.title, "BreakpointList", "\t".join(items))
+		return 1
 
 	def OnListEndLabelEdit(self, std, extra):
 		item = extra[0]
@@ -304,7 +309,7 @@ class DebuggerBreakpointsWindow(DebuggerListViewWindow):
 		item_id = self.GetItem(item[0])[6]
 
 		from bdb import Breakpoint
-		for bplist in Breakpoint.bplist.values():
+		for bplist in list(Breakpoint.bplist.values()):
 			for bp in bplist:
 				if id(bp)==item_id:
 					if text.strip().lower()=="none":
@@ -318,7 +323,7 @@ class DebuggerBreakpointsWindow(DebuggerListViewWindow):
 			num = self.GetNextItem(-1, commctrl.LVNI_SELECTED)
 			item_id = self.GetItem(num)[6]
 			from bdb import Breakpoint
-			for bplist in Breakpoint.bplist.values():
+			for bplist in list(Breakpoint.bplist.values()):
 				for bp in bplist:
 					if id(bp)==item_id:
 						self.debugger.clear_break(bp.file, bp.line)
@@ -328,17 +333,17 @@ class DebuggerBreakpointsWindow(DebuggerListViewWindow):
 		self.RespondDebuggerData()
 
 	def RespondDebuggerData(self):
-		list = self
-		list.DeleteAllItems()
+		l = self
+		l.DeleteAllItems()
 		index = -1
 		from bdb import Breakpoint
-		for bplist in Breakpoint.bplist.values():
+		for bplist in list(Breakpoint.bplist.values()):
 			for bp in bplist:
 				baseName = os.path.split(bp.file)[1]
 				cond = bp.cond
 				item = index+1, 0, 0, 0, str(cond), 0, id(bp)
-				index = list.InsertItem(item)
-				list.SetItemText(index, 1, "%s: %s" % (baseName, bp.line))
+				index = l.InsertItem(item)
+				l.SetItemText(index, 1, "%s: %s" % (baseName, bp.line))
 
 class DebuggerWatchWindow(DebuggerListViewWindow):
 	title = "Watch"
@@ -527,7 +532,7 @@ class Debugger(debugger_parent):
 		try:
 			return self.options[option]
 		except KeyError:
-			raise error, "Option %s is not a valid option" % option
+			raise error("Option %s is not a valid option" % option)
 
 	def prep_run(self, cmd):
 		pass
@@ -571,12 +576,14 @@ class Debugger(debugger_parent):
 		frame.f_locals['__return__'] = return_value
 		self.interaction(frame, None)
 
-	def user_exception(self, frame, (exc_type, exc_value, exc_traceback)):
+	def user_exception(self, frame, exc_info):
+		print ('user exception callled !!!!!!!')
 		# This function is called if an exception occurs,
 		# but only if we are to stop at or just below this level
+		(exc_type, exc_value, exc_traceback) = exc_info
 		if self.get_option(OPT_STOP_EXCEPTIONS):
 			frame.f_locals['__exception__'] = exc_type, exc_value
-			print "Unhandled exception while debugging..."
+			print("Unhandled exception while debugging...")
 			traceback.print_exception(exc_type, exc_value, exc_traceback)
 			self.interaction(frame, exc_traceback)
 
@@ -586,20 +593,23 @@ class Debugger(debugger_parent):
 
 	def stop_here(self, frame):
 		if self.isInitialBreakpoint:
+			print ('skip IsInitialBreakpoint')
 			self.isInitialBreakpoint = 0
 			self.set_continue()
 			return 0
 		if frame is self.botframe and self.skipBotFrame == SKIP_RUN:
+			print ('skip SKIP_RUN')
 			self.set_continue()
 			return 0
 		if frame is self.botframe and self.skipBotFrame == SKIP_STEP:
+			print ('skip SKIP_STEP')
 			self.set_step()
 			return 0
 		return debugger_parent.stop_here(self, frame)
 
 	def run(self, cmd,globals=None, locals=None, start_stepping = 1):
-		if type(cmd) not in [types.StringType, types.CodeType]:
-			raise TypeError, "Only strings can be run"
+		if type(cmd) not in [bytes, types.CodeType]:
+			raise TypeError("Only strings can be run")
 		self.last_cmd_debugged = cmd
 		if start_stepping:
 			self.isInitialBreakpoint = 0
@@ -614,14 +624,14 @@ class Debugger(debugger_parent):
 			self.reset()
 			self.prep_run(cmd)
 			sys.settrace(self.trace_dispatch)
-			if type(cmd) <> types.CodeType:
+			if type(cmd) != types.CodeType:
 				cmd = cmd+'\n'
 			try:
 				try:
 					if start_stepping: self.skipBotFrame = SKIP_STEP
 					else: self.skipBotFrame = SKIP_RUN
 					if sys.version_info > (2,2):
-						exec cmd in globals, locals
+						exec(cmd, globals, locals)
 					else:
 						_doexec(cmd, globals, locals)
 				except bdb.BdbQuit:
@@ -646,7 +656,7 @@ class Debugger(debugger_parent):
 		sys.settrace(self.trace_dispatch)
 		try:
 			try:
-				exec what in globs, locs
+				exec(what, globs, locs)
 			except bdb.BdbQuit:
 				pass
 		finally:
@@ -683,9 +693,9 @@ class Debugger(debugger_parent):
 				fname = os.path.split(frame.f_code.co_filename)[1]
 			else:
 				fname = "??"
-			print `name`, fname, frame.f_lineno, frame
+			print(repr(name), fname, frame.f_lineno, frame)
 		else:
-			print `name`, "None"
+			print(repr(name), "None")
 
 	def set_trace(self):
 		# Start debugging from _2_ levels up!
@@ -699,7 +709,7 @@ class Debugger(debugger_parent):
 			# scriptutils.py creates a local variable with name
 			# '_debugger_stop_frame_', and we dont go past it
 			# (everything above this is Pythonwin framework code)
-			if frame.f_locals.has_key("_debugger_stop_frame_"):
+			if "_debugger_stop_frame_" in frame.f_locals:
 				self.userbotframe = frame
 				break
 
@@ -746,10 +756,10 @@ class Debugger(debugger_parent):
 			else:
 				title = " - break"
 		else:
-			raise error, "Invalid debugger state passed!"
+			raise error("Invalid debugger state passed!")
 		win32ui.GetMainFrame().SetWindowText(win32ui.LoadString(win32ui.IDR_MAINFRAME) + title)
 		if self.debuggerState == DBGSTATE_QUITTING and state != DBGSTATE_NOT_DEBUGGING:
-			print "Ignoring state change cos Im trying to stop!", state
+			print("Ignoring state change cos Im trying to stop!", state)
 			return
 		self.debuggerState = state
 		try:
@@ -814,7 +824,7 @@ class Debugger(debugger_parent):
 		self.RespondDebuggerState(DBGSTATE_BREAK)
 		self.GUIAboutToInteract()
 		if self.pumping:
-			print "!!! Already pumping - outa here"
+			print("!!! Already pumping - outa here")
 			return
 		self.pumping = 1
 		win32ui.StartDebuggerPump() # NOTE - This will NOT return until the user is finished interacting
@@ -949,8 +959,8 @@ class Debugger(debugger_parent):
 			# Can't find the source file - linecache may have it?
 			import linecache
 			line = linecache.getline(filename, lineno)
-			print "%s(%d): %s" % (os.path.basename(filename), lineno, line[:-1].expandtabs(4))
+			print("%s(%d): %s" % (os.path.basename(filename), lineno, line[:-1].expandtabs(4)))
 			return 0
 
 def _doexec(cmd, globals, locals):
-	exec cmd in globals, locals
+	exec(cmd, globals, locals)

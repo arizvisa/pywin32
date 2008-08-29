@@ -21,7 +21,9 @@ import string
 
 true = 1
 false = 0
-get_input_line = raw_input
+
+import code
+get_input_line = code.InteractiveConsole.raw_input
 
 class Stdin:
     def __init__(self):
@@ -109,7 +111,7 @@ class Stdin:
         """Grab one line from get_input_line() and append it to the buffer.
         """
         line = get_input_line()
-        print '>>>',line  # echo input to console
+        print('>>>',line)  # echo input to console
         self.buffer = self.buffer + line + '\n'
 
     def readlines(self, *sizehint): 
@@ -119,7 +121,7 @@ class Stdin:
         (possibly after rounding up to an internal buffer size) are read.
         """
         if self.closed:
-            return apply(self.real_file.readlines, sizehint)
+            return self.real_file.readlines(*sizehint)
         
         result = []
         total_read = 0
@@ -158,7 +160,7 @@ Sell you soul to the devil, baby
         result = test_input[:end_of_line_pos]
         test_input = test_input[end_of_line_pos + 1:]
         if len(result) == 0 or result[0] == '~':
-            raise 'EOF'
+            raise EOFError
         return result
     
     get_input_line = fake_raw_input
@@ -166,12 +168,12 @@ Sell you soul to the devil, baby
     # Some completely inadequate tests, just to make sure the code's not totally broken    
     try:    
         x = Stdin()
-        print x.read()
-        print x.readline()
-        print x.read(12)
-        print x.readline(47)
-        print x.readline(3)
-        print x.readlines()
+        print(x.read())
+        print(x.readline())
+        print(x.read(12))
+        print(x.readline(47))
+        print(x.readline(3))
+        print(x.readlines())
     finally:
         get_input_line = raw_input
 else:

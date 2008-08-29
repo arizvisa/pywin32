@@ -60,7 +60,7 @@ class FontView(docview.ScrollView):
 			left, top, right, bottom = self.GetClientRect()
 			self.width = right - left
 			self.height = bottom - top
-		x, y = self.width / 2, self.height / 2
+		x, y = self.width // 2, self.height // 2
 		dc.TextOut (x, y, self.text)
 	
 def FontDemo():
@@ -74,6 +74,6 @@ def FontDemo():
 #	del template
 
 if __name__=='__main__':
-	import demoutils
+	from . import demoutils
 	if demoutils.NeedGoodGUI():
 		FontDemo()

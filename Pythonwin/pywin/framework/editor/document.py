@@ -76,7 +76,7 @@ class EditorDocumentBase(ParentEditorDocument):
 			pass
 		try:
 			self.SaveFile(fileName)
-		except IOError, details:
+		except IOError as details:
 			win32ui.MessageBox("Error - could not save file\r\n\r\n%s"%details)
 			return 0
 		self.SetModifiedFlag(0) # No longer dirty
@@ -116,7 +116,7 @@ class EditorDocumentBase(ParentEditorDocument):
 				info = None
 			states.append(info)
 		self.OnOpenDocument(self.GetPathName())
-		for view, info in map(None, views, states):
+		for view, info in zip(views, states):
 			if info is not None:
 				view._EndUserStateChange(info)
 		self._DocumentStateChanged()
@@ -128,13 +128,14 @@ class EditorDocumentBase(ParentEditorDocument):
 			return
 		try:
 			newstat = os.stat(self.GetPathName())
-		except os.error, (code, msg):
+		except os.error as xxx_todo_changeme:
+			(code, msg) = xxx_todo_changeme.args
 			if not self.bReportedFileNotFound:
-				print "The file '%s' is open for editing, but\nchecking it for changes caused the error: %s" % (self.GetPathName(), msg)
+				print("The file '%s' is open for editing, but\nchecking it for changes caused the error: %s" % (self.GetPathName(), msg))
 				self.bReportedFileNotFound = 1
 			return
 		if self.bReportedFileNotFound:
-			print "The file '%s' has re-appeared - continuing to watch for changes..." % (self.GetPathName(),)
+			print("The file '%s' has re-appeared - continuing to watch for changes..." % (self.GetPathName(),))
 			self.bReportedFileNotFound = 0 # Once found again we want to start complaining.
 		changed = (self.fileStat is None) or \
 			self.fileStat[0] != newstat[0] or \
@@ -218,7 +219,7 @@ class EditorDocumentBase(ParentEditorDocument):
 			return 0
 
 		if pretend_ss:
-			print "We are only pretending to check it out!"
+			print("We are only pretending to check it out!")
 			win32api.SetFileAttributes(self.GetPathName(), win32con.FILE_ATTRIBUTE_NORMAL)
 			self.ReloadDocument()
 			return 1
@@ -231,7 +232,7 @@ class EditorDocumentBase(ParentEditorDocument):
 					self.scModule = getattr(self.scModule, part)
 			except:
 				traceback.print_exc()
-				print "Error loading source control module."
+				print("Error loading source control module.")
 				return 0
 		
 		if self.scModule.CheckoutFile(self.GetPathName()):
@@ -253,7 +254,7 @@ class EditorDocumentBase(ParentEditorDocument):
 				frame.MDIActivate()
 				frame.AutoRestore()
 			except:
-				print "Could not bring document to foreground"
+				print("Could not bring document to foreground")
 		return self._obj_.SaveModified()
 
 # NOTE - I DONT use the standard threading module,
@@ -287,8 +288,9 @@ class FileWatchingThread(pywin.mfc.thread.WinThread):
 					 win32con.FILE_NOTIFY_CHANGE_LAST_WRITE
 			try:
 				self.watchEvent = win32api.FindFirstChangeNotification(path, 0, filter)
-			except win32api.error, (rc, fn, msg):
-				print "Can not watch file", path, "for changes -", msg
+			except win32api.error as xxx_todo_changeme1:
+				(rc, fn, msg) = xxx_todo_changeme1.args
+				print("Can not watch file", path, "for changes -", msg)
 	def SignalStop(self):
 		win32event.SetEvent(self.stopEvent)
 	def Run(self):
@@ -306,8 +308,9 @@ class FileWatchingThread(pywin.mfc.thread.WinThread):
 				try:
 					# If the directory has been removed underneath us, we get this error.
 					win32api.FindNextChangeNotification(self.watchEvent)
-				except win32api.error, (rc, fn, msg):
-					print "Can not watch file", self.doc.GetPathName(), "for changes -", msg
+				except win32api.error as xxx_todo_changeme2:
+					(rc, fn, msg) = xxx_todo_changeme2.args
+					print("Can not watch file", self.doc.GetPathName(), "for changes -", msg)
 					break
 
 		# close a circular reference

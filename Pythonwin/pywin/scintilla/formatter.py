@@ -5,7 +5,7 @@ import win32con
 import winerror
 import string
 import array
-import scintillacon
+from . import scintillacon
 
 WM_KICKIDLE = 0x036A
 
@@ -100,7 +100,7 @@ class FormatterBase:
 	def RegisterStyle(self, style, stylenum):
 		assert stylenum is not None, "We must have a style number"
 		assert style.stylenum is None, "Style has already been registered"
-		assert not self.styles.has_key(stylenum), "We are reusing a style number!"
+		assert stylenum not in self.styles, "We are reusing a style number!"
 		style.stylenum = stylenum
 		self.styles[style.name] = style
 		self.styles_by_id[stylenum] = style
@@ -152,7 +152,7 @@ class FormatterBase:
 		defaultStyle = Style("default", baseFormat)
 		defaultStyle.stylenum = scintillacon.STYLE_DEFAULT
 		self._ReformatStyle(defaultStyle)
-		for style in self.styles.values():
+		for style in list(self.styles.values()):
 			if style.aliased is None:
 				style.NormalizeAgainstDefault(baseFormat)
 			self._ReformatStyle(style)
@@ -165,7 +165,7 @@ class FormatterBase:
 		self.baseFormatProp = eval(self.LoadPreference("Base Format Proportional", str(self.baseFormatProp)))
 		self.bUseFixed = int(self.LoadPreference("Use Fixed", 1))
 
-		for style in self.styles.values():
+		for style in list(self.styles.values()):
 			new = self.LoadPreference(style.name, str(style.format))
 			try:
 				style.format = eval(new)
@@ -176,7 +176,7 @@ class FormatterBase:
 					style.background = None
 					
 			except:
-				print "Error loading style data for", style.name
+				print("Error loading style data for", style.name)
 
 	def LoadPreference(self, name, default):
 		return win32ui.GetProfileVal("Format", name, default)
@@ -185,7 +185,7 @@ class FormatterBase:
 		self.SavePreference("Base Format Fixed", str(self.baseFormatFixed))
 		self.SavePreference("Base Format Proportional", str(self.baseFormatProp))
 		self.SavePreference("Use Fixed", self.bUseFixed)
-		for style in self.styles.values():
+		for style in list(self.styles.values()):
 			if style.aliased is None:
 				self.SavePreference(style.name, str(style.format))
 				bg_name = style.name + " background"
@@ -224,7 +224,7 @@ class Formatter(FormatterBase):
 #		assert end-start>=0, "Can't have negative styling"
 		stylenum = self.styles[styleName].stylenum
 		while start<end:
-			self.style_buffer[start]=chr(stylenum)
+			self.style_buffer[start]=stylenum
 			start = start+1
 		#self.scintilla.SCISetStyling(end - start + 1, stylenum)
 
@@ -235,7 +235,7 @@ class Formatter(FormatterBase):
 		FormatterBase.RegisterStyle(self, style, stylenum)
 
 	def ColorizeString(self, str, charStart, styleStart):
-		raise RuntimeError, "You must override this method"
+		raise RuntimeError("You must override this method")
 
 	def Colorize(self, start=0, end=-1):
 		scintilla = self.scintilla
@@ -247,7 +247,7 @@ class Formatter(FormatterBase):
 			styleStart = None
 #		trace("Coloring", start, end, end-start, len(stringVal), styleStart, self.scintilla.SCIGetCharAt(start))
 		scintilla.SCIStartStyling(start, 31)
-		self.style_buffer = array.array("c", chr(0)*len(stringVal))
+		self.style_buffer = array.array("b", (0,)*len(stringVal))
 		self.ColorizeString(stringVal, styleStart)
 		scintilla.SCISetStylingEx(self.style_buffer)
 		self.style_buffer = None

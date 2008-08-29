@@ -38,7 +38,7 @@ class MyDialog(dialog.Dialog):
                                   self.IDC_SLIDER)
 		return rc
 	def OnCancel(self):
-		print "The slider control is at position", self.slider.GetPos()
+		print("The slider control is at position", self.slider.GetPos())
 		self._obj_.OnCancel()
 ###
 def demo():

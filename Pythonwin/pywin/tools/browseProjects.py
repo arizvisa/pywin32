@@ -56,7 +56,7 @@ class HLICLBRClass(HLICLBRItem):
 		 ret = []
 		 for c in self.super:
 			 ret.append(HLICLBRClass(c, " (Parent class)"))
-		 for meth, lineno in self.methods.items():
+		 for meth, lineno in list(self.methods.items()):
 			 ret.append(HLICLBRMethod(meth, self.file, lineno, " (method)"))
 		 return ret
 	def IsExpandable(self):
@@ -103,7 +103,7 @@ class HLIModuleItem(hierlist.HierListItem):
 			data = reader(mod, [path])
 			if data:
 				ret = []
-				for item in data.values():
+				for item in list(data.values()):
 					if item.__class__ != pyclbr.Class: # ie, it is a pyclbr Function instance (only introduced post 1.5.2)
 						ret.append(HLICLBRFunction( item, " (function)" ) )
 					else:
@@ -165,7 +165,7 @@ class HLIProjectRoot(hierlist.HierListItem):
 		if len(pathList)==1: # Single dir - dont bother putting the dir in
 			ret = MakePathSubList(pathList[0])
 		else:
-			ret = map( HLIDirectoryItem, pathList )
+			ret = list(map( HLIDirectoryItem, pathList ))
 		return ret
 
 class HLIRoot(hierlist.HierListItem):
@@ -226,7 +226,7 @@ class dynamic_browser (dialog.Dialog):
 def BrowseDialog():
     root = HLIRoot()
     if not root.IsExpandable():
-        raise TypeError, "Browse() argument must have __dict__ attribute, or be a Browser supported type"
+        raise TypeError("Browse() argument must have __dict__ attribute, or be a Browser supported type")
         
     dlg = dynamic_browser (root)
     dlg.CreateWindow()

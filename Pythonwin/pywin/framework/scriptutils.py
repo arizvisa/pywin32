@@ -14,7 +14,7 @@ import traceback
 import linecache
 import bdb
 
-from cmdline import ParseArgs
+from .cmdline import ParseArgs
 
 RS_DEBUGGER_NONE=0 # Dont run under the debugger.
 RS_DEBUGGER_STEP=1 # Start stepping under the debugger
@@ -76,8 +76,8 @@ def IsOnPythonPath(path):
 			# Python 1.5 and later allows an empty sys.path entry.
 			if syspath and win32ui.FullPath(syspath)==path:
 				return 1
-		except win32ui.error, details:
-			print "Warning: The sys.path entry '%s' is invalid\n%s" % (syspath, details)
+		except win32ui.error as details:
+			print("Warning: The sys.path entry '%s' is invalid\n%s" % (syspath, details))
 	return 0
 
 def GetPackageModuleName(fileName):
@@ -96,7 +96,7 @@ def GetPackageModuleName(fileName):
 			path, modBit = os.path.split(path)
 			modBits.append(modBit)
 			# If on path, _and_ existing package of that name loaded.
-			if IsOnPythonPath(path) and sys.modules.has_key(modBit) and \
+			if IsOnPythonPath(path) and modBit in sys.modules and \
 				( os.path.exists(os.path.join(path, '__init__.py')) or \
 				os.path.exists(os.path.join(path, '__init__.pyc')) or \
 				os.path.exists(os.path.join(path, '__init__.pyo')) \
@@ -158,9 +158,9 @@ def GetActiveFileName(bAutoSave = 1):
 		pathName = doc.GetPathName()
 
 		if bAutoSave and \
-		   (len(pathName)>0 or \
-		    doc.GetTitle()[:8]=="Untitled" or \
-		    doc.GetTitle()[:6]=="Script"): # if not a special purpose window
+			(len(pathName)>0 or \
+			doc.GetTitle()[:8]=="Untitled" or \
+			doc.GetTitle()[:6]=="Script"): # if not a special purpose window
 			if doc.IsModified():
 				try:
 					doc.OnSaveDocument(pathName)
@@ -262,7 +262,8 @@ def RunScript(defName=None, defArgs=None, bShowDialog = 1, debuggingType=None):
 
 	try:
 		f = open(script)
-	except IOError, (code, msg):
+	except IOError as xxx_todo_changeme:
+		(code, msg) = xxx_todo_changeme.args
 		win32ui.MessageBox("The file could not be opened - %s (%d)" % (msg, code))
 		return
 
@@ -308,14 +309,14 @@ def RunScript(defName=None, defArgs=None, bShowDialog = 1, debuggingType=None):
 			debugger.run(codeObject, __main__.__dict__, start_stepping=0)
 		else:
 			# Post mortem or no debugging
-			exec codeObject in __main__.__dict__
+			exec(codeObject, __main__.__dict__)
 		bWorked = 1
 	except bdb.BdbQuit:
 		# Dont print tracebacks when the debugger quit, but do print a message.
-		print "Debugging session cancelled."
+		print("Debugging session cancelled.")
 		exitCode = 1
 		bWorked = 1
-	except SystemExit, code:
+	except SystemExit as code:
 		exitCode = code
 		bWorked = 1
 	except KeyboardInterrupt:
@@ -328,13 +329,16 @@ def RunScript(defName=None, defArgs=None, bShowDialog = 1, debuggingType=None):
 			interact.edit.currentView.AppendToPrompt([])
 		bWorked = 1
 	except:
+		## ??? sys.exc_info is reset to (None, None, None) after some function calls -
+		##	Is this a 'feature' of py3k, or are we clearing an error somewhere ???
+		exc_type, exc_value, exc_traceback=sys.exc_info()
 		if interact.edit and interact.edit.currentView:
 			interact.edit.currentView.EnsureNoPrompt()
-		traceback.print_exc()
+		traceback.print_exception(exc_type, exc_value, exc_traceback)
 		if interact.edit and interact.edit.currentView:
 			interact.edit.currentView.AppendToPrompt([])
 		if debuggingType == RS_DEBUGGER_PM:
-			debugger.pm()
+			debugger.pm(exc_traceback)
 	sys.argv = oldArgv
 	if insertedPath0:
 		del sys.path[0]
@@ -361,7 +365,7 @@ def ImportFile():
 		pathName = None
 
 	if pathName is not None:
-		if os.path.splitext(pathName)[1].lower() <> ".py":
+		if os.path.splitext(pathName)[1].lower() != ".py":
 			pathName = None
 
 	if pathName is None:
@@ -377,7 +381,7 @@ def ImportFile():
 	path, modName = os.path.split(pathName)
 	modName, modExt = os.path.splitext(modName)
 	newPath = None
-	for key, mod in sys.modules.items():
+	for key, mod in list(sys.modules.items()):
 		if hasattr(mod, '__file__'):
 			fname = mod.__file__
 			base, ext = os.path.splitext(fname)
@@ -391,7 +395,7 @@ def ImportFile():
 		modName, newPath = GetPackageModuleName(pathName)
 		if newPath: sys.path.append(newPath)
 
-	if sys.modules.has_key(modName):
+	if modName in sys.modules:
 		bNeedReload = 1
 		what = "reload"
 	else:
@@ -403,16 +407,18 @@ def ImportFile():
 #	win32ui.GetMainFrame().BeginWaitCursor()
 
 	try:
-		# always do an import, as it is cheap is already loaded.  This ensures
+		# always do an import, as it is cheap if it's already loaded.  This ensures
 		# it is in our name space.
 		codeObj = compile('import '+modName,'<auto import>','exec')
 	except SyntaxError:
 		win32ui.SetStatusText('Invalid filename for import: "' +modName+'"')
 		return
 	try:
-		exec codeObj in __main__.__dict__
+		exec(codeObj, __main__.__dict__)
 		if bNeedReload:
-			reload(sys.modules[modName])
+
+			import imp
+			imp.reload(sys.modules[modName])
 #			codeObj = compile('reload('+modName+')','<auto import>','eval')
 #			exec codeObj in __main__.__dict__
 		win32ui.SetStatusText('Successfully ' + what + "ed module '"+modName+"'")
@@ -434,8 +440,8 @@ def CheckFile():
 	win32ui.DoWaitCursor(1)
 	try:
 		f = open(pathName)
-	except IOError, details:
-		print "Cant open file '%s' - %s" % (pathName, details)
+	except IOError as details:
+		print("Cant open file '%s' - %s" % (pathName, details))
 		return
 	try:
 		code = f.read() + "\n"
@@ -453,14 +459,14 @@ def CheckFile():
 	win32ui.DoWaitCursor(0)
 
 def RunTabNanny(filename):
-	import cStringIO
+	import io
 	tabnanny = FindTabNanny()
 	if tabnanny is None:
 		win32ui.MessageBox("The TabNanny is not around, so the children can run amok!" )
 		return
 		
 	# Capture the tab-nanny output
-	newout = cStringIO.StringIO()
+	newout = io.StringIO()
 	old_out = sys.stderr, sys.stdout
 	sys.stderr = sys.stdout = newout
 	try:
@@ -480,8 +486,8 @@ def RunTabNanny(filename):
 				pass
 			win32ui.SetStatusText("The TabNanny found trouble at line %d" % lineno)
 		except (IndexError, TypeError, ValueError):
-			print "The tab nanny complained, but I cant see where!"
-			print data
+			print("The tab nanny complained, but I cant see where!")
+			print(data)
 		return 0
 	return 1
 
@@ -512,7 +518,7 @@ def JumpToDocument(fileName, lineno=0, col = 1, nChars = 0, bScrollToTop = 0):
 		try:
 			view.EnsureCharsVisible(charNo)
 		except AttributeError:
-			print "Doesnt appear to be one of our views?"
+			print("Doesnt appear to be one of our views?")
 		view.SetSel(min(start, size), min(start + nChars, size))
 	if bScrollToTop:
 		curTop = view.GetFirstVisibleLine()
@@ -548,14 +554,14 @@ def FindTabNanny():
 	try:
 		path = win32api.RegQueryValue(win32con.HKEY_LOCAL_MACHINE, "SOFTWARE\\Python\\PythonCore\\%s\\InstallPath" % (sys.winver))
 	except win32api.error:
-		print "WARNING - The Python registry does not have an 'InstallPath' setting"
-		print "          The file '%s' can not be located" % (filename)
+		print("WARNING - The Python registry does not have an 'InstallPath' setting")
+		print("          The file '%s' can not be located" % (filename))
 		return None
 	fname = os.path.join(path, "Tools\\Scripts\\%s" % filename)
 	try:
 		os.stat(fname)
 	except os.error:
-		print "WARNING - The file '%s' can not be located in path '%s'" % (filename, path)
+		print("WARNING - The file '%s' can not be located in path '%s'" % (filename, path))
 		return None
 
 	tabnannyhome, tabnannybase = os.path.split(fname)

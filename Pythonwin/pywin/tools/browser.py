@@ -9,8 +9,7 @@ import __main__
 import string
 import win32ui
 from pywin.mfc import dialog
-
-import hierlist
+from . import hierlist
 from types import *
 
             
@@ -65,7 +64,7 @@ class HLIPythonObject(hierlist.HierListItem):
 	def GetSubList(self):
 		ret = []
 		try:
-			for (key, ob) in self.myobject.__dict__.items():
+			for (key, ob) in list(self.myobject.__dict__.items()):
 				if key not in special_names:
 					ret.append(MakeHLI( ob, key ) )
 		except (AttributeError, TypeError):
@@ -94,7 +93,7 @@ class HLIPythonObject(hierlist.HierListItem):
 		if hasattr(self.myobject, '__doc__'):
 			return 1
 		try:
-			for key in self.myobject.__dict__.keys():
+			for key in list(self.myobject.__dict__.keys()):
 				if key not in special_names:
 					return 1
 		except (AttributeError, TypeError):
@@ -204,8 +203,8 @@ class HLIFunction(HLIPythonObject):
 			ret.append( MakeHLI( self.myobject.func_argdefs, "Arg Defs" ))
 		except AttributeError:
 			pass
-		ret.append( MakeHLI( self.myobject.func_code, "Code" ))
-		ret.append( MakeHLI( self.myobject.func_globals, "Globals" ))
+		ret.append( MakeHLI( self.myobject.__code__, "Code" ))
+		ret.append( MakeHLI( self.myobject.__globals__, "Globals" ))
 		self.InsertDocString(ret)
 		return ret
 
@@ -242,7 +241,7 @@ class HLIDict(HLIPythonObject):
 			return len(self.myobject) > 0
 	def GetSubList(self):
 		ret = []
-		keys = self.myobject.keys()
+		keys = list(self.myobject.keys())
 		keys.sort()
 		for key in keys:
 			ob = self.myobject[key]
@@ -255,21 +254,21 @@ class HLIString(HLIPythonObject):
     def IsExpandable(self):
         return 0
 
-TypeMap = { ClassType : HLIClass, 
+TypeMap = { type : HLIClass, 
             FunctionType: HLIFunction,
-            TupleType: HLITuple,
-            DictType: HLIDict,
-            ListType: HLIList,
+            tuple: HLITuple,
+            dict: HLIDict,
+            list: HLIList,
             ModuleType: HLIModule,
-            InstanceType : HLIInstance,
+            ## InstanceType : HLIInstance,
             CodeType : HLICode,
             BuiltinFunctionType : HLIBuiltinFunction,
             FrameType : HLIFrame,
             TracebackType : HLITraceback,
-            StringType : HLIString,
-            IntType: HLIPythonObject,
-            LongType: HLIPythonObject,
-            FloatType: HLIPythonObject,
+            str : HLIString,
+            int: HLIPythonObject,
+            ## LongType: HLIPythonObject,
+            float: HLIPythonObject,
            }
 try:
     TypeMap[UnicodeType] = HLIString
@@ -364,7 +363,7 @@ def Browse (ob=__main__):
     " Browse the argument, or the main dictionary "
     root = MakeHLI (ob, 'root')
     if not root.IsExpandable():
-        raise TypeError, "Browse() argument must have __dict__ attribute, or be a Browser supported type"
+        raise TypeError("Browse() argument must have __dict__ attribute, or be a Browser supported type")
         
     dlg = dynamic_browser (root)
     dlg.CreateWindow()
@@ -397,7 +396,7 @@ class BrowserDocument (docview.Document):
 		self.root = root
 		self.SetTitle("Browser: " + root.name)
 	def OnOpenDocument (self, name):
-		raise TypeError, "This template can not open files"
+		raise TypeError("This template can not open files")
 		return 0
 
 class BrowserView(docview.TreeView):
@@ -422,7 +421,7 @@ def BrowseMDI(ob=__main__):
 	MakeTemplate()
 	root = MakeHLI(ob, repr(ob))
 	if not root.IsExpandable():
-		raise TypeError, "Browse() argument must have __dict__ attribute, or be a Browser supported type"
+		raise TypeError("Browse() argument must have __dict__ attribute, or be a Browser supported type")
 		
 	template.OpenObject(root)
 

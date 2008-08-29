@@ -1,15 +1,16 @@
 # Regedit - a Registry Editor for Python
 import win32api, win32ui, win32con, commctrl
 from pywin.mfc import window, docview, dialog
-import hierlist
+from . import hierlist
 import regutil
 import string
 
 def SafeApply( fn, args, err_desc = "" ):
 	try:
-		apply(fn, args)
+		fn(*args)
 		return 1
-	except win32api.error, (rc, fn, msg):
+	except win32api.error as xxx_todo_changeme:
+		(rc, fn, msg) = xxx_todo_changeme.args
 		msg = "Error " + err_desc + "\r\n\r\n" + msg
 		win32ui.MessageBox(msg)
 		return 0
@@ -40,7 +41,8 @@ class SplitterFrame(window.MDIChildWnd):
 
 		return 1
 
-	def OnItemDoubleClick(self,(hwndFrom, idFrom, code), extra):
+	def OnItemDoubleClick(self, xxx_todo_changeme1, extra):
+		(hwndFrom, idFrom, code) = xxx_todo_changeme1
 		if idFrom==win32ui.AFX_IDW_PANE_FIRST:
 			# Tree control
 			return None
@@ -209,7 +211,7 @@ class RegistryValueView(docview.ListView):
 		# Query for a new value.
 		try:
 			newVal = self.GetItemsCurrentValue(item, keyVal)
-		except TypeError, details:
+		except TypeError as details:
 			win32ui.MessageBox(details)
 			return
 		
@@ -217,7 +219,8 @@ class RegistryValueView(docview.ListView):
 		if d.DoModal()==win32con.IDOK:
 			try:
 				self.SetItemsCurrentValue(item, keyVal, d.newvalue)
-			except win32api.error, (rc, fn, desc):
+			except win32api.error as xxx_todo_changeme2:
+				(rc, fn, desc) = xxx_todo_changeme2.args
 				win32ui.MessageBox("Error setting value\r\n\n%s" % desc)
 			self.UpdateForRegItem(item)
 
@@ -226,7 +229,7 @@ class RegistryValueView(docview.ListView):
 		try:
 			val, type = win32api.RegQueryValueEx(hkey, valueName)
 			if type != win32con.REG_SZ:
-				raise TypeError, "Only strings can be edited"
+				raise TypeError("Only strings can be edited")
 			return val
 		finally:
 			win32api.RegCloseKey(hkey)
@@ -271,7 +274,7 @@ class RegDocument (docview.Document):
 		self.SetTitle("Registry Editor: " + subkey)
 
 	def OnOpenDocument (self, name):
-		raise TypeError, "This template can not open files"
+		raise TypeError("This template can not open files")
 		return 0
 		
 

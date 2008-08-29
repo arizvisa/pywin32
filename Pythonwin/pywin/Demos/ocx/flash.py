@@ -15,7 +15,7 @@ import sys
 FlashModule = gencache.EnsureModule("{D27CDB6B-AE6D-11CF-96B8-444553540000}", 0, 1, 0)
 
 if FlashModule is None:
- raise ImportError, "Flash does not appear to be installed."
+ raise ImportError("Flash does not appear to be installed.")
 
 class MyFlashComponent(activex.Control, FlashModule.ShockwaveFlash):
  def __init__(self):
@@ -27,7 +27,7 @@ class MyFlashComponent(activex.Control, FlashModule.ShockwaveFlash):
   self.started = 0
 
  def OnFSCommand(self, command, args):
-  print "FSCommend" , command, args
+  print("FSCommend" , command, args)
   self.x = self.x + 20
   self.y = self.y + 20
   self.angle = self.angle + 20
@@ -42,10 +42,10 @@ class MyFlashComponent(activex.Control, FlashModule.ShockwaveFlash):
   self.TPlay("_root.mikeBall")
 
  def OnProgress(self, percentDone):
-  print "PercentDone", percentDone
+  print("PercentDone", percentDone)
  def OnReadyStateChange(self, newState):
   # 0=Loading, 1=Uninitialized, 2=Loaded, 3=Interactive, 4=Complete
-  print "State", newState
+  print("State", newState)
 
 
 class BrowserFrame(window.MDIChildWnd):

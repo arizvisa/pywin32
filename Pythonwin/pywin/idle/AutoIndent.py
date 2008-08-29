@@ -1,40 +1,5 @@
-#from Tkinter import TclError
-#import tkMessageBox
-#import tkSimpleDialog
-
-###$ event <<newline-and-indent>>
-###$ win <Key-Return>
-###$ win <KP_Enter>
-###$ unix <Key-Return>
-###$ unix <KP_Enter>
-
-###$ event <<indent-region>>
-###$ win <Control-bracketright>
-###$ unix <Alt-bracketright>
-###$ unix <Control-bracketright>
-
-###$ event <<dedent-region>>
-###$ win <Control-bracketleft>
-###$ unix <Alt-bracketleft>
-###$ unix <Control-bracketleft>
-
-###$ event <<comment-region>>
-###$ win <Alt-Key-3>
-###$ unix <Alt-Key-3>
-
-###$ event <<uncomment-region>>
-###$ win <Alt-Key-4>
-###$ unix <Alt-Key-4>
-
-###$ event <<tabify-region>>
-###$ win <Alt-Key-5>
-###$ unix <Alt-Key-5>
-
-###$ event <<untabify-region>>
-###$ win <Alt-Key-6>
-###$ unix <Alt-Key-6>
-
-import PyParse
+import string
+from . import PyParse
 
 class AutoIndent:
 
@@ -116,7 +81,7 @@ class AutoIndent:
         self.text = editwin.text
 
     def config(self, **options):
-        for key, value in options.items():
+        for key, value in list(options.items()):
             if key == 'usetabs':
                 self.usetabs = value
             elif key == 'indentwidth':
@@ -126,7 +91,7 @@ class AutoIndent:
             elif key == 'context_use_ps1':
                 self.context_use_ps1 = value
             else:
-                raise KeyError, "bad option name: %s" % `key`
+                raise KeyError("bad option name: %s" % repr(key))
 
     # If ispythonsource and guess are true, guess a good value for
     # indentwidth based on file content (if possible), and if
@@ -136,7 +101,7 @@ class AutoIndent:
 
     def set_indentation_params(self, ispythonsource, guess=1):
         if guess and ispythonsource:
-            i = self.guess_indent()
+            i = 4 ## self.guess_indent()
             if 2 <= i <= 8:
                 self.indentwidth = i
             if self.indentwidth != self.tabwidth:
@@ -254,7 +219,7 @@ class AutoIndent:
             y = PyParse.Parser(self.indentwidth, self.tabwidth)
             for context in self.num_context_lines:
                 startat = max(lno - context, 1)
-                startatindex = `startat` + ".0"
+                startatindex = repr(startat) + ".0"
                 rawtext = text.get(startatindex, "insert")
                 y.set_str(rawtext)
                 bod = y.find_good_parse_start(
@@ -286,7 +251,7 @@ class AutoIndent:
                     else:
                         self.reindent_to(y.compute_backslash_indent())
                 else:
-                    assert 0, "bogus continuation type " + `c`
+                    assert 0, "bogus continuation type " + repr(c)
                 return "break"
 
             # This line starts a brand new stmt; indent relative to
@@ -492,7 +457,7 @@ def classifyws(s, tabwidth):
             effective = effective + 1
         elif ch == '\t':
             raw = raw + 1
-            effective = (effective / tabwidth + 1) * tabwidth
+            effective = (effective // tabwidth + 1) * tabwidth
         else:
             break
     return raw, effective
@@ -518,29 +483,24 @@ class IndentSearcher:
         if self.finished:
             return ""
         i = self.i = self.i + 1
-        mark = `i` + ".0"
+        mark = repr(i) + ".0"
         if self.text.compare(mark, ">=", "end"):
             return ""
         return self.text.get(mark, mark + " lineend+1c")
 
-    def tokeneater(self, type, token, start, end, line,
-                   INDENT=_tokenize.INDENT,
-                   NAME=_tokenize.NAME,
-                   OPENERS=('class', 'def', 'for', 'if', 'try', 'while')):
-        if self.finished:
-            pass
-        elif type == NAME and token in OPENERS:
-            self.blkopenline = line
-        elif type == INDENT and self.blkopenline:
-            self.indentedline = line
-            self.finished = 1
-
     def run(self):
+        OPENERS=('class', 'def', 'for', 'if', 'try', 'while')
         save_tabsize = _tokenize.tabsize
         _tokenize.tabsize = self.tabwidth
         try:
             try:
-                _tokenize.tokenize(self.readline, self.tokeneater)
+                for (typ, token, start, end, line) in _tokenize.tokenize(self.readline):
+                    if typ == NAME and token in OPENERS:
+                        self.blkopenline = line
+                    elif type == INDENT and self.blkopenline:
+                        self.indentedline = line
+                        break
+
             except (_tokenize.TokenError, IndentationError):
                 # since we cut off the tokenizer early, we can trigger
                 # spurious errors

@@ -38,7 +38,7 @@ import win32api
 from pywin.mfc import docview, dialog, window
 import win32con
 import sys, string, re, glob, os, stat, time
-import scriptutils
+from . import scriptutils
 
 def getsubdirs(d):
     dlist = []
@@ -56,19 +56,19 @@ class dirpath:
         for d in dp:
             if os.path.isdir(d):
                 d = d.lower()
-                if not dirs.has_key(d):
+                if d not in dirs:
                     dirs[d] = None
                     if recurse:
                         subdirs = getsubdirs(d)
                         for sd in subdirs:
                             sd = sd.lower()
-                            if not dirs.has_key(sd):
+                            if sd not in dirs:
                                 dirs[sd] = None
             elif os.path.isfile(d):
                 pass
             else:
                 x = None
-                if os.environ.has_key(d):
+                if d in os.environ:
                     x = dirpath(os.environ[d])
                 elif d[:5] == 'HKEY_':
                     keystr = d.split('\\')
@@ -89,16 +89,16 @@ class dirpath:
                     win32ui.MessageBox("Directory '%s' not found" % d)
                 if x:
                     for xd in x:
-                        if not dirs.has_key(xd):
+                        if xd not in dirs:
                             dirs[xd] = None
                             if recurse:
                                 subdirs = getsubdirs(xd)
                                 for sd in subdirs:
                                     sd = sd.lower()
-                                    if not dirs.has_key(sd):
+                                    if sd not in dirs:
                                         dirs[sd] = None
         self.dirs = []
-        for d in dirs.keys():
+        for d in list(dirs.keys()):
             self.dirs.append(d)
 
     def __getitem__(self, key):
@@ -247,7 +247,7 @@ class TheDocument(docview.RichEditDoc):
         #self.text = []
         self.GetFirstView().Append('#Pychecker Run in '+self.dirpattern+'  %s\n'%time.asctime())
         if self.verbose:
-            self.GetFirstView().Append('#   ='+`self.dp.dirs`+'\n')
+            self.GetFirstView().Append('#   ='+repr(self.dp.dirs)+'\n')
         self.GetFirstView().Append('# Files   '+self.filpattern+'\n')
         self.GetFirstView().Append('# Options '+self.greppattern+'\n')
         self.fplist = self.filpattern.split(';')
@@ -261,7 +261,7 @@ class TheDocument(docview.RichEditDoc):
         else:
             ##self.flist = glob.glob(self.dp[0]+'\\'+self.fplist[0])
             import operator
-            self.flist = reduce(operator.add, map(glob.glob,self.fplist) )
+            self.flist = reduce(operator.add, list(map(glob.glob,self.fplist)) )
             #import pywin.debugger;pywin.debugger.set_trace()
             self.startPycheckerRun()
     def idleHandler(self,handler,count):
@@ -275,8 +275,8 @@ class TheDocument(docview.RichEditDoc):
         self.result=None
         old=win32api.SetCursor(win32api.LoadCursor(0, win32con.IDC_APPSTARTING))
         win32ui.GetApp().AddIdleHandler(self.idleHandler)
-        import thread
-        thread.start_new(self.threadPycheckerRun,())
+        import _thread
+        _thread.start_new(self.threadPycheckerRun,())
         ##win32api.SetCursor(old)
     def threadPycheckerRun(self):
         result=''
@@ -312,7 +312,7 @@ class TheDocument(docview.RichEditDoc):
             self.GetFirstView().Append(result)
         finally:
             self.result=result
-            print '== Pychecker run finished =='
+            print('== Pychecker run finished ==')
             self.GetFirstView().Append('\n'+'== Pychecker run finished ==')
             self.SetModifiedFlag(0)
     def _inactive_idleHandler(self, handler, count):
@@ -326,7 +326,7 @@ class TheDocument(docview.RichEditDoc):
             for i in range(len(lines)):
                 line = lines[i]
                 if self.pat.search(line) != None:
-                    self.GetFirstView().Append(f+'('+`i+1` + ') '+line)
+                    self.GetFirstView().Append(f+'('+repr(i+1) + ') '+line)
         else:
             self.fndx = -1
             self.fpndx = self.fpndx + 1
@@ -348,7 +348,7 @@ class TheDocument(docview.RichEditDoc):
         return 1
 
     def GetParams(self):
-        return self.dirpattern+'\t'+self.filpattern+'\t'+self.greppattern+'\t'+`self.casesensitive`+'\t'+`self.recurse`+'\t'+`self.verbose`
+        return self.dirpattern+'\t'+self.filpattern+'\t'+self.greppattern+'\t'+repr(self.casesensitive)+'\t'+repr(self.recurse)+'\t'+repr(self.verbose)
 
     def OnSaveDocument(self, filename):
 #       print 'OnSaveDocument() filename=',filename
@@ -556,7 +556,7 @@ class TheDialog(dialog.Dialog):
             if newitems:
                 items = items + newitems
                 for item in items:
-                    win32api.WriteProfileVal(section, `i`, item, ini)
+                    win32api.WriteProfileVal(section, repr(i), item, ini)
                     i = i + 1
             self.UpdateData(0)
 

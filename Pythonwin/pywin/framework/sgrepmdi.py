@@ -28,7 +28,7 @@ import glob
 import os
 import stat
 import glob
-import scriptutils
+from pywin.framework import scriptutils
 
 def getsubdirs(d):
 	dlist = []
@@ -46,19 +46,19 @@ class dirpath:
 		for d in dp:
 			if os.path.isdir(d):
 				d = d.lower()
-				if not dirs.has_key(d):
+				if d not in dirs:
 					dirs[d] = None
 					if recurse:
 						subdirs = getsubdirs(d)
 						for sd in subdirs:
 							sd = sd.lower()
-							if not dirs.has_key(sd):
+							if sd not in dirs:
 								dirs[sd] = None
 			elif os.path.isfile(d):
 				pass
 			else:
 				x = None
-				if os.environ.has_key(d):
+				if d in os.environ:
 					x = dirpath(os.environ[d])
 				elif d[:5] == 'HKEY_':
 					keystr = d.split('\\')
@@ -79,16 +79,16 @@ class dirpath:
 					win32ui.MessageBox("Directory '%s' not found" % d)
 				if x:
 					for xd in x:
-						if not dirs.has_key(xd):
+						if xd not in dirs:
 							dirs[xd] = None
 							if recurse:
 								subdirs = getsubdirs(xd)
 								for sd in subdirs:
 									sd = sd.lower()
-									if not dirs.has_key(sd):
+									if sd not in dirs:
 										dirs[sd] = None
 		self.dirs = []
-		for d in dirs.keys():
+		for d in list(dirs.keys()):
 			self.dirs.append(d)
 
 	def __getitem__(self, key):
@@ -233,7 +233,7 @@ class GrepDocument(docview.RichEditDoc):
 		#self.text = []
 		self.GetFirstView().Append('#Search '+self.dirpattern+'\n')
 		if self.verbose:
-			self.GetFirstView().Append('#   ='+`self.dp.dirs`+'\n')
+			self.GetFirstView().Append('#   ='+repr(self.dp.dirs)+'\n')
 		self.GetFirstView().Append('# Files '+self.filpattern+'\n')
 		self.GetFirstView().Append('#   For '+self.greppattern+'\n')
 		self.fplist = self.filpattern.split(';')
@@ -262,7 +262,7 @@ class GrepDocument(docview.RichEditDoc):
 			for i in range(len(lines)):
 				line = lines[i]
 				if self.pat.search(line) != None:
-					self.GetFirstView().Append(f+'('+`i+1` + ') '+line)
+					self.GetFirstView().Append(f+'('+repr(i+1) + ') '+line)
 		else:
 			self.fndx = -1
 			self.fpndx = self.fpndx + 1
@@ -284,7 +284,7 @@ class GrepDocument(docview.RichEditDoc):
 		return 1
 
 	def GetParams(self):
-		return self.dirpattern+'\t'+self.filpattern+'\t'+self.greppattern+'\t'+`self.casesensitive`+'\t'+`self.recurse`+'\t'+`self.verbose`
+		return self.dirpattern+'\t'+self.filpattern+'\t'+self.greppattern+'\t'+repr(self.casesensitive)+'\t'+repr(self.recurse)+'\t'+repr(self.verbose)
 
 	def OnSaveDocument(self, filename):
 #		print 'OnSaveDocument() filename=',filename
@@ -403,7 +403,7 @@ class GrepDialog(dialog.Dialog):
 	def __init__(self, dp, fp, gp, cs, r, v):
 		style = win32con.DS_MODALFRAME | win32con.WS_POPUP | win32con.WS_VISIBLE | win32con.WS_CAPTION | win32con.WS_SYSMENU | win32con.DS_SETFONT
 		CS = win32con.WS_CHILD | win32con.WS_VISIBLE
-		tmp = [ ["Grep", (0, 0, 210, 90), style, None, (8, "MS Sans Serif")], ]
+		tmp = [ ["Grep", (0, 0, 210, 90), style, 0, (8, "MS Sans Serif")], ]
 		tmp.append([STATIC, "Grep For:",            -1, (7,   7,  50,  9), CS ])
 		tmp.append([EDIT,   gp,                    101, (52,  7, 144,  11), CS | win32con.WS_TABSTOP | win32con.ES_AUTOHSCROLL | win32con.WS_BORDER])
 		tmp.append([STATIC, "Directories:",         -1, (7,  20,  50,  9), CS ])
@@ -457,7 +457,7 @@ class GrepDialog(dialog.Dialog):
 			if newitems:
 				items = items + newitems
 				for item in items:
-					win32api.WriteProfileVal(section, `i`, item, ini)
+					win32api.WriteProfileVal(section, repr(i), item, ini)
 					i = i + 1
 			self.UpdateData(0)
 
@@ -477,7 +477,7 @@ class GrepParamsDialog(dialog.Dialog):
 		self.newitems = []
 		style = win32con.DS_MODALFRAME | win32con.WS_POPUP | win32con.WS_VISIBLE | win32con.WS_CAPTION | win32con.WS_SYSMENU | win32con.DS_SETFONT
 		CS = win32con.WS_CHILD | win32con.WS_VISIBLE
-		tmp = [ ["Grep Parameters", (0, 0, 205, 100), style, None, (8, "MS Sans Serif")], ]
+		tmp = [ ["Grep Parameters", (0, 0, 205, 100), style, 0, (8, "MS Sans Serif")], ]
 		tmp.append([LISTBOX, '',                   107, (7,   7,  150,  72), CS | win32con.LBS_MULTIPLESEL| win32con.LBS_STANDARD | win32con.LBS_HASSTRINGS | win32con.WS_TABSTOP | win32con.LBS_NOTIFY])
 		tmp.append([BUTTON,'OK',         win32con.IDOK, (167, 7,  32, 12), CS | win32con.BS_DEFPUSHBUTTON| win32con.WS_TABSTOP])
 		tmp.append([BUTTON,'Cancel', win32con.IDCANCEL, (167,23,  32, 12), CS | win32con.BS_PUSHBUTTON| win32con.WS_TABSTOP])

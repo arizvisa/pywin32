@@ -6,7 +6,7 @@ Base class for Dialogs.  Also contains a few useful utility functions
 
 import win32ui
 import win32con
-import window
+from . import window
 
 def dllFromDll(dllid):
 	" given a 'dll' (maybe a dll, filename, etc), return a DLL object "
@@ -18,7 +18,7 @@ def dllFromDll(dllid):
 		try:
 			dllid.GetFileName()
 		except AttributeError:
-			raise TypeError, "DLL parameter must be None, a filename or a dll object"
+			raise TypeError("DLL parameter must be None, a filename or a dll object")
 		return dllid
 	
 class Dialog(window.Wnd):
@@ -59,15 +59,15 @@ class Dialog(window.Wnd):
 	def AddDDX( self, *args ):
 		self._obj_.datalist.append(args)
 	# Make a dialog object look like a dictionary for the DDX support
-	def __nonzero__(self):
+	def __bool__(self):
 		return 1
 	def __len__(self): return len(self.data)
 	def __getitem__(self, key): return self.data[key]
 	def __setitem__(self, key, item): self._obj_.data[key] = item# self.UpdateData(0)
-	def keys(self): return self.data.keys()
-	def items(self): return self.data.items()
-	def values(self): return self.data.values()
-	def has_key(self, key): return self.data.has_key(key)
+	def keys(self): return list(self.data.keys())
+	def items(self): return list(self.data.items())
+	def values(self): return list(self.data.values())
+	def has_key(self, key): return key in self.data
 
 class PrintDialog(Dialog):
 	" Base class for a print dialog"
@@ -82,7 +82,7 @@ class PrintDialog(Dialog):
                      dllid=None):
 		self.dll=dllFromDll(dllid)
 		if type(dlgID)==type([]):	# a template
-			raise TypeError, "dlgID parameter must be an integer resource ID"
+			raise TypeError("dlgID parameter must be an integer resource ID")
 		dlg=win32ui.CreatePrintDialog(dlgID, printSetupOnly,
                                               flags, parent,
                                               self.dll)
@@ -232,6 +232,6 @@ def GetSimpleInput(prompt, defValue='', title=None ):
 			return Dialog.OnInitDialog(self)
 			
 	dlg=DlgSimpleInput( prompt, defValue, title)
-	if dlg.DoModal() <> win32con.IDOK:
+	if dlg.DoModal() != win32con.IDOK:
 		return None
 	return dlg['result']

@@ -24,7 +24,7 @@ def FinalizeHelp():
 				frame = 0
 				win32help.HtmlHelp(frame, None, win32help.HH_UNINITIALIZE, htmlhelp_handle)
 			except win32help.error:
-				print "Failed to finalize htmlhelp!"
+				print("Failed to finalize htmlhelp!")
 			htmlhelp_handle = None
 			
 def OpenHelpFile(fileName, helpCmd = None, helpArg = None):
@@ -73,10 +73,11 @@ def _ListAllHelpFilesInRoot(root):
 	retList = []
 	try:
 		key = win32api.RegOpenKey(root, regutil.BuildDefaultPythonKey() + "\\Help", 0, win32con.KEY_READ)
-	except win32api.error, (code, fn, details):
+	except win32api.error as xxx_todo_changeme:
+		(code, fn, details) = xxx_todo_changeme.args
 		import winerror
 		if code!=winerror.ERROR_FILE_NOT_FOUND:
-			raise win32api.error, (code, fn, details)
+			raise win32api.error(code, fn, details)
 		return retList
 	try:
 		keyNo = 0
@@ -86,10 +87,11 @@ def _ListAllHelpFilesInRoot(root):
 				helpFile = win32api.RegQueryValue(key, helpDesc)
 				retList.append((helpDesc, helpFile))
 				keyNo = keyNo + 1
-			except win32api.error, (code, fn, desc):
+			except win32api.error as xxx_todo_changeme1:
+				(code, fn, desc) = xxx_todo_changeme1.args
 				import winerror
 				if code!=winerror.ERROR_NO_MORE_ITEMS:
-					raise win32api.error, (code, fn, desc)
+					raise win32api.error(code, fn, desc)
 				break
 	finally:
 		win32api.RegCloseKey(key)
@@ -142,7 +144,7 @@ def SetHelpMenuOtherHelp(mainMenu):
 		otherMenu.DeleteMenu(0, win32con.MF_BYPOSITION)
 	
 	if helpIDMap:
-		for id, (desc, fname) in helpIDMap.items():
+		for id, (desc, fname) in list(helpIDMap.items()):
 			otherMenu.AppendMenu(win32con.MF_ENABLED|win32con.MF_STRING,id, desc)
 	else:
 		helpMenu.EnableMenuItem(otherHelpMenuPos, win32con.MF_BYPOSITION | win32con.MF_GRAYED)
