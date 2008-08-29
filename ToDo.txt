@@ -1,0 +1,50 @@
+Some things that still need work for Python 3.0
+
+win32ras - Add constants with unicode names
+
+Places where need to call PyType_Ready for all types defined in module
+	perfmon
+	directsound
+	dbi, odbc
+	win32ras, win2kras
+	win32help
+
+Swig doesn't handle com_interface_parent, adsi will not build
+
+Several types set Py_TPFLAGS_BASETYPE but do not have required infrastructure to actually subclass.
+
+
+
+Pythonwin -
+	LVITEM and TVITEM conversions use PyWinobject_AsTCHAR, result needs to be freed
+
+	xxx win32uimodule - Python_callback has 64-bit issues with HWND, WPARAM, LPARAM
+
+	xxx win32util.cpp - GetReprText needs fixes for Py3k unicode repr
+
+	is_uiObject leaks a ref to _obj_ for python classes with simulated subclassing of mfc object
+
+	'stop at exceptions' option doesn't do anything  (even in 2.x)
+
+	repr for MFC objects needs work, currently doesn't print associated python class due to recursion -
+		maybe special case it in __getattr__ ?
+
+	Work on direct subclassing of MFC types
+		tp_flags must include Py_TPFLAGS_BASETYPE
+		Requires that each type have tp_new, which needs to set the object's type to passed in type
+		As prelim work, convert functions that create MFC objects (CreateDialog, CreateMenu, etc) to keyword args,
+			as they will be very similar to tp_new for created type
+
+	
+
+	Pasted text ends up with empty lines
+
+	Autoindent gets spaces/tabs wrong
+
+
+
+	
+
+	
+
+	
