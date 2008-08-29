@@ -41,10 +41,8 @@ Pythonwin -
 
 	Autoindent gets spaces/tabs wrong
 
+	Several places where 'utf-8' is hardcoded, change to default_scintilla_encoding
 
-
-	
-
-	
+	Figure out a clean way to switch between commctrl.*A and commctrl.*W constants for hooking messages
 
 	
