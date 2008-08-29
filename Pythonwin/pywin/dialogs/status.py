@@ -24,7 +24,7 @@ def MakeProgressDlgTemplate(caption, staticText = ""):
     dlg = [[caption,
 	    (0, 0, w, h),
 	    style,
-	    None,
+	    0,
 	    (8, "MS Sans Serif")],
 	   ]
 
@@ -152,14 +152,14 @@ class CThreadedStatusProcessDialog(CStatusProgressDialog):
 		self.max = max
 		self._Send(MYWM_SET)
 
-class ProgressThread(_thread.WinThread):
+class ProgressThread(thread.WinThread):
 	def __init__(self,  title, msg = "", maxticks = 100, tickincr = 1):
 		self.title = title
 		self.msg = msg
 		self.maxticks = maxticks
 		self.tickincr = tickincr
 		self.dialog = None
-		_thread.WinThread.__init__(self)
+		thread.WinThread.__init__(self)
 		self.createdEvent = threading.Event()
 
 	def InitInstance(self):
@@ -170,7 +170,7 @@ class ProgressThread(_thread.WinThread):
 		except win32ui.error:
 			pass
 		self.createdEvent.set()
-		return _thread.WinThread.InitInstance(self)
+		return thread.WinThread.InitInstance(self)
 
 	def ExitInstance(self):
 		return 0
