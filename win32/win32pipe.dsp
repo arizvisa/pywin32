@@ -128,10 +128,6 @@ InputName=win32pipe
 
 SOURCE=.\src\win32pipemodule.cpp
 # End Source File
-# Begin Source File
-
-SOURCE=.\src\win32popen.cpp
-# End Source File
 # End Group
 # End Target
 # End Project
