@@ -10,7 +10,7 @@
 // @pymethod <o PyIID>|pywintypes|IID|Creates a new IID object
 PyObject *PyWinMethod_NewIID(PyObject *self, PyObject *args)
 {
-	BSTR bstrIID;
+	WCHAR *bstrIID;
 	PyObject *obIID;
 	IID iid;
 
@@ -38,7 +38,7 @@ PyObject *PyWinMethod_NewIID(PyObject *self, PyObject *args)
 		Py_INCREF(obIID);
 		return obIID;
 	}
-	if (!PyWinObject_AsBstr(obIID, &bstrIID))
+	if (!PyWinObject_AsWCHAR(obIID, &bstrIID))
 		return NULL;
 
 	HRESULT hr = CLSIDFromString(bstrIID, &iid);
@@ -49,14 +49,14 @@ PyObject *PyWinMethod_NewIID(PyObject *self, PyObject *args)
 		if ( FAILED(hr) )
 		{
 #endif
-			PyWinObject_FreeBstr(bstrIID);
+			PyWinObject_FreeWCHAR(bstrIID);
 			PyWin_SetBasicCOMError(hr);
 			return NULL;
 #ifndef MS_WINCE
 		}
 #endif
 	}
-	PyWinObject_FreeBstr(bstrIID);
+	PyWinObject_FreeWCHAR(bstrIID);
 	/* iid -> PyObject */
 	return PyWinObject_FromIID(iid);
 }
@@ -130,6 +130,8 @@ PyObject *PyWinUnicodeObject_FromIID(const IID &riid)
 	return PyWinObject_FromOLECHAR(oleRes);
 }
 
+
+#if (PY_VERSION_HEX < 0x03000000)
 static Py_ssize_t getreadbuf(PyObject *self, Py_ssize_t index, void **ptr)
 {
 	if ( index != 0 ) {
@@ -156,14 +158,26 @@ static PyBufferProcs PyIID_as_buffer = {
 	0,
 };
 
+#else	// Revised buffer interface for Py3k
+static int getbufferinfo(PyObject *self, Py_buffer *view, int flags)
+{
+	PyIID *pyiid = (PyIID *)self;
+	return PyBuffer_FillInfo(view, self, &pyiid->m_iid, sizeof(IID), 1, flags);
+}
+
+static PyBufferProcs PyIID_as_buffer = {
+	getbufferinfo,
+	NULL	// Don't need to release any memory from Py_buffer struct
+};
+#endif
+
 // @object PyIID|A Python object, representing an IID/CLSID.
 // <nl>All pythoncom functions that return a CLSID/IID will return one of these
 // objects.  However, in almost all cases, functions that expect a CLSID/IID
 // as a param will accept either a string object, or a native PyIID object.
 PYWINTYPES_EXPORT PyTypeObject PyIIDType =
 {
-	PyObject_HEAD_INIT(&PyType_Type)
-	0,
+	PYWIN_OBJECT_HEAD
 	"PyIID",
 	sizeof(PyIID),
 	0,
@@ -183,10 +197,29 @@ PYWINTYPES_EXPORT PyTypeObject PyIIDType =
 	0,						/* tp_call */
 	// @pymeth __str__|Used whenever a string representation of the IID is required.
 	PyIID::strFunc,			/* tp_str */
-	0,		/*tp_getattro*/
-	0,		/*tp_setattro*/
+	0,						/*tp_getattro*/
+	0,						/*tp_setattro*/
 	// @comm Note that IID objects support the buffer interface.  Thus buffer(iid) can be used to obtain the raw bytes.
-	&PyIID_as_buffer,	/*tp_as_buffer*/
+	&PyIID_as_buffer,		/*tp_as_buffer*/
+	Py_TPFLAGS_DEFAULT,		/* tp_flags */
+	0,						/* tp_doc */
+	0,						/* tp_traverse */
+	0,						/* tp_clear */
+	PyIID::richcompareFunc,	/* tp_richcompare */
+	0,						/* tp_weaklistoffset */
+	0,						/* tp_iter */
+	0,						/* tp_iternext */
+	0,						/* tp_methods */
+	0,						/* tp_members */
+	0,						/* tp_getset */
+	0,						/* tp_base */
+	0,						/* tp_dict */
+	0,						/* tp_descr_get */
+	0,						/* tp_descr_set */
+	0,						/* tp_dictoffset */
+	0,						/* tp_init */
+	0,						/* tp_alloc */
+	0,						/* tp_new */
 };
 
 PyIID::PyIID(REFIID riid)
@@ -218,6 +251,39 @@ int PyIID::compare(PyObject *ob)
 	return memcmp(&m_iid, &((PyIID *)ob)->m_iid, sizeof(m_iid));
 }
 
+// Py3k requires that objects implement richcompare to be used as dict keys
+PyObject *PyIID::richcompare(PyObject *other, int op)
+{
+	BOOL e;
+	if (PyIID_Check(other))
+		e=IsEqualIID(m_iid, ((PyIID *)other)->m_iid);
+	else
+		e=FALSE;
+
+	if (op==Py_EQ){
+		if (e){
+			Py_INCREF(Py_True);
+			return Py_True;
+			}
+		else{
+			Py_INCREF(Py_False);
+			return Py_False;
+			}
+		}
+	if (op==Py_NE){
+		if (!e){
+			Py_INCREF(Py_True);
+			return Py_True;
+			}
+		else{
+			Py_INCREF(Py_False);
+			return Py_False;
+			}
+		}
+	PyErr_SetString(PyExc_TypeError, "IIDs only compare equal or not equal");
+	return NULL;
+}
+
 long PyIID::hash(void)
 {
 	DWORD n[4];
@@ -231,7 +297,11 @@ long PyIID::hash(void)
 
 PyObject *PyIID::str(void)
 {
+#if (PY_VERSION_HEX < 0x03000000)
 	return PyWinStringObject_FromIID(m_iid);
+#else
+	return PyWinUnicodeObject_FromIID(m_iid);
+#endif
 }
 
 PyObject *PyIID::repr(void)
@@ -240,7 +310,7 @@ PyObject *PyIID::repr(void)
 	StringFromGUID2(m_iid, oleRes, sizeof(oleRes));
 	TCHAR buf[128];
 	wsprintf(buf, _T("IID('%ws')"), oleRes);
-	return PyString_FromString(buf);
+	return PyWinObject_FromTCHAR(buf);
 }
 
 /*static*/ void PyIID::deallocFunc(PyObject *ob)
@@ -253,6 +323,13 @@ int PyIID::compareFunc(PyObject *ob1, PyObject *ob2)
 {
 	return ((PyIID *)ob1)->compare(ob2);
 }
+
+// Py3k requires that objects implement richcompare to be used as dict keys
+PyObject *PyIID::richcompareFunc(PyObject *self, PyObject *other, int op)
+{
+	return ((PyIID *)self)->richcompare(other, op);
+}
+
 // @pymethod int|PyIID|__hash__|Used when the hash value of an IID object is required
 long PyIID::hashFunc(PyObject *ob)
 {

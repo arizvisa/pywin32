@@ -11,10 +11,8 @@ generates Windows .hlp files.
 
 ******************************************************************/
 
-#include "windows.h"
+#include "Pywintypes.h"
 #include "lzexpand.h"
-
-#include "Python.h"
 
 static PyObject *module_error;
 static PyObject *obHandleMap = NULL;
@@ -73,16 +71,19 @@ PyObject *ReturnLZError(char *fnName, long err = 0)
 static PyObject *
 PyGetExpandedName(PyObject *self, PyObject *args)
 {
-	char outName[_MAX_PATH+1];
-	char *nameIn;
-	if (!PyArg_ParseTuple(args, "s:GetExpandedName", &nameIn )) // @pyparm int|idControl||The Id of the control to be retrieved.
+	TCHAR outName[_MAX_PATH+1];
+	TCHAR *nameIn;
+	PyObject *obnameIn;
+	if (!PyArg_ParseTuple(args, "O:GetExpandedName", &obnameIn )) // @pyparm str|Source||Name of a compressed file
 		return NULL;
-
+	if (!PyWinObject_AsTCHAR(obnameIn, &nameIn, FALSE))
+		return NULL;
 	// @pyseeapi GetExpandedName
 	int ret = GetExpandedName(nameIn, outName);
+	PyWinObject_FreeTCHAR(nameIn);
 	if (ret!=1)
 		return ReturnLZError("GetExpandedName", ret);
-	return Py_BuildValue("s",outName);
+	return PyWinObject_FromTCHAR(outName);
 }
 
 // @pymethod |win32lz|Close|Closes a handle to an LZ file.
@@ -137,17 +138,20 @@ PyLZInit(PyObject *self, PyObject *args)
 static PyObject *
 PyLZOpenFile(PyObject *self, PyObject *args)
 {
-	char *fname;
+	TCHAR *fname;
+	PyObject *obfname;
 	int op;
-	if (!PyArg_ParseTuple(args, "si:OpenFile", &fname, &op ))
+	if (!PyArg_ParseTuple(args, "Oi:OpenFile", &obfname, &op ))
 		// @pyparm string|fileName||Name of file to open
 		// @pyparm int|action||Can be one of the wi32con.OF_ constants (OF_CREATE, OF_DELETE, etc)
 		return NULL;
-
+	if (!PyWinObject_AsTCHAR(obfname, &fname, FALSE))
+		return NULL;
 	// @pyseeapi LZOpenFile
 	OFSTRUCT of;
 	of.cBytes = sizeof(OFSTRUCT);
 	INT ret = LZOpenFile(fname, &of, op);
+	PyWinObject_FreeTCHAR(fname);
 	if (ret<0)
 		return ReturnLZError("LZOpenFile",ret);
 	return Py_BuildValue("i(iiiis)",ret, of.fFixedDisk, of.nErrCode, of.Reserved1, of.Reserved2, of.szPathName);
@@ -156,7 +160,7 @@ PyLZOpenFile(PyObject *self, PyObject *args)
 
 /* List of functions exported by this module */
 // @module win32lz|A module encapsulating the Windows LZ compression routines.
-static struct PyMethodDef win32ras_functions[] = {
+static struct PyMethodDef win32lz_functions[] = {
 	{"GetExpandedName",             PyGetExpandedName,  METH_VARARGS}, // @pymeth GetExpandedName|Retrieves the original name of an expanded file,
 	{"Close",                       PyLZClose,  METH_VARARGS}, // @pymeth Close|Closes a handle to an LZ file.
 	{"Copy",                        PyLZCopy,  METH_VARARGS}, // @pymeth Copy|Copies a source file to a destination file.
@@ -166,15 +170,44 @@ static struct PyMethodDef win32ras_functions[] = {
 };
 
 
-extern "C" __declspec(dllexport) void
-initwin32lz(void)
+extern "C" __declspec(dllexport)
+#if (PY_VERSION_HEX < 0x03000000)
+void initwin32lz(void)
+#else
+PyObject *PyInit_win32lz(void)
+#endif
 {
-  PyObject *dict, *module;
-  module = Py_InitModule("win32lz", win32ras_functions);
-  if (!module) /* Eeek - some serious error! */
-    return;
-  dict = PyModule_GetDict(module);
-  if (!dict) return; /* Another serious error!*/
-  module_error = PyString_FromString("win32lz error");
-  PyDict_SetItemString(dict, "error", module_error);
+	PyObject *dict, *module;
+	PyWinGlobals_Ensure();
+
+#if (PY_VERSION_HEX < 0x03000000)
+	module = Py_InitModule("win32lz", win32lz_functions);
+	if (!module)
+		return;
+	dict = PyModule_GetDict(module);
+	if (!dict)
+		return;
+#else
+
+	static PyModuleDef win32lz_def = {
+		PyModuleDef_HEAD_INIT,
+		"win32lz",
+		"A module encapsulating the Windows LZ compression routines.",
+		-1,
+		win32lz_functions
+		};
+	module = PyModule_Create(&win32lz_def);
+	if (!module)
+		return NULL;
+	dict = PyModule_GetDict(module);
+	if (!dict)
+		return NULL;
+#endif
+
+	module_error = PyString_FromString("win32lz error");
+	PyDict_SetItemString(dict, "error", module_error);
+
+#if (PY_VERSION_HEX >= 0x03000000)
+	return module;
+#endif
 }

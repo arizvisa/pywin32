@@ -1,5 +1,6 @@
 # Magic utility that "redirects" to pywintypesxx.dll
-
+import imp, sys, os
+sys.modules['pywintypes_loader']=sys.modules['pywintypes']
 def __import_pywin32_system_module__(modname, globs):
     # This has been through a number of iterations.  The problem: how to 
     # locate pywintypesXX.dll when it may be in a number of places, and how
@@ -17,7 +18,6 @@ def __import_pywin32_system_module__(modname, globs):
     # rely on a _win32sysloader module, implemented in C but not relying
     # on pywintypesXX.dll.  It then can check if the DLL we are looking for
     # lib is already loaded.
-    import imp, sys, os
     if not sys.platform.startswith("win32"):
         # These extensions can be built on Linux via the 'mainwin' toolkit.
         # Look for a native 'lib{modname}.so'
@@ -33,7 +33,7 @@ def __import_pywin32_system_module__(modname, globs):
                         # and fill our namespace with it.
                         globs.update(mod.__dict__)
                         return
-        raise ImportError, "No dynamic module " + modname
+        raise ImportError("No dynamic module " + modname)
     # See if this is a debug build.
     for suffix_item in imp.get_suffixes():
         if suffix_item[0]=='_d.pyd':
@@ -57,8 +57,7 @@ def __import_pywin32_system_module__(modname, globs):
             if os.path.isfile(found):
                 break
         else:
-            raise ImportError, \
-                  "Module '%s' isn't in frozen sys.path %s" % (modname, sys.path)
+            raise ImportError("Module '%s' isn't in frozen sys.path %s" % (modname, sys.path))
     else:
         # First see if it already in our process - if so, we must use that.
         import _win32sysloader
@@ -95,13 +94,16 @@ def __import_pywin32_system_module__(modname, globs):
                 found = os.path.join(os.path.dirname(__file__), filename)
         if found is None:
             # give up in disgust.
-            raise ImportError, \
-                  "No system module '%s' (%s)" % (modname, filename)
-
+            raise ImportError("No system module '%s' (%s)" % (modname, filename))
     # Python can load the module
-    mod = imp.load_module(modname, None, found, 
-                          ('.dll', 'rb', imp.C_EXTENSION))
+    ## print ('__import_pywin32_system_module__ (before):', __import_pywin32_system_module__)
+    mod = imp.load_dynamic(modname, found)
+    ## print ('mod:', mod)
+    ## print ('__import_pywin32_system_module__ (after):', __import_pywin32_system_module__)
     # and fill our namespace with it.
-    globs.update(mod.__dict__)
+    # This doesn't work in py3k, where pywintypes actually ends up as the compiled pyd
+    #	which is loaded, rather than this script
+    ## globs.update(mod.__dict__)
+    mod.__import_pywin32_system_module__ = __import_pywin32_system_module__
 
-__import_pywin32_system_module__("pywintypes", globals())
+__import_pywin32_system_module__("pywintypes", {})

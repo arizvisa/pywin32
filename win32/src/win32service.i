@@ -23,8 +23,14 @@ QueryServiceConfig2func fpQueryServiceConfig2=NULL;
 %}
 
 %init %{
+
+#if (PY_VERSION_HEX >= 0x03000000)
+	if (PyType_Ready(&PyHWINSTAType) == -1 ||
+		PyType_Ready(&PyHDESKType) == -1)
+		return NULL;
+#endif
+
 	// All errors raised by this module are of this type.
-	Py_INCREF(PyWinExc_ApiError);
 	PyDict_SetItemString(d, "error", PyWinExc_ApiError);
 	PyDict_SetItemString(d, "HWINSTAType", (PyObject *)&PyHWINSTAType);
 	PyDict_SetItemString(d, "HDESKType", (PyObject *)&PyHDESKType);
@@ -121,8 +127,7 @@ PyObject *PyHWINSTA::PyHWINSTA_new(PyTypeObject *tp, PyObject *args, PyObject *k
 
 PyTypeObject PyHWINSTAType =
 {
-	PyObject_HEAD_INIT(&PyType_Type)
-	0,
+	PYWIN_OBJECT_HEAD
 	"PyHWINSTA",
 	sizeof(PyHWINSTA),
 	0,
@@ -225,8 +230,7 @@ PyObject *PyHDESK::PyHDESK_new(PyTypeObject *tp, PyObject *args, PyObject *kwarg
 
 PyTypeObject PyHDESKType =
 {
-	PyObject_HEAD_INIT(&PyType_Type)
-	0,
+	PYWIN_OBJECT_HEAD
 	"PyHDESK",
 	sizeof(PyHDESK),
 	0,
@@ -239,7 +243,7 @@ PyTypeObject PyHDESKType =
 	PyHANDLEType.tp_as_number,	/* tp_as_number */
 	0,							/* tp_as_sequence */
 	0,							/* tp_as_mapping */
-	0,
+	0,							/* tp_hash */
 	0,							/* tp_call */
 	0,							/* tp_str */
 	PyObject_GenericGetAttr,

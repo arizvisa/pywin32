@@ -651,3 +651,20 @@ done:
 	Py_DECREF(str_tuple);
 	return ret;
 }
+
+// Copy s null terminated string so that it can be deallocated with PyWinObject_FreeString
+WCHAR *PyWin_CopyString(const WCHAR *input){
+	size_t len=wcslen(input);
+	WCHAR *output=(WCHAR *)PyMem_Malloc((len+1) * sizeof(WCHAR));
+	if (output==NULL)
+		return NULL;
+	return wcsncpy(output, input, len+1);
+}
+
+char *PyWin_CopyString(const char *input){
+	size_t len=strlen(input);
+	char *output=(char *)PyMem_Malloc((len+1) * sizeof(char));
+	if (output==NULL)
+		return NULL;
+	return strncpy(output, input, len+1);
+}

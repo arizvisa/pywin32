@@ -40,10 +40,10 @@ See - I told you the implementation was simple :-)
 
 
 const size_t BUFFER_SIZE = 0x20000; // Includes size integer.
-const char *MAP_OBJECT_NAME = "Global\\PythonTraceOutputMapping";
-const char *MUTEX_OBJECT_NAME = "Global\\PythonTraceOutputMutex";
-const char *EVENT_OBJECT_NAME = "Global\\PythonTraceOutputEvent";
-const char *EVENT_EMPTY_OBJECT_NAME = "Global\\PythonTraceOutputEmptyEvent";
+const TCHAR *MAP_OBJECT_NAME = _T("Global\\PythonTraceOutputMapping");
+const TCHAR *MUTEX_OBJECT_NAME = _T("Global\\PythonTraceOutputMutex");
+const TCHAR *EVENT_OBJECT_NAME = _T("Global\\PythonTraceOutputEvent");
+const TCHAR *EVENT_EMPTY_OBJECT_NAME = _T("Global\\PythonTraceOutputEmptyEvent");
 
 // Global\\ etc goodness:
 // On NT4/9x, 'Global\\' is not understood and will fail.
@@ -71,10 +71,10 @@ const char *EVENT_EMPTY_OBJECT_NAME = "Global\\PythonTraceOutputEmptyEvent";
 // This behavior is controlled by a global variable set at mutex creation time.
 BOOL use_global_namespace = FALSE;
 
-static const char *FixupObjectName(const char *global_name)
+static const TCHAR *FixupObjectName(const TCHAR *global_name)
 {
     if (!use_global_namespace)
-        return strchr(global_name, '\\')+1;
+        return _tcschr(global_name, '\\')+1;
     // global prefix is ok.
     return global_name;
 }
@@ -174,7 +174,7 @@ static PyObject* PyTraceObject_isatty(PyObject *self, PyObject *args)
 
 
 static PyMethodDef PyTraceObject_methods[] = {
-    {"blockingread", PyTraceObject_blockingread, METH_VARARGS}, // @pytmeth blockingread
+    {"blockingread", PyTraceObject_blockingread, METH_VARARGS}, // @pymeth blockingread
     {"read",    PyTraceObject_read, METH_VARARGS }, // @pymeth read|    
     {"write",   PyTraceObject_write, METH_VARARGS }, // @pymeth write|
     {"flush",   PyTraceObject_flush, METH_VARARGS }, // @pymeth flush|Does nothing, but included to better emulate file semantics.
@@ -191,8 +191,7 @@ static PyMemberDef PyTraceObject_members[] = {
 };
 
 static PyTypeObject PyTraceObjectType = {
-    PyObject_HEAD_INIT(&PyType_Type)
-    0,
+    PYWIN_OBJECT_HEAD
     "PyTraceObject",
     sizeof(PyTraceObject),
     0,
@@ -603,18 +602,45 @@ static struct PyMethodDef win32trace_functions[] = {
     {NULL,			NULL}
 };
 
-extern "C" __declspec(dllexport) void
-initwin32trace(void)
+extern "C" __declspec(dllexport)
+#if (PY_VERSION_HEX < 0x03000000)
+void initwin32trace(void)
+#else
+PyObject *PyInit_win32trace(void)
+#endif
 {
-    PyWinGlobals_Ensure();
-    PyObject *dict;
-    PyObject* pModMe = Py_InitModule("win32trace", win32trace_functions);
-    if (!pModMe) return;
-    dict = PyModule_GetDict(pModMe);
-    if (!dict) return;
+	PyObject *dict, *module;
+	PyWinGlobals_Ensure();
 
-    Py_INCREF(PyWinExc_ApiError);
-    PyDict_SetItemString(dict, "error", PyWinExc_ApiError);
+#if (PY_VERSION_HEX < 0x03000000)
+	#define RETURN_ERROR return;
+	module = Py_InitModule("win32trace", win32trace_functions);
+	if (!module)
+		return;
+	dict = PyModule_GetDict(module);
+	if (!dict)
+		return;
+#else
+	#define RETURN_ERROR return NULL;
+	static PyModuleDef win32trace_def = {
+		PyModuleDef_HEAD_INIT,
+		"win32trace",
+		"Interface to the Windows Console functions for dealing with character-mode applications.",
+		-1,
+		win32trace_functions
+		};
+	module = PyModule_Create(&win32trace_def);
+	if (!module)
+		return NULL;
+	dict = PyModule_GetDict(module);
+	if (!dict)
+		return NULL;
+#endif
+
+	if (PyType_Ready(&PyTraceObjectType) == -1)
+		RETURN_ERROR;
+	if (PyDict_SetItemString(dict, "error", PyWinExc_ApiError) == -1)
+		RETURN_ERROR;
 
     // Allocate memory for the security descriptor.
 
@@ -669,18 +695,21 @@ initwin32trace(void)
     hMutex = CreateMutex(&sa, FALSE, FixupObjectName(MUTEX_OBJECT_NAME));
     if (hMutex==NULL) {
         PyWin_SetAPIError("CreateMutex");
-        return ;
+        RETURN_ERROR ;
     }
     assert (hEvent==NULL);
     hEvent = CreateEvent(&sa, FALSE, FALSE, FixupObjectName(EVENT_OBJECT_NAME));
     if (hEvent==NULL) {
         PyWin_SetAPIError("CreateEvent");
-        return ;
+        RETURN_ERROR;
     }
     assert (hEventEmpty==NULL);
     hEventEmpty = CreateEvent(&sa, FALSE, FALSE, FixupObjectName(EVENT_EMPTY_OBJECT_NAME));
     if (hEventEmpty==NULL) {
         PyWin_SetAPIError("CreateEvent");
-        return ;
+        RETURN_ERROR ;
     }
+#if (PY_VERSION_HEX >= 0x03000000)
+	return module;
+#endif
 }

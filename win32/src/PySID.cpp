@@ -105,7 +105,7 @@ PyObject *PySID::IsValid(PyObject *self, PyObject *args)
 	if (!PyArg_ParseTuple(args, ":IsValid"))
 		return NULL;
 	PySID *This = (PySID *)self;
-	return PyInt_FromLong( IsValidSid(This->GetSID()) );
+	return PyBool_FromLong( IsValidSid(This->GetSID()) );
 }
 
 // @pymethod int|PySID|GetSubAuthority|Returns specified subauthority from SID
@@ -174,11 +174,11 @@ PyObject *PySID::GetSidIdentifierAuthority (PyObject *self, PyObject *args)
 
 	SID_IDENTIFIER_AUTHORITY *psia;  //wtf is this thing ?  Give it back to the user, let *him* figure it out
 	psia = ::GetSidIdentifierAuthority(This->GetSID());
-    return Py_BuildValue("(iiiiii)",psia->Value[0],psia->Value[1],psia->Value[2],psia->Value[3],psia->Value[4],psia->Value[5]);
+    return Py_BuildValue("(BBBBBB)",psia->Value[0],psia->Value[1],psia->Value[2],psia->Value[3],psia->Value[4],psia->Value[5]);
 }
 
 // @object PySID|A Python object, representing a SID structure
-static struct PyMethodDef PySID_methods[] = {
+struct PyMethodDef PySID::methods[] = {
 	{"Initialize",     PySID::Initialize, 1}, 	// @pymeth Initialize|Initialize the SID.
 	{"IsValid",        PySID::IsValid, 1}, 	// @pymeth IsValid|Determines if the SID is valid.
 	{"SetSubAuthority",PySID::SetSubAuthority, 1}, 	// @pymeth SetSubAuthority|Sets a SID SubAuthority
@@ -189,6 +189,28 @@ static struct PyMethodDef PySID_methods[] = {
 	{NULL}
 };
 
+
+
+#if (PY_VERSION_HEX < 0x03000000)
+/*static*/ Py_ssize_t PySID::getreadbuf(PyObject *self, Py_ssize_t index, void **ptr)
+{
+	if ( index != 0 ) {
+		PyErr_SetString(PyExc_SystemError,
+				"accessing non-existent SID segment");
+		return -1;
+	}
+	PySID *pysid = (PySID *)self;
+	*ptr = pysid->m_psid;
+	return GetLengthSid(pysid->m_psid);
+}
+
+/*static*/ Py_ssize_t PySID::getsegcount(PyObject *self, Py_ssize_t *lenp)
+{
+	if ( lenp )
+		*lenp = GetLengthSid(((PySID *)self)->m_psid);
+	return 1;
+}
+
 static PyBufferProcs PySID_as_buffer = {
 	PySID::getreadbuf,
 	0,
@@ -196,31 +218,63 @@ static PyBufferProcs PySID_as_buffer = {
 	0,
 };
 
+#else	// New buffer interface in Py3k
+
+/*static*/ int PySID::getbufferinfo(PyObject *self, Py_buffer *view, int flags)
+{
+	PySID *pysid = (PySID *)self;
+	return PyBuffer_FillInfo(view, self, pysid->m_psid, GetLengthSid(pysid->m_psid), 1, flags);
+}
+
+static PyBufferProcs PySID_as_buffer = {
+	PySID::getbufferinfo,
+	NULL,	// Does not have any allocated mem in Py_buffer struct 
+};
+
+#endif	// PY_VERSION_HEX < 0x03000000
 
 PYWINTYPES_EXPORT PyTypeObject PySIDType =
 {
-	PyObject_HEAD_INIT(&PyType_Type)
-	0,
+	PYWIN_OBJECT_HEAD
 	"PySID",
 	sizeof(PySID),
 	0,
 	PySID::deallocFunc,		/* tp_dealloc */
-	0,		/* tp_print */
-	PySID::getattr,				/* tp_getattr */
-	0,				/* tp_setattr */
+	0,						/* tp_print */
+	0,						/* tp_getattr */
+	0,						/* tp_setattr */
 	// @pymeth __cmp__|Used when objects are compared.
-	PySID::compareFunc,	/* tp_compare */
+	PySID::compareFunc,		/* tp_compare */
 	0,						/* tp_repr */
 	0,						/* tp_as_number */
-	0,	/* tp_as_sequence */
+	0,						/* tp_as_sequence */
 	0,						/* tp_as_mapping */
 	0,
 	0,						/* tp_call */
-	PySID::strFunc,		/* tp_str */
-	0,		/*tp_getattro*/
-	0,		/*tp_setattro*/
+	PySID::strFunc,			/* tp_str */
+	PyObject_GenericGetAttr,	/*tp_getattro*/
+	0,						/*tp_setattro*/
 	// @comm Note the PySID object supports the buffer interface.  Thus buffer(sid) can be used to obtain the raw bytes.
-	&PySID_as_buffer,	/*tp_as_buffer*/
+	&PySID_as_buffer,		/*tp_as_buffer*/
+	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,	/* tp_flags */
+	0,						/* tp_doc */
+	0,						/* tp_traverse */
+	0,						/* tp_clear */
+	0,						/* tp_richcompare */
+	0,						/* tp_weaklistoffset */
+	0,						/* tp_iter */
+	0,						/* tp_iternext */
+	PySID::methods,			/* tp_methods */
+	0,						/* tp_members */
+	0,						/* tp_getset */
+	0,						/* tp_base */
+	0,						/* tp_dict */
+	0,						/* tp_descr_get */
+	0,						/* tp_descr_set */
+	0,						/* tp_dictoffset */
+	0,						/* tp_init */
+	0,						/* tp_alloc */
+	0,						/* tp_new */
 };
 
 
@@ -251,17 +305,12 @@ PySID::~PySID()
 		free(m_psid);
 }
 
-PyObject *PySID::getattr(PyObject *self, char *name)
-{
-	return Py_FindMethod(PySID_methods, self, name);
-}
-
 int PySID::compare(PyObject *ob)
 {
-	PSID p1 = NULL, p2 = NULL;
-	PyWinObject_AsSID(this, &p1);
-	PyWinObject_AsSID(ob, &p2);
-	return EqualSid(p1, p2)==FALSE;
+	PSID p2;
+	if (!PyWinObject_AsSID(ob, &p2, FALSE))
+		return -2;
+	return EqualSid(this->GetSID(), p2)==FALSE;
 }
 
 
@@ -276,26 +325,6 @@ int PySID::compareFunc(PyObject *ob1, PyObject *ob2)
 {
 	delete (PySID *)ob;
 }
-
-/*static*/ Py_ssize_t PySID::getreadbuf(PyObject *self, Py_ssize_t index, void **ptr)
-{
-	if ( index != 0 ) {
-		PyErr_SetString(PyExc_SystemError,
-				"accessing non-existent SID segment");
-		return -1;
-	}
-	PySID *pysid = (PySID *)self;
-	*ptr = pysid->m_psid;
-	return GetLengthSid(pysid->m_psid);
-}
-
-/*static*/ Py_ssize_t PySID::getsegcount(PyObject *self, Py_ssize_t *lenp)
-{
-	if ( lenp )
-		*lenp = GetLengthSid(((PySID *)self)->m_psid);
-	return 1;
-}
-
 
 // NOTE:  This function taken from KB Q131320.
 BOOL GetTextualSid( 
@@ -390,12 +419,12 @@ BOOL GetTextualSid(
 		return PyString_FromString("PySID: Invalid SID");
 	}
 	// Space for the "PySID:" prefix.
-	const char *prefix = "PySID:";
-	char *buf = (char *)malloc(strlen(prefix)+bufSize);
+	TCHAR *prefix = _T("PySID:");
+	TCHAR *buf = (TCHAR *)malloc((_tcslen(prefix)+bufSize) * sizeof(TCHAR));
 	if (buf==NULL) return PyErr_NoMemory();
-	strcpy(buf, prefix);
-	GetTextualSid(psid, buf+strlen(prefix), &bufSize);
-	PyObject *ret = PyString_FromString(buf);
+	_tcscpy(buf, prefix);
+	GetTextualSid(psid, buf+_tcslen(prefix), &bufSize);
+	PyObject *ret = PyWinObject_FromTCHAR(buf);
 	free(buf);
 	return ret;
 }

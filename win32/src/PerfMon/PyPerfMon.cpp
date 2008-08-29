@@ -85,7 +85,7 @@ PyObject *PyUnloadPerfCounterTextStrings(PyObject *self, PyObject *args)
 }
 
 /* List of functions exported by this module */
-// @module perfmon|A module which supports common Windows types.
+// @module perfmon|A module which wraps Performance Monitor functions.
 static struct PyMethodDef perfmon_functions[] = {
 	{"LoadPerfCounterTextStrings",     PyLoadPerfCounterTextStrings, 1}, 	// @pymeth LoadPerfCounterTextStrings|
 	{"UnloadPerfCounterTextStrings",   PyUnloadPerfCounterTextStrings, 1}, 	// @pymeth UnloadPerfCounterTextStrings|
@@ -97,13 +97,34 @@ static struct PyMethodDef perfmon_functions[] = {
 
 
 
-extern "C" __declspec(dllexport) void
-initperfmon(void)
+extern "C" __declspec(dllexport)
+#if (PY_VERSION_HEX < 0x03000000)
+void initperfmon(void)
 {
-  PyObject *dict, *module;
-  module = Py_InitModule("perfmon", perfmon_functions);
-  if (!module) return;
-  dict = PyModule_GetDict(module);
+	PyObject *dict, *module;
+	module = Py_InitModule("perfmon", perfmon_functions);
+	if (!module) return;
+	dict = PyModule_GetDict(module);
 }
 
+#else
+PyObject *PyInit_perfmon(void)
+{
+	PyObject *dict, *module;
+	static PyModuleDef permon_def = {
+		PyModuleDef_HEAD_INIT,
+		"perfmon",
+		"Contains functions and objects wrapping the Performance Monitor APIs",
+		-1,
+		perfmon_functions
+		};
+	module = PyModule_Create(&permon_def);
+	if (!module)
+		return NULL;
+	dict = PyModule_GetDict(module);
+	if (!dict)
+		return NULL;
+	return module;
+}
+#endif
 

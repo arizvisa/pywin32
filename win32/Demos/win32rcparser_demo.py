@@ -18,7 +18,7 @@ g_rcname = os.path.abspath(
         os.path.join( this_dir, "..", "test", "win32rcparser", "test.rc"))
 
 if not os.path.isfile(g_rcname):
-    raise RuntimeError, "Can't locate test.rc (should be at '%s')" % (g_rcname,)
+    raise RuntimeError("Can't locate test.rc (should be at '%s')" % (g_rcname,))
 
 class DemoWindow:
     def __init__(self, dlg_template):
@@ -63,8 +63,8 @@ class DemoWindow:
 def DemoModal():
     # Load the .rc file.
     resources = win32rcparser.Parse(g_rcname)
-    for id, ddef in resources.dialogs.items():
-        print "Displaying dialog", id
+    for id, ddef in list(resources.dialogs.items()):
+        print("Displaying dialog", id)
         w=DemoWindow(ddef)
         w.DoModal()
 

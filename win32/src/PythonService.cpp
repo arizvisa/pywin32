@@ -540,33 +540,50 @@ static struct PyMethodDef servicemanager_functions[] = {
 	{NULL}
 };
 
-static int AddConstant(PyObject *dict, const char *key, long value)
-{
-	PyObject *oval = PyInt_FromLong(value);
-	if (!oval)
-	{
-		return 1;
-	}
-	int rc = PyDict_SetItemString(dict, (char*)key, oval);
-	Py_DECREF(oval);
-	return rc;
-}
 
-#define ADD_CONSTANT(tok) AddConstant(dict, #tok, tok)
+#define ADD_CONSTANT(tok) PyModule_AddIntConstant(dict, #tok, tok)
 
-extern "C" __declspec(dllexport) void
-initservicemanager(void)
+extern "C" __declspec(dllexport)
+#if (PY_VERSION_HEX < 0x03000000)
+void initservicemanager(void)
+#else
+PyObject *PyInit_servicemanager(void)
+#endif
 {
+
+	PyObject *dict, *module;
+	PyWinGlobals_Ensure();
+
+#if (PY_VERSION_HEX < 0x03000000)
+#define RETURN_ERROR return;
+	  module = Py_InitModule("servicemanager", servicemanager_functions);
+	if (!module)
+		return;
+	dict = PyModule_GetDict(module);
+	if (!dict)
+		return;
+#else
+
+#define RETURN_ERROR return NULL;
+	static PyModuleDef servicemanager_def = {
+		PyModuleDef_HEAD_INIT,
+		"servicemanager",
+		"A module that interfaces with the Windows Service Control Manager.",
+		-1,
+		servicemanager_functions
+		};
+	module = PyModule_Create(&servicemanager_def);
+	if (!module)
+		return NULL;
+	dict = PyModule_GetDict(module);
+	if (!dict)
+		return NULL;
+#endif
+
   HMODULE advapi32_module;
-  PyObject *dict, *module;
-  module = Py_InitModule("servicemanager", servicemanager_functions);
-  if (!module) /* Eeek - some serious error! */
-    return;
-  dict = PyModule_GetDict(module);
-  if (!dict) return; /* Another serious error!*/
-
   servicemanager_startup_error = PyErr_NewException("servicemanager.startup_error", NULL, NULL);
-  if (servicemanager_startup_error == NULL) return;
+  if (servicemanager_startup_error == NULL)
+	  RETURN_ERROR;
 
   PyDict_SetItemString(dict, "startup_error", servicemanager_startup_error);
 
@@ -585,7 +602,6 @@ initservicemanager(void)
   ADD_CONSTANT(EVENTLOG_WARNING_TYPE);
   ADD_CONSTANT(EVENTLOG_AUDIT_SUCCESS);
   ADD_CONSTANT(EVENTLOG_AUDIT_FAILURE);
-  PyWinGlobals_Ensure();
 
   // Check if we can use the newer control handler registration function
   // which permits us to support multiple services.  This should be available
@@ -602,6 +618,10 @@ initservicemanager(void)
           g_maxServices = MAX_SERVICES;
       }
   }
+
+#if (PY_VERSION_HEX >= 0x03000000)
+	return module;
+#endif
 }
 
 // Couple of helpers for the service manager
@@ -616,7 +636,12 @@ static void PyService_InitPython()
 	// than "c:\path\to\ExeName.exe"
 	// This, however, shouldnt be a problem, as Python itself
 	// knows how to get the .EXE name when it needs.
+#if (PY_VERSION_HEX < 0x03000000)
 	Py_SetProgramName(__argv[0]);
+#else
+	Py_SetProgramName(__wargv[0]);
+#endif;
+
 #ifdef BUILD_FREEZE
 	PyInitFrozenExtensions();
 #endif
@@ -626,9 +651,14 @@ static void PyService_InitPython()
 #endif
 	// Ensure we are set for threading.
 	PyEval_InitThreads();
-	PySys_SetArgv(__argc, __argv);
 
+#if (PY_VERSION_HEX < 0x03000000)
+	PySys_SetArgv(__argc, __argv);
 	initservicemanager();
+#else
+	PySys_SetArgv(__argc, __wargv);
+	PyInit_servicemanager();
+#endif
 }
 
 /*************************************************************************

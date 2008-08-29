@@ -1,5 +1,7 @@
 # 'Request' example added jjk  11/20/98
 
+import site ## still not fixed in 3.0b3
+
 import win32ui
 from pywin.mfc import object
 import dde
@@ -9,14 +11,14 @@ class MySystemTopic(object.Object):
 		object.Object.__init__(self, dde.CreateServerSystemTopic())
 
 	def Exec(self, cmd):
-		print "System Topic asked to exec", cmd
+		print("System Topic asked to exec", cmd)
 
 class MyOtherTopic(object.Object):
 	def __init__(self, topicName):
 		object.Object.__init__(self, dde.CreateTopic(topicName))
 
 	def Exec(self, cmd):
-		print "Other Topic asked to exec", cmd
+		print("Other Topic asked to exec", cmd)
 
 class MyRequestTopic(object.Object):
 	def __init__(self, topicName):
@@ -25,7 +27,7 @@ class MyRequestTopic(object.Object):
 		object.Object.__init__(self, topic)
 
 	def Request(self, aString):
-		print "Request Topic asked to compute length of:", aString
+		print("Request Topic asked to compute length of:", aString)
 		return(str(len(aString)))
 
 server = dde.CreateServer()

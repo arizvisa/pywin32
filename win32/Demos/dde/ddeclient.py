@@ -1,5 +1,5 @@
 # 'Request' example added jjk  11/20/98
-
+import site ## Py3k bug 3279
 import win32ui
 import dde
 
@@ -15,5 +15,5 @@ conversation.Exec("DoSomethingElse")
 conversation.ConnectTo("RunAny", "ComputeStringLength")
 s = 'abcdefghi'
 sl = conversation.Request(s)
-print 'length of "%s" is %s'%(s,sl)
+print('length of "%s" is %s'%(s,sl))
 

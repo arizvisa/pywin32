@@ -228,4 +228,4 @@ if __name__=='__main__':
 
     data, key = sspiclient.encrypt("hello")
     assert sspiserver.decrypt(data, key) == "hello"
-    print "cool!"
+    print("cool!")

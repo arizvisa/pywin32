@@ -2584,7 +2584,7 @@ static PyObject *PyFlushPrinter(PyObject *self, PyObject *args)
 
 
 /* List of functions exported by this module */
-// @module win32print|A module, encapsulating the Windows Win32 API.
+// @module win32print|A module encapsulating the Windows printing API.
 static struct PyMethodDef win32print_functions[] = {
 	{"OpenPrinter",				PyOpenPrinter, 1}, // @pymeth OpenPrinter|Retrieves a handle to a printer.
 	{"GetPrinter",				PyGetPrinter       ,1}, // @pymeth GetPrinter|Retrieves information about a printer
@@ -2645,15 +2645,39 @@ static void AddConstant(PyObject *dict, char *name, long val)
 }
 
 
-extern "C" __declspec(dllexport) void
-initwin32print(void)
+extern "C" __declspec(dllexport)
+#if (PY_VERSION_HEX < 0x03000000)
+void initwin32print(void)
+#else
+PyObject *PyInit_win32print(void)
+#endif
 {
   PyObject *module, *dict;
   PyWinGlobals_Ensure();
-  module = Py_InitModule("win32print", win32print_functions);
-  if (!module) return;
-  dict = PyModule_GetDict(module);
-  if (!dict) return;
+
+#if (PY_VERSION_HEX < 0x03000000)
+	module = Py_InitModule("win32print", win32print_functions);
+	if (!module)
+		return;
+	dict = PyModule_GetDict(module);
+	if (!dict)
+		return;
+#else
+	static PyModuleDef win32print_def = {
+		PyModuleDef_HEAD_INIT,
+		"win32print",
+		"A module encapsulating the Windows printing API.",
+		-1,
+		win32print_functions
+		};
+	module = PyModule_Create(&win32print_def);
+	if (!module)
+		return NULL;
+	dict = PyModule_GetDict(module);
+	if (!dict)
+		return NULL;
+#endif
+
   AddConstant(dict, "PRINTER_INFO_1", 1);
   AddConstant(dict, "PRINTER_ENUM_LOCAL", PRINTER_ENUM_LOCAL);
   AddConstant(dict, "PRINTER_ENUM_NAME", PRINTER_ENUM_NAME);
@@ -2835,5 +2859,8 @@ initwin32print(void)
 	pfnSetDefaultPrinter=(SetDefaultPrinterfunc)GetProcAddress(hmodule, "SetDefaultPrinterW");
   }
   dummy_tuple=PyTuple_New(0);
-}
 
+#if (PY_VERSION_HEX >= 0x03000000)
+	return module;
+#endif
+}

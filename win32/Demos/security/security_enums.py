@@ -14,21 +14,21 @@ class Enum:
                     try:
                         const_val=getattr(winnt, const_name)
                     except AttributeError:
-                        raise AttributeError, 'Constant "%s" not found in win32security, ntsecuritycon, or winnt.' %const_name 
+                        raise AttributeError('Constant "%s" not found in win32security, ntsecuritycon, or winnt.' %const_name) 
             setattr(self, const_name, const_val)
 
     def lookup_name(self, const_val):
         """Looks up the name of a particular value."""
-        for k,v in self.__dict__.items():
+        for k,v in list(self.__dict__.items()):
             if v==const_val:
                 return k
-        raise AttributeError, 'Value %s not found in enum' %const_val
+        raise AttributeError('Value %s not found in enum' %const_val)
 
     def lookup_flags(self, flags):
         """Returns the names of all recognized flags in input, and any flags not found in the enum."""
         flag_names=[]
         unknown_flags=flags
-        for k,v in self.__dict__.items():
+        for k,v in list(self.__dict__.items()):
             if flags & v == v:
                 flag_names.append(k)
                 unknown_flags = unknown_flags & ~v

@@ -60,7 +60,6 @@
 #include "pyncb.h"
 
 
-
 /****************************************************************************
 		HELPER FUNCTIONS
 
@@ -129,55 +128,46 @@ BOOL PyNETENUMHANDLE::Close(void)
 
 // @pymethod |win32wnet|WNetAddConnection2|Creates a connection to a network resource. The function can redirect 
 // a local device to the network resource.
-static
-PyObject *
-PyWNetAddConnection2 (PyObject *self, PyObject *args)
-
+// @comm This function previously accepted separate parameters to construct a <o PyNETRESOURCE>.  It has been
+//	changed to accept a NETRESOURCE object instead of the individual elements.
+// @comm Accepts keyword arguments.
+// @pyseeapi WNetAddConnection2
+static PyObject *PyWNetAddConnection2 (PyObject *self, PyObject *args, PyObject *kwargs)
 {
-	// @todo Eventually should update this to use a NETRESOURCE object (it was written before PyNETRESOURCE)
-	DWORD	Type;  // @pyparm int|type||The resource type.  May be either RESOURCETYPE_DISK, RESOURCETYPE_PRINT, or RESOURCETYPE_ANY (from win32netcon)
-	LPSTR	LocalName; // @pyparm string|localName||holds the name of a local device to map connection to; may be NULL
-	LPSTR	RemoteName;	// @pyparm string|remoteName||holds the passed in remote machine\service name.
-	LPSTR	ProviderName = NULL;	// @pyparm string|ProviderName|None|holds name of network provider to use (if any): NULL lets OS handle it
-	LPSTR	Username = NULL; // @pyparm string|userName|None|The user name to connect as.
-	LPSTR	Password = NULL; // @pyparm string|password|None|The password to use.
-	
+	LPTSTR	Username = NULL;
+	LPTSTR	Password = NULL; 
+	PyObject *obnr, *obPassword=Py_None, *obUsername=Py_None, *ret=NULL;
 	DWORD	ErrorNo;		// holds the returned error number, if any
-	DWORD	flags = 0; // @pyparm int|flags|0|Specifies a DWORD value that describes connection options. The following value is currently defined.
-	// @flagh Value|Meaning
-	// @flag CONNECT_UPDATE_PROFILE|The network resource connection should be remembered. 
-	// <nl>If this bit flag is set, the operating system automatically attempts to restore the connection when the user logs on.
-	// <nl>The operating system remembers only successful connections that redirect local devices. It does not remember connections that are unsuccessful or deviceless connections. (A deviceless connection occurs when the lpLocalName member is NULL or points to an empty string.)
-	// <nl>If this bit flag is clear, the operating system does not automatically restore the connection at logon.
-	NETRESOURCE  NetResource;
+	DWORD	flags = 0;
+	NETRESOURCE  * pNetResource;
 
-	if (!PyArg_ParseTuple(args,"izs|zzzi",&Type,&LocalName,&RemoteName,&ProviderName,&Username,&Password, &flags))
+	static char *keywords[] = {"NetResource","Password","UserName","Flags", NULL};
+	if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|OOk", keywords,
+		&obnr,			// @pyparm <o PyNETRESOURCE>|NetResource||Describes the network resource for the connection.
+		&obPassword,	// @pyparm str|Password|None|The password to use.  Use None for default credentials.
+		&obUsername,	// @pyparm str|UserName|None|The user name to connect as.  Use None for default credentials.
+		&flags))		// @pyparm int|Flags|0|Combination win32netcon.CONNECT_* flags
 		return NULL;
-
-// Build the NETRESOURCE structure
-    Py_BEGIN_ALLOW_THREADS
-
-	memset((void *)&NetResource, '\0', sizeof(NETRESOURCE));
-	NetResource.dwType = Type;
-	NetResource.lpLocalName = LocalName;
-	NetResource.lpProvider = ProviderName;
-	NetResource.lpRemoteName = RemoteName;
-
-#ifdef _WIN32_WCE_	// Windows CE only has the #3 version...use NULL for HWND to simulate #2
-	ErrorNo = WNetAddConnection3(NULL,&NetResource, Password, Username, flags);
-#else
-	ErrorNo = WNetAddConnection2(&NetResource, Password, Username, flags);
-#endif
-	Py_END_ALLOW_THREADS
-
-	if (ErrorNo != NO_ERROR)
-	{
-		return ReturnNetError("WNetAddConnection2", ErrorNo);
-	}
-
-	Py_INCREF(Py_None);
-	return Py_None;
-
+	if (PyWinObject_AsNETRESOURCE(obnr, &pNetResource, FALSE)
+		&& PyWinObject_AsTCHAR(obPassword, &Password, TRUE)
+		&& PyWinObject_AsTCHAR(obUsername, &Username, TRUE)){
+		Py_BEGIN_ALLOW_THREADS
+		#ifdef _WIN32_WCE_	// Windows CE only has the #3 version...use NULL for HWND to simulate #2
+			ErrorNo = WNetAddConnection3(NULL, pNetResource, Password, Username, flags);
+		#else
+			ErrorNo = WNetAddConnection2(pNetResource, Password, Username, flags);
+		#endif
+		Py_END_ALLOW_THREADS
+		if (ErrorNo != NO_ERROR)
+			ReturnNetError("WNetAddConnection2", ErrorNo);
+		else{
+			Py_INCREF(Py_None);
+			ret = Py_None;
+			}
+		}
+	PyWinObject_FreeTCHAR(Password);
+	PyWinObject_FreeTCHAR(Username);
+	return ret;
 };
 
 // @pymethod |win32wnet|WNetCancelConnection2|Closes network connections made by WNetAddConnection2 or 3
@@ -185,18 +175,20 @@ static
 PyObject *
 PyWNetCancelConnection2 (PyObject *self, PyObject *args)
 {
-	LPSTR	lpName; // @pyparm string|name||Name of existing connection to be closed
+	LPTSTR	lpName; // @pyparm string|name||Name of existing connection to be closed
 	DWORD	dwFlags; // @pyparm int|flags||Currently determines if the persisent connection information will be updated as a result of this call.
 	DWORD	bForce; // @pyparm int|force||indicates if the close operation should be forced. (i.e. ignore open files and connections)
 	DWORD	ErrorNo;
 
-	if(!PyArg_ParseTuple(args, "sii",&lpName, &dwFlags, &bForce))
+	PyObject *obName;
+	if(!PyArg_ParseTuple(args, "Okk", &obName, &dwFlags, &bForce))
 		return NULL;
-
+	if (!PyWinObject_AsTCHAR(obName, &lpName, FALSE))
+		return NULL;
 	Py_BEGIN_ALLOW_THREADS
 		ErrorNo = WNetCancelConnection2(lpName, dwFlags, (BOOL)bForce);
 	Py_END_ALLOW_THREADS
-
+	PyWinObject_FreeTCHAR(lpName);
 	if (ErrorNo != NO_ERROR)
 	{
 		return ReturnNetError("WNetCancelConnection2", ErrorNo);
@@ -219,15 +211,12 @@ PyWNetOpenEnum(PyObject *self, PyObject *args)
 	// @pyparm int|scope||Specifies the scope of the enumeration.
 	// @pyparm int|type||Specifies the resource types to enumerate.
 	// @pyparm int|usage||Specifies the resource usage to be enumerated.
-	// @pyparm <o NETRESOURCE>|resource||Python NETRESOURCE object.
+	// @pyparm <o PyNETRESOURCE>|resource||Python NETRESOURCE object.
 
 	if (!PyArg_ParseTuple(args, "iiiO", &dwScope,&dwType,&dwUsage,&ob_nr))
 		return NULL;
-	if (ob_nr == Py_None)
-		p_nr = NULL;
-	else if
-		(!PyWinObject_AsNETRESOURCE(ob_nr, &p_nr, FALSE))
-			return(ReturnError("failed converting NetResource Object","WNetOpenEnum"));
+	if (!PyWinObject_AsNETRESOURCE(ob_nr, &p_nr, TRUE))
+		return NULL;
 
 	Py_BEGIN_ALLOW_THREADS
 	Errno = WNetOpenEnum(dwScope, dwType, dwUsage, p_nr, &hEnum);
@@ -262,7 +251,7 @@ PyWNetCloseEnum(PyObject *self, PyObject *args)
 	return Py_None;
 };
 
-// @pymethod [<o NETRESOURCE>, ...]|win32wnet|WNetEnumResource|Enumerates a list of resources
+// @pymethod [<o PyNETRESOURCE>, ...]|win32wnet|WNetEnumResource|Enumerates a list of resources
 static
 PyObject *
 PyWNetEnumResource(PyObject *self, PyObject *args)
@@ -477,7 +466,7 @@ done:
 	return ret;
 }
 
-// @pymethod (<o NETRESOURCE>, str)|win32wnet|WNetGetResourceInformation|Finds the type and provider of a network resource
+// @pymethod (<o PyNETRESOURCE>, str)|win32wnet|WNetGetResourceInformation|Finds the type and provider of a network resource
 // @rdesc Returns a NETRESOURCE and a string containing the trailing part of the remote path
 PyObject *
 PyWNetGetResourceInformation(PyObject *self, PyObject *args)
@@ -493,7 +482,7 @@ PyWNetGetResourceInformation(PyObject *self, PyObject *args)
 #endif
 
 	if (!PyArg_ParseTuple(args, "O!", &PyNETRESOURCEType, 
-		&NRT))	// @pyparm <o NETRESOURCE>|NetResource||Describes a network resource.  lpRemoteName is required, dwType and lpProvider can be supplied if known
+		&NRT))	// @pyparm <o PyNETRESOURCE>|NetResource||Describes a network resource.  lpRemoteName is required, dwType and lpProvider can be supplied if known
 		return NULL;
 
 	if (!PyWinObject_AsNETRESOURCE(NRT, &nrin, FALSE))
@@ -562,14 +551,14 @@ PyObject *PyWNetGetLastError(PyObject *self, PyObject *args)
 	DWORD err, extendederr;
 	TCHAR errstr[1024], provider[256];
 	Py_BEGIN_ALLOW_THREADS
-	err=WNetGetLastError(&extendederr, errstr, sizeof(errstr), provider, sizeof(provider));
+	err=WNetGetLastError(&extendederr, errstr, sizeof(errstr)/sizeof(TCHAR), provider, sizeof(provider)/sizeof(TCHAR));
 	Py_END_ALLOW_THREADS
 	if (err==NO_ERROR)
 		return Py_BuildValue("kNN", extendederr, PyWinObject_FromTCHAR(errstr), PyWinObject_FromTCHAR(provider));
 	return ReturnNetError("WNetGetLastError", err);
 }
 
-// @pymethod <o NETRESOURCE>|win32wnet|WNetGetResourceParent|Finds the parent resource of a network resource
+// @pymethod <o PyNETRESOURCE>|win32wnet|WNetGetResourceParent|Finds the parent resource of a network resource
 PyObject *PyWNetGetResourceParent(PyObject *self, PyObject *args)
 {
 	NETRESOURCE *nr, *parentnr=NULL;
@@ -579,7 +568,7 @@ PyObject *PyWNetGetResourceParent(PyObject *self, PyObject *args)
 #endif
 	PyObject *obnr, *ret=NULL;
 	if (!PyArg_ParseTuple(args, "O:WNetGetResourceParent", 
-		&obnr))		// @pyparm <o NETRESOURCE>|NetResource||Describes a network resource.  lpRemoteName and lpProvider are required, dwType is recommended for efficiency
+		&obnr))		// @pyparm <o PyNETRESOURCE>|NetResource||Describes a network resource.  lpRemoteName and lpProvider are required, dwType is recommended for efficiency
 		return NULL;
 	if (!PyWinObject_AsNETRESOURCE(obnr, &nr, FALSE))
 		return NULL;
@@ -620,7 +609,7 @@ static PyMethodDef win32wnet_functions[] = {
 	// @pymeth Netbios|Executes a Netbios call.
 	{"Netbios",					PyWinMethod_Netbios,			1,	"Calls the windows Netbios function"},
 	// @pymeth WNetAddConnection2|Creates a connection to a network resource.
-	{"WNetAddConnection2",		PyWNetAddConnection2,		1,	"type,localname,remotename,provider,username,password (does not use NETRESOURCE)"},
+	{"WNetAddConnection2",		(PyCFunction)PyWNetAddConnection2,	METH_KEYWORDS|METH_VARARGS,	"WNetAddConnection2(NetResource, Password, UserName, Flags)"},
 	// @pymeth WNetCancelConnection2|Closes network connections made by WNetAddConnection2 or 3
 	{"WNetCancelConnection2",	PyWNetCancelConnection2,	1,	"localname,dwflags,bforce"},
 	// @pymeth WNetOpenEnum|Opens an Enumeration Handle for Enumerating Resources with <om win32wnet.WNetEnumResource>
@@ -642,21 +631,52 @@ static PyMethodDef win32wnet_functions[] = {
 	{NULL,			NULL}
 };
 
-extern "C" __declspec(dllexport) 
-void
-initwin32wnet(void)
-
+extern "C" __declspec(dllexport)
+#if (PY_VERSION_HEX < 0x03000000)
+void initwin32wnet(void)
+#else
+PyObject *PyInit_win32wnet(void)
+#endif
 {
-  PyObject *dict, *module;
-  module = Py_InitModule("win32wnet", win32wnet_functions);
-  if (!module) return;
-  dict = PyModule_GetDict(module);
-  if (!dict) return;
-  PyWinGlobals_Ensure();
-  PyDict_SetItemString(dict, "error", PyWinExc_ApiError);
-  PyDict_SetItemString(dict, "NETRESOURCEType", (PyObject *)&PyNETRESOURCEType);
-  PyDict_SetItemString(dict, "NCBType", (PyObject *)&PyNCBType);
+	PyObject *dict, *module;
+#if (PY_VERSION_HEX < 0x03000000)
+	module = Py_InitModule("win32wnet", win32wnet_functions);
+	if (!module)
+		return;
+	dict = PyModule_GetDict(module);
+	if (!dict)
+		return;
 
-  Py_INCREF(PyWinExc_ApiError);
+#else
+	static PyModuleDef win32wnet_def = {
+		PyModuleDef_HEAD_INIT,
+		"win32wnet",
+		"A module that exposes the Windows Networking API.",
+		-1,
+		win32wnet_functions
+		};
+	module = PyModule_Create(&win32wnet_def);
+	if (!module)
+		return NULL;
+	dict = PyModule_GetDict(module);
+	if (!dict)
+		return NULL;
+#endif
+
+	PyWinGlobals_Ensure();
+	Py_INCREF(PyWinExc_ApiError);
+	PyDict_SetItemString(dict, "error", PyWinExc_ApiError);
+
+#if (PY_VERSION_HEX >= 0x03000000)
+	if ((PyType_Ready(&PyNETRESOURCEType) == -1) ||
+		(PyType_Ready(&PyNCBType) == -1))
+		return NULL;
+#endif
+
+	PyDict_SetItemString(dict, "NETRESOURCEType", (PyObject *)&PyNETRESOURCEType);
+	PyDict_SetItemString(dict, "NCBType", (PyObject *)&PyNCBType);
+
+#if (PY_VERSION_HEX >= 0x03000000)
+  return module;
+#endif;
 }
-

@@ -12,6 +12,7 @@
 #include <time.h>
 
 #include "pywintypes.h"
+#include "structmember.h"
 
 /* Python 1.5.2 doesn't have PyObject_New
    PyObject_NEW is not *quite* as safe, but seem to work fine
@@ -34,6 +35,10 @@ typedef struct
 	PyObject *objectOf;
 } DbiContainer;
 
+static struct PyMemberDef DbiContainer_members[] = {
+	{"value", offsetof(DbiContainer, objectOf), T_OBJECT},
+	{NULL},
+};
 
 PyObject *dbiValue(PyObject *o)
 {
@@ -68,21 +73,6 @@ static PyMethodDef noMethods[] =
 {
 	{0, 0}
 };
-
-static PyObject *dbiGetAttr
-(
-	PyObject *self,
-	char *name
-)
-{
-	if (!strcmp(name, "value"))
-	{
-		PyObject *val = dbiValue(self);
-		Py_INCREF(val);
-		return val;
-	}
-	return Py_FindMethod(noMethods, self, name);
-}
 
 static PyObject *dbiRawStr(PyObject *self)
 {
@@ -121,6 +111,8 @@ static PyObject* dt_nb_float(PyObject* a)
 {
 	return delg(a)->nb_float(dbiValue(a));
 }
+
+#if (PY_VERSION_HEX < 0x03000000)
 static PyObject* dt_nb_oct(PyObject* a)
 {
 	return delg(a)->nb_oct(dbiValue(a));
@@ -129,6 +121,8 @@ static PyObject* dt_nb_hex(PyObject* a)
 {
 	return delg(a)->nb_hex(dbiValue(a));
 }
+#endif
+
 static int dt_cmp(PyObject *a, PyObject *b)
 {
 	return dbiValue(a)->ob_type->tp_compare(a,b);
@@ -140,7 +134,9 @@ PyNumberMethods dt_as_number =
 	dt_nb_add ,   /* nb_add */
 	dt_nb_subtract ,   /* nb_subtract */
 	0,   /* nb_multiply */
-	0,   /* nb_divide */
+#if (PY_VERSION_HEX < 0x03000000)
+	0,   /* nb_divide (removed in Python 3)*/
+#endif
 	0,   /* nb_remainder */
 	0,   /* nb_divmod */
 	0,   /* nb_power */
@@ -154,33 +150,58 @@ PyNumberMethods dt_as_number =
 	0,   /* nb_and */
 	0,   /* nb_xor */
 	0,   /* nb_or */
-	dt_nb_coerce,   /* nb_coerce */
+#if (PY_VERSION_HEX < 0x03000000)
+	dt_nb_coerce,   /* nb_coerce (removed in Python 3) */
+#endif
 	dt_nb_int ,   /* nb_int */
 	dt_nb_long ,   /* nb_long */
 	dt_nb_float ,   /* nb_float */
+#if (PY_VERSION_HEX < 0x03000000)
 	dt_nb_oct ,   /* nb_oct */
 	dt_nb_hex    /* nb_hex */
+#endif
 };
 
 static PyTypeObject DbiDate_Type =
 {
-	PyObject_HEAD_INIT (&PyType_Type)
-	0,			/*ob_size */
-	"DbiDate",		/*tp_name */
+	PYWIN_OBJECT_HEAD
+	"DbiDate",				/*tp_name */
 	sizeof(DbiContainer),	/*tp_basicsize */
-	0,			/*tp_itemsize */
-	dbiDealloc,		/*tp_dealloc */
-	0,			/*tp_print */
-	dbiGetAttr,		/*tp_getattr */
-	0,                    /*tp_setattr */
-	dt_cmp,               /*tp_compare */
+	0,						/*tp_itemsize */
+	dbiDealloc,				/*tp_dealloc */
+	0,						/*tp_print */
+	0,						/*tp_getattr */
+	0,						/*tp_setattr */
+	dt_cmp,					/*tp_compare */
 	0,                    /*tp_repr */
 	&dt_as_number,        /**tp_as_number */
 	0,                    /**tp_as_sequence */
 	0,                    /**tp_as_mapping */
 	0,                    /*tp_hash */
 	0,                    /*tp_call */
-	dateStr               /*tp_str */
+	dateStr,               /*tp_str */
+	PyObject_GenericGetAttr,	/* tp_getattro dbiGetAttr */
+	PyObject_GenericSetAttr,	/* tp_setattro */
+	0,						/*tp_as_buffer*/
+	Py_TPFLAGS_DEFAULT,		/* tp_flags */
+	0,						/* tp_doc */
+	0,						/* tp_traverse */
+	0,						/* tp_clear */
+	0,						/* tp_richcompare */
+	0,						/* tp_weaklistoffset */
+	0,						/* tp_iter */
+	0,						/* tp_iternext */
+	noMethods,				/* tp_methods */
+	DbiContainer_members,	/* tp_members */
+	0,						/* tp_getset */
+	0,						/* tp_base */
+	0,						/* tp_dict */
+	0,						/* tp_descr_get */
+	0,						/* tp_descr_set */
+	0,						/* tp_dictoffset */
+	0,						/* tp_init */
+	0,						/* tp_alloc */
+	0,						/* tp_new */
 };
 
 static int dt_nb_coerce(PyObject **pv, PyObject **pw)
@@ -198,14 +219,13 @@ static int dt_nb_coerce(PyObject **pv, PyObject **pw)
 
 static PyTypeObject DbiRaw_Type =
 {
-	PyObject_HEAD_INIT (&PyType_Type)
-	0,			/*ob_size */
-	"DbiRaw",		/*tp_name */
+	PYWIN_OBJECT_HEAD
+	"DbiRaw",				/*tp_name */
 	sizeof(DbiContainer),	/*tp_basicsize */
-	0,			/*tp_itemsize */
-	dbiDealloc,   	/*tp_dealloc */
-	0,			/*tp_print */
-	dbiGetAttr,		/*tp_getattr */
+	0,						/*tp_itemsize */
+	dbiDealloc,				/*tp_dealloc */
+	0,						/*tp_print */
+	0,						/*tp_getattr */
 	0,                    /*tp_setattr */
 	0,                    /*tp_compare */
 	0,                    /*tp_repr */
@@ -213,20 +233,72 @@ static PyTypeObject DbiRaw_Type =
 	0,                    /**tp_as_sequence */
 	0,                    /**tp_as_mapping */
 	0,                    /*tp_hash */
-	0,                    /*tp_call */
-	dbiRawStr             /*tp_str */
+	0,						/*tp_call */
+	dbiRawStr,				/*tp_str */
+	PyObject_GenericGetAttr,	/* tp_getattro */
+	PyObject_GenericSetAttr,	/* tp_setattro */
+	0,						/*tp_as_buffer*/
+	Py_TPFLAGS_DEFAULT,		/* tp_flags */
+	0,						/* tp_doc */
+	0,						/* tp_traverse */
+	0,						/* tp_clear */
+	0,						/* tp_richcompare */
+	0,						/* tp_weaklistoffset */
+	0,						/* tp_iter */
+	0,						/* tp_iternext */
+	noMethods,				/* tp_methods */
+	DbiContainer_members,	/* tp_members */
+	0,						/* tp_getset */
+	0,						/* tp_base */
+	0,						/* tp_dict */
+	0,						/* tp_descr_get */
+	0,						/* tp_descr_set */
+	0,						/* tp_dictoffset */
+	0,						/* tp_init */
+	0,						/* tp_alloc */
+	0,						/* tp_new */
 };
 
 static PyTypeObject DbiRowId_Type =
 {
-  PyObject_HEAD_INIT (&PyType_Type)
-  0,			/*ob_size */
-  "DbiRowId",		/*tp_name */
-  sizeof(DbiContainer),	/*tp_basicsize */
-  0,			/*tp_itemsize */
-  dbiDealloc,   	/*tp_dealloc */
-  0,			/*tp_print */
-  dbiGetAttr		/*tp_getattr */
+	PYWIN_OBJECT_HEAD
+	"DbiRowId",				/*tp_name */
+	sizeof(DbiContainer),	/*tp_basicsize */
+	0,						/*tp_itemsize */
+	dbiDealloc,				/*tp_dealloc */
+	0,						/*tp_print */
+	0,						/*tp_getattr */
+	0,                    /*tp_setattr */
+	0,                    /*tp_compare */
+	0,                    /*tp_repr */
+	0,                    /**tp_as_number */
+	0,                    /**tp_as_sequence */
+	0,                    /**tp_as_mapping */
+	0,                    /*tp_hash */
+	0,						/*tp_call */
+	dbiRawStr,				/*tp_str */
+	PyObject_GenericGetAttr,	/* tp_getattro */
+	PyObject_GenericSetAttr,	/* tp_setattro */
+	0,						/*tp_as_buffer*/
+	Py_TPFLAGS_DEFAULT,		/* tp_flags */
+	0,						/* tp_doc */
+	0,						/* tp_traverse */
+	0,						/* tp_clear */
+	0,						/* tp_richcompare */
+	0,						/* tp_weaklistoffset */
+	0,						/* tp_iter */
+	0,						/* tp_iternext */
+	noMethods,				/* tp_methods */
+	DbiContainer_members,	/* tp_members */
+	0,						/* tp_getset */
+	0,						/* tp_base */
+	0,						/* tp_dict */
+	0,						/* tp_descr_get */
+	0,						/* tp_descr_set */
+	0,						/* tp_dictoffset */
+	0,						/* tp_init */
+	0,						/* tp_alloc */
+	0,						/* tp_new */
 };
 
 static PyObject *makeDate(PyObject *self, PyObject *args)
@@ -277,27 +349,51 @@ static PyMethodDef globalMethods[] =
 	{0,     0}        /* Sentinel */
 };
 
-__declspec(dllexport) void
-initdbi()
+extern "C" __declspec(dllexport)
+#if (PY_VERSION_HEX < 0x03000000)
+void initdbi(void)
+#else
+PyObject *PyInit_dbi(void)
+#endif
 {
-	PyObject *m = Py_InitModule("dbi", globalMethods);
-	PyObject *d;
-	if (!m) /* Eeek - some serious error! */
+	PyObject *dict, *module;
+	PyWinGlobals_Ensure();
+
+#if (PY_VERSION_HEX < 0x03000000)
+	module = Py_InitModule("dbi", globalMethods);
+	if (!module)
 		return;
-	d = PyModule_GetDict(m);
-	if (!d) return; /* Another serious error!*/
-	PyDict_SetItemString(d, "STRING",
+	dict = PyModule_GetDict(module);
+	if (!dict)
+		return;
+#else
+	static PyModuleDef dbi_def = {
+		PyModuleDef_HEAD_INIT,
+		"dbi",
+		"Wraps ODBC datatypes",
+		-1,
+		globalMethods
+		};
+	module = PyModule_Create(&dbi_def);
+	if (!module)
+		return NULL;
+	dict = PyModule_GetDict(module);
+	if (!dict)
+		return NULL;
+#endif
+
+	PyDict_SetItemString(dict, "STRING",
 						 DbiString = PyString_FromString("STRING"));
-	PyDict_SetItemString(d, "RAW",
+	PyDict_SetItemString(dict, "RAW",
 						 DbiRaw = PyString_FromString("RAW"));
-	PyDict_SetItemString(d, "NUMBER",
+	PyDict_SetItemString(dict, "NUMBER",
 						 DbiNumber = PyString_FromString("NUMBER"));
-	PyDict_SetItemString(d, "DATE",
+	PyDict_SetItemString(dict, "DATE",
 						 DbiDate = PyString_FromString("DATE"));
-	PyDict_SetItemString(d, "ROWID",
+	PyDict_SetItemString(dict, "ROWID",
 						 DbiRowId = PyString_FromString("ROWID"));
 	PyDict_SetItemString(
-		d, "TYPES",
+		dict, "TYPES",
 		Py_BuildValue("(OOOOO)",
 					  DbiString,
 					  DbiRaw,
@@ -307,23 +403,27 @@ initdbi()
 
 	/* Establish errors */
 	PyDict_SetItemString(
-		d, "noError",
+		dict, "noError",
 		DbiNoError = PyString_FromString("dbi.no-error"));
 	PyDict_SetItemString(
-		d, "opError",
+		dict, "opError",
 		DbiOpError = PyString_FromString("dbi.operation-error"));
 	PyDict_SetItemString(
-		d, "progError",
+		dict, "progError",
 		DbiProgError = PyString_FromString("dbi.program-error"));
 	PyDict_SetItemString(
-		d, "integrityError",
+		dict, "integrityError",
 		DbiIntegrityError = PyString_FromString("dbi.integrity-error"));
 	PyDict_SetItemString(
-		d, "dataError",
+		dict, "dataError",
 		DbiDataError = PyString_FromString("dbi.data-error"));
 	PyDict_SetItemString(
-		d, "internalError",
+		dict, "internalError",
 		DbiInternalError = PyString_FromString("dbi.internal-error"));
+
+#if (PY_VERSION_HEX >= 0x03000000)
+	return module;
+#endif
 }
 
 int dbiIsDate(const PyObject *o)

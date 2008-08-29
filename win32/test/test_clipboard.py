@@ -77,21 +77,21 @@ class TestGlobalMemory(unittest.TestCase):
     def tearDown(self):
         CloseClipboard()
     def test_mem(self):
-        val = "test"
+        val = b"test"
         SetClipboardData(win32con.CF_TEXT, val)
         # Get the raw data - this will include the '\0'
         raw_data = GetGlobalMemory(GetClipboardDataHandle(win32con.CF_TEXT))
         self.failUnlessEqual(val + '\0', raw_data)
     def test_bad_mem(self):
         if sys.getwindowsversion()[0] > 5:
-            print "skipping test_bad_mem - fails on Vista (x64 at least - not sure about x32...)"
+            print ("skipping test_bad_mem - fails on Vista (x64 at least - not sure about x32...)")
             return
         self.failUnlessRaises(pywintypes.error, GetGlobalMemory, 0)
         self.failUnlessRaises(pywintypes.error, GetGlobalMemory, 1)
         self.failUnlessRaises(pywintypes.error, GetGlobalMemory, -1)
     def test_custom_mem(self):
-        test_data = "hello\x00\xff"
-        test_buffer = array.array("c", test_data)
+        test_data = b"hello\x00\xff"
+        test_buffer = array.array("b", test_data)
         cf = RegisterClipboardFormat(custom_format_name)
         self.failUnlessEqual(custom_format_name, GetClipboardFormatName(cf))
         SetClipboardData(cf, test_buffer)

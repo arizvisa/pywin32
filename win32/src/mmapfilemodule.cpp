@@ -207,9 +207,9 @@ mmapfile_write_byte_method (mmapfile_object * self,
 	char value;
 
 	CHECK_VALID;
-	if (!PyArg_ParseTuple (args, "c",
+	if (!PyArg_ParseTuple (args, "c:write_byte",
 		&value))	// @pyparm str|char||Single byte to be placed in buffer
-		return(NULL);
+		return NULL;
 
 	// read and write methods can leave pos = size, technically past end of buffer
 	if (self->pos < self->size){
@@ -467,26 +467,45 @@ static struct PyMethodDef mmapfile_object_methods[] = {
 };
 
 
-static PyObject *
-mmapfile_object_getattr(mmapfile_object * self, char * name)
-{
-  return Py_FindMethod (mmapfile_object_methods, (PyObject *)self, name);
-}
-
 static PyTypeObject mmapfile_object_type = {
-  PyObject_HEAD_INIT(&PyType_Type)
-  0,									// ob_size
-  "mmapfile",							// tp_name
-  sizeof(mmapfile_object),				// tp_size
-  0,									// tp_itemsize
-  // methods
-  (destructor) mmapfile_object_dealloc, // tp_dealloc
-  0,									// tp_print
-  (getattrfunc) mmapfile_object_getattr,// tp_getatt
-  0,									// tp_setattr
-  0,									// tp_compare
-  0,									// tp_repr
-  0,									// tp_as_number
+	PYWIN_OBJECT_HEAD
+	"mmapfile",				// tp_name
+	sizeof(mmapfile_object),	// tp_size
+	0,						// tp_itemsize
+	(destructor) mmapfile_object_dealloc, // tp_dealloc
+	0,						// tp_print
+	0,						// tp_getatt
+	0,						// tp_setattr
+	0,						// tp_compare
+	0,						// tp_repr
+	0,						// tp_as_number
+	0,						/* tp_as_sequence */
+	0,						/* tp_as_mapping */
+	0,						/* tp_hash */
+	0,						/* tp_call */
+	0,						/* tp_str */
+	PyObject_GenericGetAttr,		/* tp_getattro */
+	0,						/* tp_setattro */
+	0,						/*tp_as_buffer*/
+	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,	/* tp_flags */
+	0,						/* tp_doc */
+	0,						/* tp_traverse */
+	0,						/* tp_clear */
+	0,						/* tp_richcompare */
+	0,						/* tp_weaklistoffset */
+	0,						/* tp_iter */
+	0,						/* tp_iternext */
+	mmapfile_object_methods,	/* tp_methods */
+	0,						/* tp_members */
+	0,						/* tp_getset */
+	0,						/* tp_base */
+	0,						/* tp_dict */
+	0,						/* tp_descr_get */
+	0,						/* tp_descr_set */
+	0,						/* tp_dictoffset */
+	0,						/* tp_init */
+	0,						/* tp_alloc */
+	0,						/* tp_new */
 };
 
 // @pymethod <o Pymmapfile>|mmapfile|mmapfile|Creates or opens a memory mapped file.
@@ -499,8 +518,8 @@ static PyObject *
 new_mmapfile_object (PyObject * self, PyObject * args, PyObject *kwargs)
 {
 	mmapfile_object * m_obj;
-	char * filename;
-	PyObject *obtagname, *obview_size=Py_None;
+	TCHAR * filename;
+	PyObject *obfilename, *obtagname, *obview_size=Py_None;
 	PSECURITY_ATTRIBUTES psa=NULL; // Not accepted as a parameter yet
 
 	m_obj = PyObject_New (mmapfile_object, &mmapfile_object_type);
@@ -517,8 +536,8 @@ new_mmapfile_object (PyObject * self, PyObject * args, PyObject *kwargs)
 	m_obj->creation_status = 0;
 
 	static char *keywords[]={"File", "Name", "MaximumSize", "FileOffset", "NumberOfBytesToMap", NULL};
-	if (!PyArg_ParseTupleAndKeywords(args, kwargs, "zO|KKO", keywords,
-		&filename,	// @pyparm str|File||Name of file.  Use None or '' when opening an existing named mapping, or to use system pagefile.
+	if (!PyArg_ParseTupleAndKeywords(args, kwargs, "OO|KKO", keywords,
+		&obfilename,	// @pyparm str|File||Name of file.  Use None or '' when opening an existing named mapping, or to use system pagefile.
 		&obtagname,	// @pyparm str|Name||Name of mapping object to create or open, can be None
 		&m_obj->mapping_size.QuadPart,	// @pyparm int|MaximumSize|0|Size of file mapping to create, should be specified as a multiple
 				// of system page size (see <om win32api.GetSystemInfo>).  Defaults to size of existing file if 0.
@@ -535,24 +554,31 @@ new_mmapfile_object (PyObject * self, PyObject * args, PyObject *kwargs)
 		Py_DECREF(m_obj);
 		return NULL;
 		}
+	if (!PyWinObject_AsTCHAR(obfilename, &filename, TRUE)){
+		Py_DECREF(m_obj);
+		return NULL;
+		}
 	if (obview_size!=Py_None){
 		m_obj->size=PyInt_AsSsize_t(obview_size);
 		if (m_obj->size==-1 && PyErr_Occurred()){
 			Py_DECREF(m_obj);
+			PyWinObject_FreeTCHAR(filename);
 			return NULL;
 			}
 		}
 
 	// if an actual filename has been specified
-	if (filename && strlen(filename)){
+	if (filename && _tcslen(filename)){
 		m_obj->file_handle = CreateFile (filename, GENERIC_READ|GENERIC_WRITE,
 			FILE_SHARE_READ|FILE_SHARE_WRITE, psa, OPEN_ALWAYS, 0, NULL);
 		if (m_obj->file_handle == INVALID_HANDLE_VALUE){
 			Py_DECREF(m_obj);
+			PyWinObject_FreeTCHAR(filename);
 			return PyWin_SetAPIError("CreateFile");
 			}
 		}
-	
+	PyWinObject_FreeTCHAR(filename);
+
 	// If mapping size was not specified, use existing file size
 	if ((!m_obj->mapping_size.QuadPart) && (m_obj->file_handle != INVALID_HANDLE_VALUE)){
 		m_obj->mapping_size.LowPart = GetFileSize (m_obj->file_handle, &m_obj->mapping_size.HighPart);
@@ -627,8 +653,10 @@ static struct PyMethodDef mmapfile_functions[] = {
 	{NULL,			NULL}		 // Sentinel
 };
 
-extern"C" __declspec(dllexport) void
-initmmapfile(void)
+
+extern "C" __declspec(dllexport)
+#if (PY_VERSION_HEX < 0x03000000)
+void initmmapfile(void)
 {
 	PyObject *dict, *module;
 	PyWinGlobals_Ensure();
@@ -641,3 +669,31 @@ initmmapfile(void)
 	Py_INCREF(PyWinExc_ApiError);
 	PyDict_SetItemString(dict, "error", PyWinExc_ApiError);
 }
+
+#else
+PyObject *PyInit_mmapfile(void)
+{
+
+	PyObject *dict, *module;
+	PyWinGlobals_Ensure();
+
+	static PyModuleDef mmapfile_def = {
+		PyModuleDef_HEAD_INIT,
+		"mmapfile",
+		"Compiled extension module that provides access to the memory mapped file API",
+		-1,
+		mmapfile_functions
+		};
+	module = PyModule_Create(&mmapfile_def);
+	if (!module)
+		return NULL;
+	dict = PyModule_GetDict(module);
+	if (!dict)
+		return NULL;
+	if (PyDict_SetItemString(dict, "error", PyWinExc_ApiError) == -1)
+		return NULL;
+	if (PyType_Ready(&mmapfile_object_type) == -1)
+		return NULL;
+	return module;
+}
+#endif

@@ -147,21 +147,54 @@ static struct PyMethodDef timer_functions[] = {
 	{NULL,			NULL}
 };
 
-extern"C" __declspec(dllexport) void
-inittimer(void)
+
+extern "C" __declspec(dllexport)
+#if (PY_VERSION_HEX < 0x03000000)
+void inittimer(void)
 {
 	PyWinGlobals_Ensure();
 	timer_id_callback_map = PyDict_New();
 	if (!timer_id_callback_map)
 		return;
+
 	PyObject *dict, *module;
 	module = Py_InitModule("timer", timer_functions);
-	if (!module) /* Eeek - some serious error! */
-		return;
+	if (!module) return;
 	dict = PyModule_GetDict(module);
 	if (!dict)
-		return; /* Another serious error!*/
-	Py_INCREF(PyWinExc_ApiError);
+		return;
+
 	PyDict_SetItemString(dict, "error", PyWinExc_ApiError);
 	PyDict_SetItemString(dict, "__version__", PyString_FromString("0.2"));
 }
+
+#else
+PyObject *PyInit_timer(void)
+{
+	PyWinGlobals_Ensure();
+	timer_id_callback_map = PyDict_New();
+	if (!timer_id_callback_map)
+		return NULL;
+
+	PyObject *dict, *module;
+	static PyModuleDef timer_def = {
+		PyModuleDef_HEAD_INIT,
+		"timer",
+		"Extension that wraps Win32 Timer functions",
+		-1,
+		timer_functions
+		};
+	module = PyModule_Create(&timer_def);
+	if (!module)
+		return NULL;
+	dict = PyModule_GetDict(module);
+	if (!dict)
+		return NULL;
+
+	if (PyDict_SetItemString(dict, "error", PyWinExc_ApiError) == -1)
+		return NULL;
+	if (PyDict_SetItemString(dict, "__version__", PyString_FromString("0.2")) == -1)
+		return NULL;
+	return module;
+}
+#endif

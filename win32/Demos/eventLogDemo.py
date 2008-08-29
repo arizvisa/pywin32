@@ -29,30 +29,30 @@ def ReadLog(computer, logType="Application", dumpEachRecord = 0):
                 user_desc = None
             if dumpEachRecord:
                 if user_desc:
-                    print user_desc
-                print msg
+                    print(user_desc)
+                print(msg)
         num = num + len(objects)
 
     if numRecords == num:
-        print "Successfully read all", numRecords, "records"
+        print("Successfully read all", numRecords, "records")
     else:
-        print "Couldn't get all records - reported %d, but found %d" % (numRecords, num)
-        print "(Note that some other app may have written records while we were running!)"
+        print("Couldn't get all records - reported %d, but found %d" % (numRecords, num))
+        print("(Note that some other app may have written records while we were running!)")
     win32evtlog.CloseEventLog(h)
 
 def Usage():
-    print "Writes an event to the event log."
-    print "-w : Dont write any test records."
-    print "-r : Dont read the event log"
-    print "-c : computerName : Process the log on the specified computer"
-    print "-v : Verbose"
-    print "-t : LogType - Use the specified log - default = 'Application'"
+    print("Writes an event to the event log.")
+    print("-w : Dont write any test records.")
+    print("-r : Dont read the event log")
+    print("-c : computerName : Process the log on the specified computer")
+    print("-v : Verbose")
+    print("-t : LogType - Use the specified log - default = 'Application'")
 
 
 def test():
     # check if running on Windows NT, if not, display notice and terminate
     if win32api.GetVersion() & 0x80000000:
-        print "This sample only runs on NT"
+        print("This sample only runs on NT")
         return
 
     import sys, getopt
@@ -64,7 +64,7 @@ def test():
     verbose = 0
 
     if len(args)>0:
-        print "Invalid args"
+        print("Invalid args")
         usage()
         return 1
     for opt, val in opts:
@@ -85,7 +85,7 @@ def test():
         ReportEvent(logType, 2, strings=["The message text for event 2"], data = "Raw\0Data")
         ReportEvent(logType, 1, eventType=win32evtlog.EVENTLOG_WARNING_TYPE, strings=["A warning"], data = "Raw\0Data")
         ReportEvent(logType, 1, eventType=win32evtlog.EVENTLOG_INFORMATION_TYPE, strings=["An info"], data = "Raw\0Data")
-        print "Successfully wrote 3 records to the log"
+        print("Successfully wrote 3 records to the log")
 
     if do_read:
         ReadLog(computer, logType, verbose > 0)

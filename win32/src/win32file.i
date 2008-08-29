@@ -22,12 +22,13 @@
 //		<nl>RemoveDirectory / RemoveDirectoryTransacted
 
 %{
-//#define UNICODE
+#define UNICODE
 #ifndef MS_WINCE
 //#define FAR
 #ifndef _WIN32_WINNT
 #define _WIN32_WINNT 0x0501
 #endif
+
 #include "winsock2.h"
 #include "mswsock.h"
 #include "windows.h"
@@ -35,6 +36,12 @@
 #include "assert.h"
 #include <stddef.h>
 #include "sfc.h"
+
+// pyconfig.h defines socklen_t, which conflicts with below header
+#ifdef socklen_t
+#	undef socklen_t
+#endif
+#include "Ws2tcpip.h"
 #endif
 
 #define NEED_PYWINOBJECTS_H
@@ -318,6 +325,7 @@ BOOLAPI DefineDosDeviceW(
 BOOLAPI DeleteFile(TCHAR *fileName);
 // @pyparm <o PyUnicode>|fileName||The filename to delete
 
+/*
 %{
 // @pyswig str/buffer|DeviceIoControl|Sends a control code to a device or file system driver
 // @comm Accepts keyword args
@@ -365,8 +373,10 @@ PyObject *py_DeviceIoControl(PyObject *self, PyObject *args, PyObject *kwargs)
 			ret=PyBuffer_New(OutBufferSize);
 			if (ret==NULL)
 				return NULL;
-			(*ret->ob_type->tp_as_buffer->bf_getwritebuffer)(ret, 0, &OutBuffer);
-			bBuffer=TRUE;
+			if (!PyWinObject_AsWriteBuffer(ret, &OutBuffer, &OutBufferSize)){
+				Py_DECREF(ret);
+				return NULL;
+				}
 			}
 		else{
 			ret = PyString_FromStringAndSize(NULL, OutBufferSize);
@@ -417,6 +427,7 @@ PyObject *py_DeviceIoControl(PyObject *self, PyObject *args, PyObject *kwargs)
 	if (numRead < OutBufferSize){
 		if (bBuffer){
 			// Create a view of existing buffer with actual output size
+			// Reimplement by using ob->tp_as_buffer->getbuffer, but there's no way to specify an offset
 			PyObject *resized=PyBuffer_FromReadWriteObject(ret, 0, numRead);
 			Py_DECREF(ret);
 			ret=resized;
@@ -428,9 +439,11 @@ PyObject *py_DeviceIoControl(PyObject *self, PyObject *args, PyObject *kwargs)
 }
 PyCFunction pfnpy_DeviceIoControl=(PyCFunction)py_DeviceIoControl;
 %}
+%native(DeviceIoControl) pfnpy_DeviceIoControl;
+*/
 
 %native (OVERLAPPED) PyWinMethod_NewOVERLAPPED;
-%native(DeviceIoControl) pfnpy_DeviceIoControl;
+
 
 
 //FileIOCompletionRoutine	
@@ -506,8 +519,7 @@ ffi_iternext(PyObject *iterator)
 }
 
 PyTypeObject FindFileIterator_Type = {
-	PyObject_HEAD_INIT(&PyType_Type)
-	0,					/* ob_size */
+	PYWIN_OBJECT_HEAD
 	"FindFileIterator",				/* tp_name */
 	sizeof(FindFileIterator),			/* tp_basicsize */
 	0,					/* tp_itemsize */
@@ -748,18 +760,20 @@ PyObject *MyGetCompressedFileSize(PyObject *self, PyObject *args)
 		return NULL;
 	if (!PyWinObject_AsTCHAR(obName, &fname, FALSE))
 		return NULL;
-	DWORD dwSizeLow, dwSizeHigh;
+	ULARGE_INTEGER ulsize;
     Py_BEGIN_ALLOW_THREADS
-	dwSizeLow = GetCompressedFileSize(fname, &dwSizeHigh);
+	ulsize.LowPart = GetCompressedFileSize(fname, &ulsize.HighPart);
     Py_END_ALLOW_THREADS
+    
+    PyWinObject_FreeTCHAR(fname);
 	// If we failed ... 
-	if (dwSizeLow == 0xFFFFFFFF && 
+	if (ulsize.LowPart == 0xFFFFFFFF && 
 	    GetLastError() != NO_ERROR )
 		return PyWin_SetAPIError("GetCompressedFileSize");
-	return PyLong_FromTwoInts(dwSizeHigh, dwSizeLow);
+	return PyWinObject_FromULARGE_INTEGER(ulsize);
 }
 %}
-// @pyswig <o PyLARGE_INTEGER>|GetCompressedFileSize|Determines the compressed size of a file.
+// @pyswig long|GetCompressedFileSize|Determines the compressed size of a file.
 %native(GetCompressedFileSize) MyGetCompressedFileSize;
 
 #endif
@@ -772,19 +786,19 @@ PyObject *MyGetFileSize(PyObject *self, PyObject *args)
 	HANDLE hFile;
 	if (!PyWinObject_AsHANDLE(obHandle, &hFile))
 		return NULL;
-	DWORD dwSizeLow=0, dwSizeHigh=0;
+	ULARGE_INTEGER ulsize;
     Py_BEGIN_ALLOW_THREADS
-	dwSizeLow = GetFileSize (hFile, &dwSizeHigh);
+	ulsize.LowPart = GetFileSize (hFile, &ulsize.HighPart);
     Py_END_ALLOW_THREADS
 	// If we failed ... 
-	if (dwSizeLow == 0xFFFFFFFF && 
+	if (ulsize.LowPart == 0xFFFFFFFF && 
 	    GetLastError() != NO_ERROR )
 		return PyWin_SetAPIError("GetFileSize");
-	return PyLong_FromTwoInts(dwSizeHigh, dwSizeLow);
+	return PyWinObject_FromULARGE_INTEGER(ulsize);
 }
 
 %}
-// @pyswig <o PyLARGE_INTEGER>|GetFileSize|Determines the size of a file.
+// @pyswig long|GetFileSize|Determines the size of a file.
 %native(GetFileSize) MyGetFileSize;
 
 // @object PyOVERLAPPEDReadBuffer|An alias for a standard Python buffer object.
@@ -851,7 +865,6 @@ PyObject *MyReadFile(PyObject *self, PyObject *args)
 		}
 
 	void *buf = NULL;
-	PyBufferProcs *pb = NULL;
 
 	bufSize = PyInt_AsLong(obBuf);
 	if ((bufSize!=(DWORD)-1) || !PyErr_Occurred()){
@@ -859,8 +872,11 @@ PyObject *MyReadFile(PyObject *self, PyObject *args)
 			obRet = PyBuffer_New(bufSize);
 			if (obRet==NULL)
 				return NULL;
-			pb = obRet->ob_type->tp_as_buffer;
-			(*pb->bf_getreadbuffer)(obRet, 0, &buf);
+			// This should never fail
+			if (!PyWinObject_AsWriteBuffer(obRet, &buf, &bufSize)){
+				Py_DECREF(obRet);
+				return NULL;
+				}
 			}
 		else{
 			obRet=PyString_FromStringAndSize(NULL, bufSize);
@@ -1516,18 +1532,19 @@ PyObject *MySetFilePointer(PyObject *self, PyObject *args)
 		return NULL;
 	if (!PyWinObject_AsHANDLE(obHandle, &handle))
 		return NULL;
-	long offHigh;
-	unsigned offLow;
-	if (!PyLong_AsTwoInts(obOffset, (int *)&offHigh, &offLow))
+
+	LARGE_INTEGER offset;
+	if (!PyWinObject_AsLARGE_INTEGER(obOffset, &offset))
 		return NULL;
+		
     Py_BEGIN_ALLOW_THREADS
-	offLow = SetFilePointer(handle, offLow, &offHigh, iMethod);
+	offset.LowPart = SetFilePointer(handle, offset.LowPart, &offset.HighPart, iMethod);
     Py_END_ALLOW_THREADS
 	// If we failed ... 
-	if (offLow == 0xFFFFFFFF && 
+	if (offset.LowPart == 0xFFFFFFFF && 
 	    GetLastError() != NO_ERROR )
 		return PyWin_SetAPIError("SetFilePointer");
-	return PyLong_FromTwoInts(offHigh, offLow);
+	return PyWinObject_FromLARGE_INTEGER(offset);
 }
 %}
 %native(SetFilePointer) MySetFilePointer;
@@ -1606,6 +1623,191 @@ int _getmaxstdio( void );
 #pragma comment(lib,"ws2_32.lib")
 %}
 
+
+%{
+// @pyswig |TransmitFile|Transmits a file over a socket
+// TransmitFile(sock, filehandle, bytes_to_write, bytes_per_send, overlap, flags [, (prepend_buf, postpend_buf)])
+// @rdesc Returns 0 on completion, or ERROR_IO_PENDING if an overlapped operation has been queued
+static PyObject *py_TransmitFile( PyObject *self, PyObject *args, PyObject *kwargs ) {
+	PyObject *obhFile;
+	HANDLE hFile;
+	SOCKET s;
+	PyObject *obOverlapped = NULL;
+	PyObject *obSocket;
+	PyObject *obHead=Py_None, *obTail=Py_None;
+	DWORD flags, bytes_to_write, bytes_per_send;
+	OVERLAPPED *pOverlapped;
+    int error, rc;
+
+	static char *keywords[]={"Socket","File","NumberOfBytesToWrite", "NumberOfBytesPerSend",
+		"Overlapped","Flags","Head","Tail", NULL};
+	if (!PyArg_ParseTupleAndKeywords(args, kwargs, "OOiiOi|OO:TransmitFile", keywords,
+		&obSocket, // @pyparm <o PySocket>/int|Socket||Socket that will be used to send the file
+		&obhFile, // @pyparm <o PyHANDLE>/int|File||Handle to the file
+		&bytes_to_write, // @pyparm int|NumberOfBytesToWrite||The number of bytes in the file to transmit, use 0 for entire file.
+		&bytes_per_send, // @pyparm int|NumberOfBytesPerSend||The size, in bytes, of each block of data sent in each send operation.
+		&obOverlapped, // @pyparm <o PyOVERLAPPED>|Overlapped||An overlapped structure, can be None.
+		&flags, // @pyparm int|Flags||A set of flags used to modify the behavior of the TransmitFile function call. (win32file.TF_*)
+		&obHead, // @pyparm buffer|Head|None|Buffer to send on the socket before the file
+		&obTail))	// @pyparm buffer|Tail|None|Buffer to send on the socket after the file
+		return NULL;
+
+	if (!PySocket_AsSOCKET(obSocket, &s)) {
+		return NULL;
+	}
+	GUID guid = WSAID_TRANSMITFILE;
+	DWORD dwBytes;
+	LPFN_TRANSMITFILE lpfnTransmitFile = NULL;
+
+	error = WSAIoctl(s, SIO_GET_EXTENSION_FUNCTION_POINTER, &guid, sizeof(GUID),
+				   &lpfnTransmitFile, sizeof(lpfnTransmitFile), &dwBytes, NULL, NULL);
+	if (error == SOCKET_ERROR) {
+		rc = WSAGetLastError();
+		PyWin_SetAPIError("WSAIoctl", rc);
+		return NULL;
+	}
+	if (!PyWinObject_AsOVERLAPPED(obOverlapped, &pOverlapped, TRUE))
+		return NULL;
+	if (!PyWinObject_AsHANDLE(obhFile, &hFile)) {
+		return NULL;
+	}
+	TRANSMIT_FILE_BUFFERS tf_buffers;
+	TRANSMIT_FILE_BUFFERS *ptf_buffers;
+	if (!PyWinObject_AsReadBuffer(obHead, &tf_buffers.Head, &tf_buffers.HeadLength, TRUE))
+		return NULL;
+	if (!PyWinObject_AsReadBuffer(obTail, &tf_buffers.Tail, &tf_buffers.TailLength, TRUE))
+		return NULL;
+		
+	if (tf_buffers.Head || tf_buffers.Tail)
+		ptf_buffers = &tf_buffers;
+	else
+		ptf_buffers = NULL;
+	
+	rc=0;
+	Py_BEGIN_ALLOW_THREADS;
+	if (!lpfnTransmitFile(s, hFile, bytes_to_write, bytes_per_send, pOverlapped, ptf_buffers, flags))
+		rc = WSAGetLastError();
+	Py_END_ALLOW_THREADS;
+		
+	if (rc == 0 || rc == ERROR_IO_PENDING || rc == WSA_IO_PENDING)
+		return PyInt_FromLong(rc);
+	return PyWin_SetAPIError("TransmitFile", rc);
+}
+PyCFunction pfnpy_TransmitFile=(PyCFunction)py_TransmitFile;
+%}
+%native(TransmitFile) pfnpy_TransmitFile;
+
+////////////////////////////////////////////////////////////////////////////////    
+%{
+// @pyswig (int, int)|ConnectEx|Version of connect that uses Overlapped I/O
+// ConnectEx(sock, (addr, port), buf, overlap)
+// @rdesc Returns the completion code and number of bytes sent.
+//	The error code will be 0 for a completed operation, or ERROR_IO_PENDING for a pending overlapped operation.
+static PyObject *py_ConnectEx( PyObject *self, PyObject *args, PyObject *kwargs ) {
+	OVERLAPPED *pOverlapped = NULL;
+	SOCKET sConnecting;
+	PyObject *obOverlapped = NULL;
+	PyObject *obConnecting = NULL;
+	PyObject *obBuf = Py_None;
+	PyObject *addro;
+	void *buffer=NULL;
+	DWORD buffer_len=0; 
+	int rc, error;
+    DWORD sent=0;
+	static char *keywords[]={"s","name","Overlapped","SendBuffer", NULL};
+	if (!PyArg_ParseTupleAndKeywords(args, kwargs, "OOO|O:ConnectEx", keywords,
+		&obConnecting, // @pyparm <o PySocket>/int|s||A bound, unconnected socket that will be used to connect
+		&addro, // @pyparm tuple|name||Address to connect to (host, port)
+		&obOverlapped, // @pyparm <o PyOVERLAPPED>|Overlapped||An overlapped structure
+		&obBuf)) // @pyparm buffer|SendBuffer|None|Buffer to send on the socket after connect
+		return NULL;
+		
+	if (!PySocket_AsSOCKET(obConnecting, &sConnecting)) {
+		return NULL;
+	}
+	if (!PyWinObject_AsReadBuffer(obBuf, &buffer, &buffer_len, TRUE))
+		return NULL;
+
+	GUID guid = WSAID_CONNECTEX;
+	DWORD dwBytes;
+	LPFN_CONNECTEX lpfnConnectEx = NULL;
+
+	error = WSAIoctl(sConnecting, SIO_GET_EXTENSION_FUNCTION_POINTER, &guid, sizeof(GUID),
+				   &lpfnConnectEx, sizeof(lpfnConnectEx), &dwBytes, NULL, NULL);
+	if (error == SOCKET_ERROR) {
+		rc = WSAGetLastError();
+		PyWin_SetAPIError("WSAIoctl", rc);
+		return NULL;
+	}
+	// convert the address
+	// 	
+	char pbuf[30];
+	char *hptr, *pptr;
+	PyObject *hobj = NULL;
+	PyObject *pobj = (PyObject *)NULL;
+	PyObject *idna = NULL;
+
+	struct addrinfo hints, *res;
+	if (!PyArg_ParseTuple(addro, "OO:getaddrinfo", &hobj, &pobj)) {
+		return NULL;
+	}
+	if (hobj == Py_None) {
+		hptr = NULL;
+	} else if (PyUnicode_Check(hobj)) {
+		idna = PyObject_CallMethod(hobj, "encode", "s", "idna");
+		if (!idna)
+			return NULL;
+		hptr = PyString_AsString(idna);
+	} else if (PyString_Check(hobj)) {
+		hptr = PyString_AsString(hobj);
+	} else {
+		PyErr_SetString(PyExc_TypeError,
+				"getaddrinfo() argument 1 must be string or None");
+		return NULL;
+	}
+	if (PyInt_Check(pobj)) {
+		PyOS_snprintf(pbuf, sizeof(pbuf), "%ld", PyInt_AsLong(pobj));
+		pptr = pbuf;
+	} else if (PyString_Check(pobj)) {
+		pptr = PyString_AsString(pobj);
+	} else if (pobj == Py_None) {
+		pptr = (char *)NULL;
+	} else {
+		PyErr_SetString(PyExc_TypeError, "Int or String expected");
+		return NULL;
+	}
+
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = AF_INET;
+	hints.ai_socktype = SOCK_STREAM;
+	hints.ai_protocol = IPPROTO_TCP;
+	error = getaddrinfo(hptr, pptr, &hints, &res);
+	if (error)
+	{
+		PyWin_SetAPIError("getaddrinfo", WSAGetLastError());
+		return NULL;
+	}
+	// done screwing with the address
+	
+	if (!PyWinObject_AsOVERLAPPED(obOverlapped, &pOverlapped))
+	{
+		return NULL;
+	}
+	
+	rc=0;
+	Py_BEGIN_ALLOW_THREADS;
+	if (!lpfnConnectEx(sConnecting, res->ai_addr, res->ai_addrlen, buffer, buffer_len, &sent, pOverlapped))
+		rc=WSAGetLastError();
+	Py_END_ALLOW_THREADS;
+	if (rc==0 || rc == ERROR_IO_PENDING)
+		return Py_BuildValue("ii", rc, sent);
+	return PyWin_SetAPIError("ConnectEx", rc);
+}
+PyCFunction pfnpy_ConnectEx=(PyCFunction)py_ConnectEx;
+%}
+%native(ConnectEx) pfnpy_ConnectEx;
+
+////////////////////////////////////////////////////////////////////////////////    
 %native(AcceptEx) MyAcceptEx;
 
 %native(GetAcceptExSockaddrs) MyGetAcceptExSockaddrs;
@@ -1626,11 +1828,9 @@ static PyObject *MyAcceptEx
 	SOCKET sAccepting;
 	PyObject *obOverlapped = NULL;
 	DWORD dwBufSize = 0;
-	PyObject *rv = NULL;
 	PyObject *obListening = NULL;
 	PyObject *obAccepting = NULL;
 	PyObject *obBuf = NULL;
-	PyObject *pORB = NULL;
 	void *buf = NULL;
 	DWORD cBytesRecvd = 0;
 	BOOL ok;
@@ -1689,28 +1889,16 @@ static PyObject *MyAcceptEx
 		return NULL;
 	}
 
-	if (obBuf->ob_type->tp_as_buffer && obBuf->ob_type->tp_as_buffer->bf_getwritebuffer)
-	{
-		pORB = obBuf;
-		Py_INCREF(pORB);
-		pb = pORB->ob_type->tp_as_buffer;
-		dwBufSize = (*pb->bf_getwritebuffer)(pORB, 0, &buf);
-		if (dwBufSize==(DWORD)-1 && PyErr_Occurred())
-			goto Error;
-		if (dwBufSize < (DWORD)iMinBufferSize )
-		{
-			PyErr_Format(
-				PyExc_ValueError,
-				"Second param must be at least %ld bytes long",
-				iMinBufferSize);
-			goto Error;
-		}
-	}
-	else
-	{
-		PyErr_SetString(PyExc_TypeError, "Second param must be a buffer object");
+	if (!PyWinObject_AsWriteBuffer(obBuf, &buf, &dwBufSize))
 		return NULL;
-	}
+	if (dwBufSize < (DWORD)iMinBufferSize )
+		{
+		PyErr_Format(
+			PyExc_ValueError,
+			"Second param must be at least %ld bytes long",
+			iMinBufferSize);
+		return NULL;
+		}
 
 	// Phew... finally, all the arguments are converted...
 	Py_BEGIN_ALLOW_THREADS
@@ -1728,19 +1916,9 @@ static PyObject *MyAcceptEx
 	{
 		rc = WSAGetLastError();
 		if (rc != ERROR_IO_PENDING)
-		{
-			PyWin_SetAPIError("AcceptEx", WSAGetLastError());
-			goto Error;
-		}
+			return PyWin_SetAPIError("AcceptEx", WSAGetLastError());
 	}
-	Py_DECREF(pORB);
-	rv = PyInt_FromLong(rc);
-Cleanup:
-	return rv;
-Error:
-	Py_DECREF(pORB);
-	rv = NULL;
-	goto Cleanup;
+	return PyInt_FromLong(rc);
 }
 
 static PyObject *
@@ -1847,28 +2025,16 @@ PyObject *MyGetAcceptExSockaddrs
 			return NULL;
 	}
 	iMinBufferSize = (wsProtInfo.iMaxSockAddr + 16) * 2;
-
-	if (obBuf->ob_type->tp_as_buffer && obBuf->ob_type->tp_as_buffer->bf_getreadbuffer)
-	{
-		pORB = obBuf;
-		Py_INCREF(pORB);
-		pb = pORB->ob_type->tp_as_buffer;
-		dwBufSize = (*pb->bf_getreadbuffer)(pORB, 0, &buf);
-		if (dwBufSize==(DWORD)-1 && PyErr_Occurred())
-			goto Error;
-		if (dwBufSize < (DWORD)iMinBufferSize )
-		{
-			PyErr_Format(
-				PyExc_ValueError,
-				"Second param must be at least %ld bytes long",
-				iMinBufferSize);
-			goto Error;
-		}
-	}
-	else
-	{
-		PyErr_SetString(PyExc_TypeError, "Second param must be a buffer object");
+	if (!PyWinObject_AsReadBuffer(obBuf, &buf, &dwBufSize))
 		return NULL;
+
+	if (dwBufSize < (DWORD)iMinBufferSize )
+	{
+		PyErr_Format(
+			PyExc_ValueError,
+			"Second param must be at least %ld bytes long",
+			iMinBufferSize);
+		goto Error;
 	}
 
 	cbRemote = cbLocal = wsProtInfo.iMaxSockAddr + 16;
@@ -2042,24 +2208,8 @@ PyObject *MyWSASend
 		return NULL;
 	}
 
-	if (PyString_Check(obBuf))
-	{
-		wsBuf.buf = PyString_AS_STRING(obBuf);
-		wsBuf.len = PyString_GET_SIZE(obBuf);
-	}
-	else if (obBuf->ob_type->tp_as_buffer && obBuf->ob_type->tp_as_buffer->bf_getreadbuffer)
-	{
-		Py_INCREF(obBuf);
-		pb = obBuf->ob_type->tp_as_buffer;
-		wsBuf.len = (*pb->bf_getreadbuffer)(obBuf, 0, (void **)&wsBuf.buf);
-		if (wsBuf.len==(u_long)-1 && PyErr_Occurred())
-			return NULL;
-	}
-	else
-	{
-		PyErr_SetString(PyExc_TypeError, "Second param must be a buffer object or a string.");
+	if (!PyWinObject_AsReadBuffer(obBuf, (void **)&wsBuf.buf, &wsBuf.len, FALSE))
 		return NULL;
-	}
 
 	Py_BEGIN_ALLOW_THREADS;
 	rc = WSASend(
@@ -2154,19 +2304,8 @@ PyObject *MyWSARecv
 		return NULL;
 	}
 
-	if (obBuf->ob_type->tp_as_buffer && obBuf->ob_type->tp_as_buffer->bf_getwritebuffer)
-	{
-		Py_INCREF(obBuf);
-		pb = obBuf->ob_type->tp_as_buffer;
-		wsBuf.len = (*pb->bf_getwritebuffer)(obBuf, 0, (void **)&wsBuf.buf);
-		if (wsBuf.len==(u_long)-1 && PyErr_Occurred())
-			return NULL;
-	}
-	else
-	{
-		PyErr_SetString(PyExc_TypeError, "Second param must be a PyOVERLAPPEDReadBuffer object");
+	if (!PyWinObject_AsWriteBuffer(obBuf, (void **)&wsBuf.buf, &wsBuf.len, FALSE))
 		return NULL;
-	}
 
 	Py_BEGIN_ALLOW_THREADS;
 	rc = WSARecv(
@@ -2224,6 +2363,7 @@ Error:
 %}
 
 #define SO_UPDATE_ACCEPT_CONTEXT SO_UPDATE_ACCEPT_CONTEXT
+#define SO_UPDATE_CONNECT_CONTEXT SO_UPDATE_CONNECT_CONTEXT
 #define SO_CONNECT_TIME SO_CONNECT_TIME
 
 #define WSAEWOULDBLOCK WSAEWOULDBLOCK
@@ -2654,6 +2794,11 @@ typedef DWORD (WINAPI *GetFullPathNameTransactedWfunc)(LPCWSTR,DWORD,LPWSTR,LPWS
 static GetFullPathNameTransactedWfunc pfnGetFullPathNameTransactedW = NULL;
 typedef DWORD (WINAPI *GetFullPathNameTransactedAfunc)(LPCSTR,DWORD,LPSTR,LPSTR*,HANDLE);
 static GetFullPathNameTransactedAfunc pfnGetFullPathNameTransactedA = NULL;
+
+typedef BOOL (WINAPI *Wow64DisableWow64FsRedirectionfunc)(PVOID*);
+static Wow64DisableWow64FsRedirectionfunc pfnWow64DisableWow64FsRedirection = NULL;
+typedef BOOL (WINAPI *Wow64RevertWow64FsRedirectionfunc)(PVOID);
+static Wow64RevertWow64FsRedirectionfunc pfnWow64RevertWow64FsRedirection = NULL;
 
 /* FILE_INFO_BY_HANDLE_CLASS and various structs used by this function are in fileextd.h, can be downloaded here:
 http://www.microsoft.com/downloads/details.aspx?familyid=1decc547-ab00-4963-a360-e4130ec079b8&displaylang=en
@@ -3509,7 +3654,7 @@ py_BackupRead(PyObject *self, PyObject *args)
 	if (!PyWinLong_AsVoidPtr(obctxt, &ctxt))
 		return NULL;
 	if (obbuf==Py_None){
-		obbufout=PyBuffer_New(bytes_requested); // ??? any way to create a writable buffer from Python level ???
+		obbufout=PyBuffer_New(bytes_requested);
 		if (obbufout==NULL)
 			return NULL;
 		if (!PyWinObject_AsWriteBuffer(obbufout, (void **)&buf, &buflen)){
@@ -4196,12 +4341,15 @@ static PyObject *PyObject_FromFILEX_INFO(GET_FILEEX_INFO_LEVELS level, void *p)
 	switch (level) {
 		case GetFileExInfoStandard: {
 			WIN32_FILE_ATTRIBUTE_DATA *pa = (WIN32_FILE_ATTRIBUTE_DATA *)p;
+			ULARGE_INTEGER fsize;
+			fsize.LowPart=pa->nFileSizeLow;
+			fsize.HighPart=pa->nFileSizeHigh;
 			return Py_BuildValue("iNNNN",
 			             pa->dwFileAttributes,
 						 PyWinObject_FromFILETIME(pa->ftCreationTime),
 						 PyWinObject_FromFILETIME(pa->ftLastAccessTime),
 						 PyWinObject_FromFILETIME(pa->ftLastWriteTime),
-			             PyLong_FromTwoInts(pa->nFileSizeHigh, pa->nFileSizeLow));
+			             PyWinObject_FromULARGE_INTEGER(fsize));
 			break;
 		}
 			
@@ -5067,8 +5215,19 @@ PyCFunction pfnpy_GetFullPathName=(PyCFunction)py_GetFullPathName;
 %native (SfcIsFileProtected) py_SfcIsFileProtected;
 
 %init %{
-	PyDict_SetItemString(d, "error", PyWinExc_ApiError);
-	PyDict_SetItemString(d, "INVALID_HANDLE_VALUE", PyWinLong_FromHANDLE(INVALID_HANDLE_VALUE));
+
+#if (PY_VERSION_HEX < 0x03000000)
+#define RETURN_ERROR return;
+#else
+#define RETURN_ERROR return NULL;
+#endif
+
+	if (PyType_Ready(&FindFileIterator_Type) == -1)
+		RETURN_ERROR;
+	if (PyDict_SetItemString(d, "error", PyWinExc_ApiError) == -1)
+		RETURN_ERROR;
+	if (PyDict_SetItemString(d, "INVALID_HANDLE_VALUE", PyWinLong_FromHANDLE(INVALID_HANDLE_VALUE)) == -1)
+		RETURN_ERROR;
 
 	for (PyMethodDef *pmd = win32fileMethods;pmd->ml_name;pmd++)
 		if   ((strcmp(pmd->ml_name, "CreateFileW")==0)
@@ -5097,6 +5256,8 @@ PyCFunction pfnpy_GetFullPathName=(PyCFunction)py_GetFullPathName;
 			||(strcmp(pmd->ml_name, "GetFullPathName")==0)
 			||(strcmp(pmd->ml_name, "GetFileInformationByHandleEx")==0)	// not impl yet
 			||(strcmp(pmd->ml_name, "DeviceIoControl")==0)
+			||(strcmp(pmd->ml_name, "TransmitFile")==0)
+			||(strcmp(pmd->ml_name, "ConnectEx")==0)
 			)
 			pmd->ml_flags = METH_VARARGS | METH_KEYWORDS;
 
@@ -5165,6 +5326,8 @@ PyCFunction pfnpy_GetFullPathName=(PyCFunction)py_GetFullPathName;
 		pfnGetFullPathNameTransactedW=(GetFullPathNameTransactedWfunc)GetProcAddress(hmodule, "GetFullPathNameTransactedW");
 		pfnGetFullPathNameTransactedA=(GetFullPathNameTransactedAfunc)GetProcAddress(hmodule, "GetFullPathNameTransactedA");
 		// pfnGetFileInformationByHandleEx=(GetFileInformationByHandleExfunc)GetProcAddress(hmodule, "GetFileInformationByHandleEx");
+		pfnWow64DisableWow64FsRedirection=(Wow64DisableWow64FsRedirectionfunc)GetProcAddress(hmodule, "Wow64DisableWow64FsRedirection");
+		pfnWow64RevertWow64FsRedirection=(Wow64RevertWow64FsRedirectionfunc)GetProcAddress(hmodule, "Wow64RevertWow64FsRedirection");
 		}
 
 	hmodule=GetModuleHandle(TEXT("sfc.dll"));
@@ -5238,6 +5401,13 @@ PyCFunction pfnpy_GetFullPathName=(PyCFunction)py_GetFullPathName;
 #define FILE_SYSTEM_NOT_SUPPORT FILE_SYSTEM_NOT_SUPPORT
 #define FILE_USER_DISALLOWED FILE_USER_DISALLOWED
 #define FILE_READ_ONLY FILE_READ_ONLY
+
+#define TF_DISCONNECT TF_DISCONNECT
+#define TF_REUSE_SOCKET TF_REUSE_SOCKET
+#define TF_WRITE_BEHIND TF_WRITE_BEHIND
+#define TF_USE_DEFAULT_WORKER TF_USE_DEFAULT_WORKER
+#define TF_USE_SYSTEM_THREAD TF_USE_SYSTEM_THREAD
+#define TF_USE_KERNEL_APC TF_USE_KERNEL_APC
 
 // flags used with CopyFileEx
 #define COPY_FILE_ALLOW_DECRYPTED_DESTINATION COPY_FILE_ALLOW_DECRYPTED_DESTINATION

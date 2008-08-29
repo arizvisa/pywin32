@@ -4,7 +4,6 @@ import win32con, ntsecuritycon
 import sys
 import os
 import tempfile
-import sets
 import threading
 import time
 import shutil
@@ -19,7 +18,7 @@ class TestSimpleOps(unittest.TestCase):
         os.close(fd)
         os.unlink(filename)
         handle = win32file.CreateFile(filename, win32file.GENERIC_WRITE, 0, None, win32con.CREATE_NEW, 0, None)
-        test_data = "Hello\0there"
+        test_data = b"Hello\0there"
         try:
             win32file.WriteFile(handle, test_data)
             handle.Close()
@@ -44,7 +43,7 @@ class TestSimpleOps(unittest.TestCase):
         h = win32file.CreateFile( testName, desiredAccess, win32file.FILE_SHARE_READ, None, win32file.CREATE_ALWAYS, fileFlags, 0)
     
         # Write a known number of bytes to the file.
-        data = "z" * 1025
+        data = b"z" * 1025
     
         win32file.WriteFile(h, data)
     
@@ -58,14 +57,16 @@ class TestSimpleOps(unittest.TestCase):
         self.failUnless(read_data == data, "Read data is not what we wrote!")
     
         # Now truncate the file at 1/2 its existing size.
-        newSize = len(data)/2
+        newSize = len(data)//2
         win32file.SetFilePointer(h, newSize, win32file.FILE_BEGIN)
         win32file.SetEndOfFile(h)
-        self.failUnless(win32file.GetFileSize(h) == newSize, "Truncated file does not have the expected size!")
+        self.failUnless(win32file.GetFileSize(h) == newSize,
+            "Truncated file does not have the expected size! (%s)" %newSize)
     
         # GetFileAttributesEx/GetFileAttributesExW tests.
-        self.failUnless(win32file.GetFileAttributesEx(testName) == win32file.GetFileAttributesExW(testName),
-                        "ERROR: Expected GetFileAttributesEx and GetFileAttributesExW to return the same data")
+        print (win32file.GetFileAttributesEx(testName), win32file.GetFileAttributesExW(testName))
+        self.failUnlessEqual(win32file.GetFileAttributesEx(testName), win32file.GetFileAttributesExW(testName))
+                 ##       "ERROR: Expected GetFileAttributesEx and GetFileAttributesExW to return the same data")
     
         attr, ct, at, wt, size = win32file.GetFileAttributesEx(testName)
         self.failUnless(size==newSize, 
@@ -92,7 +93,7 @@ class TestSimpleOps(unittest.TestCase):
                                 0)
         try:
             #Write some data
-            data = 'Some data'
+            data = b'Some data'
             (res, written) = win32file.WriteFile(f, data)
             
             self.failIf(res)
@@ -126,7 +127,7 @@ class TestOverlapped(unittest.TestCase):
         overlapped.hEvent = evt
         # Create the file and write shit-loads of data to it.
         h = win32file.CreateFile( testName, desiredAccess, 0, None, win32file.CREATE_ALWAYS, 0, 0)
-        chunk_data = "z" * 0x8000
+        chunk_data = b"z" * 0x8000
         num_loops = 512
         expected_size = num_loops * len(chunk_data)
         for i in range(num_loops):
@@ -174,8 +175,9 @@ class TestOverlapped(unittest.TestCase):
         # Check that.
         try:
             win32file.CloseHandle(hv)
-            raise RuntimeError, "Expected close to fail!"
-        except win32file.error, (hr, func, msg):
+            raise RuntimeError("Expected close to fail!")
+        except win32file.error as details:
+            hr, func, msg = details.args
             self.failUnlessEqual(hr, winerror.ERROR_INVALID_HANDLE)
 
     def testCompletionPortsQueued(self):
@@ -234,7 +236,7 @@ class TestOverlapped(unittest.TestCase):
         try:
             time.sleep(0.1) # let thread do its thing.
             try:
-                win32pipe.CallNamedPipe(r"\\.\pipe\pywin32_test_pipe", "Hello there", BUFSIZE, 0)
+                win32pipe.CallNamedPipe(r"\\.\pipe\pywin32_test_pipe", b"Hello there", BUFSIZE, 0)
             except win32pipe.error:
                 # Testing for overlapped death causes this
                 if not test_overlapped_death:
@@ -291,10 +293,10 @@ class TestSocketExtensions(unittest.TestCase):
         t = threading.Thread(target=self.acceptWorker, args=(port, running,stopped))
         t.start()
         running.wait(2)
-        if not running.isSet():
+        if not running.is_set():
             self.fail("AcceptEx Worker thread failed to start")
         s = socket.create_connection(('127.0.0.1', port), 10)
-        win32file.WSASend(s, "hello", None)
+        win32file.WSASend(s, b"hello", None)
         overlapped = pywintypes.OVERLAPPED()
         overlapped.hEvent = win32event.CreateEvent(None, 0, 0, None)
         # Like above - WSARecv used to allow strings as the receive buffer!!
@@ -305,7 +307,7 @@ class TestSocketExtensions(unittest.TestCase):
         win32file.WSARecv(s, buffer, overlapped)
         nbytes = win32file.GetOverlappedResult(s.fileno(), overlapped, True)
         got = buffer[:nbytes]
-        self.failUnlessEqual(got, "hello")
+        self.failUnlessEqual(got, b"hello")
         # thread should have stopped
         stopped.wait(2)
         if not stopped.isSet():
@@ -315,9 +317,9 @@ class TestFindFiles(unittest.TestCase):
     def testIter(self):
         dir = os.path.join(os.getcwd(), "*")
         files = win32file.FindFilesW(dir)
-        set1 = sets.Set()
+        set1 = set()
         set1.update(files)
-        set2 = sets.Set()
+        set2 = set()
         for file in win32file.FindFilesIterator(dir):
             set2.add(file)
         assert len(set2) > 5, "This directory has less than 5 files!?"
@@ -394,14 +396,14 @@ class TestDirectoryChanges(unittest.TestCase):
         flags = win32con.FILE_NOTIFY_CHANGE_FILE_NAME
         while 1:
             try:
-                print "waiting", dh
+                print ("waiting", dh)
                 changes = win32file.ReadDirectoryChangesW(dh,
                                                           8192,
                                                           False, #sub-tree
                                                           flags)
-                print "got", changes
-            except 'xx':
-                xx
+                print ("got", changes)
+            except:
+                traceback.print_exc()
             changes.extend(changes)
 
     def _watcherThreadOverlapped(self, dn, dh, changes):
@@ -432,7 +434,7 @@ class TestDirectoryChanges(unittest.TestCase):
                     # print "looks like dir handle was closed!"
                     return
             else:
-                print "ERROR: Watcher thread timed-out!"
+                print ("ERROR: Watcher thread timed-out!")
                 return # kill the thread!
 
     def tearDown(self):
@@ -446,13 +448,13 @@ class TestDirectoryChanges(unittest.TestCase):
             try:
                 shutil.rmtree(dn)
             except OSError:
-                print "FAILED to remove directory", dn
+                print ("FAILED to remove directory", dn)
 
         for t in self.watcher_threads:
             # closing dir handle should have killed threads!
             t.join(5)
-            if t.isAlive():
-                print "FAILED to wait for thread termination"
+            if t.is_alive():
+                print ("FAILED to wait for thread termination")
 
     def stablize(self):
         time.sleep(0.5)
@@ -481,16 +483,16 @@ class TestEncrypt(unittest.TestCase):
     def testEncrypt(self):
         fname = tempfile.mktemp("win32file_test")
         f = open(fname, "wb")
-        f.write("hello")
+        f.write(b"hello")
         f.close()
         f = None
         try:
             try:
                 win32file.EncryptFile(fname)
-            except win32file.error, details:
-                if details[0] != winerror.ERROR_ACCESS_DENIED:
+            except win32file.error as details:
+                if details.args[0] != winerror.ERROR_ACCESS_DENIED:
                     raise
-                print "It appears this is not NTFS - cant encrypt/decrypt"
+                print ("It appears this is not NTFS - cant encrypt/decrypt")
             win32file.DecryptFile(fname)
         finally:
             if f is not None:

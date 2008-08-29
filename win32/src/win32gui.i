@@ -253,9 +253,20 @@ PyObject *PyWinObject_FromHDEVNOTIFY(HGDIOBJ h)
 
 // Written to the module init function.
 %init %{
+#if (PY_VERSION_HEX < 0x03000000)
+	#define RETURN_ERROR return;
+#else
+	#define RETURN_ERROR return NULL;
+#endif
+
 PyEval_InitThreads(); /* Start the interpreter's thread-awareness */
 PyDict_SetItemString(d, "dllhandle", PyWinLong_FromVoidPtr(g_dllhandle));
 PyDict_SetItemString(d, "error", PyWinExc_ApiError);
+
+if (PyType_Ready(&PyWNDCLASSType) == -1 ||
+	PyType_Ready(&PyBITMAPType) == -1 ||
+	PyType_Ready(&PyLOGFONTType) == -1)
+	RETURN_ERROR;
 
 // Expose the window procedure and window class dicts to aid debugging
 g_AtomMap = PyDict_New();
@@ -849,12 +860,11 @@ public:
 
 	static void deallocFunc(PyObject *ob);
 
-	static PyObject *getattr(PyObject *self, char *name);
-	static int setattr(PyObject *self, char *name, PyObject *v);
-#pragma warning( disable : 4251 )
-	static struct memberlist memberlist[];
-#pragma warning( default : 4251 )
-
+	static PyObject *getattro(PyObject *self, PyObject *obname);
+	static int setattro(PyObject *self, PyObject *obname, PyObject *v);
+	static struct PyMemberDef members[];
+	static struct PyMethodDef methods[];
+	static PyObject *PySetDialogProc(PyObject *self, PyObject *args);
 	WNDCLASS m_WNDCLASS;
 	PyObject *m_obMenuName, *m_obClassName, *m_obWndProc;
 };
@@ -865,28 +875,49 @@ public:
 // The object can then be passed to any function which takes an WNDCLASS object
 PyTypeObject PyWNDCLASSType =
 {
-	PyObject_HEAD_INIT(&PyType_Type)
-	0,
+	PYWIN_OBJECT_HEAD
 	"PyWNDCLASS",
 	sizeof(PyWNDCLASS),
 	0,
 	PyWNDCLASS::deallocFunc,		/* tp_dealloc */
-	0,		/* tp_print */
-	PyWNDCLASS::getattr,				/* tp_getattr */
-	PyWNDCLASS::setattr,				/* tp_setattr */
+	0,						/* tp_print */
+	0,						/* tp_getattr */
+	0,						/* tp_setattr */
 	0,						/* tp_compare */
 	0,						/* tp_repr */
 	0,						/* tp_as_number */
-	0,	/* tp_as_sequence */
+	0,						/* tp_as_sequence */
 	0,						/* tp_as_mapping */
-	0,
+	0,						/* tp_hash */
 	0,						/* tp_call */
-	0,		/* tp_str */
+	0,						/* tp_str */
+	PyWNDCLASS::getattro,	/* tp_getattro */
+	PyWNDCLASS::setattro,	/* tp_setattro */
+	0,						/* tp_as_buffer */
+	Py_TPFLAGS_DEFAULT,		/* tp_flags */
+	0,						/* tp_doc */
+	0,						/* tp_traverse */
+	0,						/* tp_clear */
+	0,						/* tp_richcompare */
+	0,						/* tp_weaklistoffset */
+	0,						/* tp_iter */
+	0,						/* tp_iternext */
+	PyWNDCLASS::methods,	/* tp_methods */
+	PyWNDCLASS::members,	/* tp_members */
+	0,						/* tp_getset */
+	0,						/* tp_base */
+	0,						/* tp_dict */
+	0,						/* tp_descr_get */
+	0,						/* tp_descr_set */
+	0,						/* tp_dictoffset */
+	0,						/* tp_init */
+	0,						/* tp_alloc */
+	0,						/* tp_new */
 };
 
 #define OFF(e) offsetof(PyWNDCLASS, e)
 
-/*static*/ struct memberlist PyWNDCLASS::memberlist[] = {
+/*static*/ struct PyMemberDef PyWNDCLASS::members[] = {
 	{"style",            T_INT,  OFF(m_WNDCLASS.style)}, // @prop integer|style|
 //	{"cbClsExtra",       T_INT,  OFF(m_WNDCLASS.cbClsExtra)}, // @prop integer|cbClsExtra|
 	{"cbWndExtra",       T_INT,  OFF(m_WNDCLASS.cbWndExtra)}, // @prop integer|cbWndExtra|
@@ -898,7 +929,7 @@ PyTypeObject PyWNDCLASSType =
 	// @prop integer|hIcon|
 	// @prop integer|hCursor|
 	// @prop integer|hbrBackground|
-	// These 3 handled manually in PyWNDCLASS::getattr/setattr.  The pymeth below is used as an
+	// These 3 handled manually in PyWNDCLASS::getattro/setattro.  The pymeth below is used as an
 	// end tag, so these props will be lost if below it
 	// @prop string/<o PyUnicode>|lpszMenuName|
 	// @prop string/<o PyUnicode>|lpszClassName|
@@ -906,7 +937,7 @@ PyTypeObject PyWNDCLASSType =
 
 };
 
-static PyObject *meth_SetDialogProc(PyObject *self, PyObject *args)
+PyObject *PyWNDCLASS::PySetDialogProc(PyObject *self, PyObject *args)
 {
 	if (!PyArg_ParseTuple(args, ":SetDialogProc"))
 		return NULL;
@@ -916,8 +947,8 @@ static PyObject *meth_SetDialogProc(PyObject *self, PyObject *args)
 	return Py_None;
 }
 
-static struct PyMethodDef PyWNDCLASS_methods[] = {
-	{"SetDialogProc",     meth_SetDialogProc, 1}, 	// @pymeth SetDialogProc|Sets the WNDCLASS to be for a dialog box.
+struct PyMethodDef PyWNDCLASS::methods[] = {
+	{"SetDialogProc",    PyWNDCLASS::PySetDialogProc, 1}, 	// @pymeth SetDialogProc|Sets the WNDCLASS to be for a dialog box.
 	// @pymethod |PyWNDCLASS|SetDialogProc|Sets the WNDCLASS to be for a dialog box
 	{NULL}
 };
@@ -940,25 +971,24 @@ PyWNDCLASS::~PyWNDCLASS(void)
 	Py_XDECREF(m_obWndProc);
 }
 
-PyObject *PyWNDCLASS::getattr(PyObject *self, char *name)
+PyObject *PyWNDCLASS::getattro(PyObject *self, PyObject *obname)
 {
-	PyObject *ret = Py_FindMethod(PyWNDCLASS_methods, self, name);
-	if (ret != NULL)
-		return ret;
-	PyErr_Clear();
+	char *name=PYWIN_ATTR_CONVERT(obname);
+	if (name==NULL)
+		return NULL;
 	PyWNDCLASS *pW = (PyWNDCLASS *)self;
 	if (strcmp("lpszMenuName", name)==0) {
-		ret = pW->m_obMenuName ? pW->m_obMenuName : Py_None;
+		PyObject *ret = pW->m_obMenuName ? pW->m_obMenuName : Py_None;
 		Py_INCREF(ret);
 		return ret;
 	}
 	if (strcmp("lpszClassName", name)==0) {
-		ret = pW->m_obClassName ? pW->m_obClassName : Py_None;
+		PyObject *ret = pW->m_obClassName ? pW->m_obClassName : Py_None;
 		Py_INCREF(ret);
 		return ret;
 	}
 	if (strcmp("lpfnWndProc", name)==0) {
-		ret = pW->m_obWndProc ? pW->m_obWndProc : Py_None;
+		PyObject *ret = pW->m_obWndProc ? pW->m_obWndProc : Py_None;
 		Py_INCREF(ret);
 		return ret;
 	}
@@ -974,7 +1004,7 @@ PyObject *PyWNDCLASS::getattr(PyObject *self, char *name)
 	if (strcmp("hbrBackground", name)==0)
 		return PyWinLong_FromVoidPtr(pW->m_WNDCLASS.hbrBackground);
 
-	return PyMember_Get((char *)self, memberlist, name);
+	return PyObject_GenericGetAttr(self, obname);
 }
 
 int SetTCHAR(PyObject *v, PyObject **m, LPCTSTR *ret)
@@ -1001,12 +1031,16 @@ int SetTCHAR(PyObject *v, PyObject **m, LPCTSTR *ret)
 	return 0;
 #endif
 }
-int PyWNDCLASS::setattr(PyObject *self, char *name, PyObject *v)
+
+int PyWNDCLASS::setattro(PyObject *self, PyObject *obname, PyObject *v)
 {
 	if (v == NULL) {
 		PyErr_SetString(PyExc_AttributeError, "can't delete WNDCLASS attributes");
 		return -1;
 	}
+	char *name=PYWIN_ATTR_CONVERT(obname);
+	if (name==NULL)
+		return -1;
 	PyWNDCLASS *pW = (PyWNDCLASS *)self;
 	if (strcmp("lpszMenuName", name)==0) {
 		return SetTCHAR(v, &pW->m_obMenuName, &pW->m_WNDCLASS.lpszMenuName);
@@ -1036,7 +1070,7 @@ int PyWNDCLASS::setattr(PyObject *self, char *name, PyObject *v)
 	if (strcmp("hbrBackground", name)==0)
 		return PyWinLong_AsVoidPtr(v, (void **)&pW->m_WNDCLASS.hbrBackground) ? 0 : -1;
 
-	return PyMember_Set((char *)self, memberlist, name, v);
+	return PyObject_GenericSetAttr(self, obname, v);
 }
 
 /*static*/ void PyWNDCLASS::deallocFunc(PyObject *ob)
@@ -1066,11 +1100,9 @@ public:
 
 	/* Python support */
 	static void deallocFunc(PyObject *ob);
-	static PyObject *getattr(PyObject *self, char *name);
-	static int setattr(PyObject *self, char *name, PyObject *v);
-#pragma warning( disable : 4251 )
-	static struct memberlist memberlist[];
-#pragma warning( default : 4251 )
+	static PyObject *getattro(PyObject *self, PyObject *obname);
+	static int setattro(PyObject *self, PyObject *obname, PyObject *v);
+	static struct PyMemberDef members[];
 	BITMAP m_BITMAP;
 };
 #define PyBITMAP_Check(ob)	((ob)->ob_type == &PyBITMAPType)
@@ -1084,28 +1116,50 @@ public:
 // The object can then be passed to any function which takes an BITMAP object
 PyTypeObject PyBITMAPType =
 {
-	PyObject_HEAD_INIT(&PyType_Type)
-	0,
+	PYWIN_OBJECT_HEAD
 	"PyBITMAP",
 	sizeof(PyBITMAP),
 	0,
-	PyBITMAP::deallocFunc,		/* tp_dealloc */
-	0,		/* tp_print */
-	PyBITMAP::getattr,				/* tp_getattr */
-	PyBITMAP::setattr,				/* tp_setattr */
+	PyBITMAP::deallocFunc,	/* tp_dealloc */
+	0,						/* tp_print */
+	0,						/* tp_getattr */
+	0,						/* tp_setattr */
 	0,						/* tp_compare */
 	0,						/* tp_repr */
 	0,						/* tp_as_number */
-	0,	/* tp_as_sequence */
+	0,						/* tp_as_sequence */
 	0,						/* tp_as_mapping */
-	0,
+	0,						/* tp_hash */
 	0,						/* tp_call */
-	0,		/* tp_str */
+	0,						/* tp_str */
+	PyBITMAP::getattro,		/* tp_getattro */
+	PyBITMAP::setattro,		/* tp_setattro */
+	0,						/* tp_as_buffer */
+	Py_TPFLAGS_DEFAULT,		/* tp_flags */
+	0,						/* tp_doc */
+	0,						/* tp_traverse */
+	0,						/* tp_clear */
+	0,						/* tp_richcompare */
+	0,						/* tp_weaklistoffset */
+	0,						/* tp_iter */
+	0,						/* tp_iternext */
+	0,						/* tp_methods */
+	PyBITMAP::members,		/* tp_members */
+	0,						/* tp_getset */
+	0,						/* tp_base */
+	0,						/* tp_dict */
+	0,						/* tp_descr_get */
+	0,						/* tp_descr_set */
+	0,						/* tp_dictoffset */
+	0,						/* tp_init */
+	0,						/* tp_alloc */
+	0,						/* tp_new */
 };
+
 #undef OFF
 #define OFF(e) offsetof(PyBITMAP, e)
 
-/*static*/ struct memberlist PyBITMAP::memberlist[] = {
+/*static*/ struct PyMemberDef PyBITMAP::members[] = {
 	{"bmType",           T_LONG,  OFF(m_BITMAP.bmType)}, // @prop integer|bmType|
 	{"bmWidth",           T_LONG,  OFF(m_BITMAP.bmWidth)}, // @prop integer|bmWidth|
 	{"bmHeight",           T_LONG,  OFF(m_BITMAP.bmHeight)}, // @prop integer|bmHeight|
@@ -1134,28 +1188,34 @@ PyBITMAP::~PyBITMAP(void)
 {
 }
 
-PyObject *PyBITMAP::getattr(PyObject *self, char *name)
+PyObject *PyBITMAP::getattro(PyObject *self, PyObject *obname)
 {
+	char *name=PYWIN_ATTR_CONVERT(obname);
+	if (name==NULL)
+		return NULL;
 	PyBITMAP *pB = (PyBITMAP *)self;
 	if (strcmp("bmBits", name)==0) {
 		return PyWinLong_FromVoidPtr(pB->m_BITMAP.bmBits);
 	}
-	return PyMember_Get((char *)self, memberlist, name);
+	return PyObject_GenericGetAttr(self, obname);
 }
 
-int PyBITMAP::setattr(PyObject *self, char *name, PyObject *v)
+int PyBITMAP::setattro(PyObject *self, PyObject *obname, PyObject *v)
 {
 	if (v == NULL) {
 		PyErr_SetString(PyExc_AttributeError, "can't delete BITMAP attributes");
 		return -1;
 	}
+	char *name=PYWIN_ATTR_CONVERT(obname);
+	if (name==NULL)
+		return -1;
 	if (strcmp("bmBits", name)==0) {
 		PyBITMAP *pB = (PyBITMAP *)self;
 		if (!PyWinLong_AsVoidPtr(v, &pB->m_BITMAP.bmBits))
 			return -1;
 		return 0;
 	}
-	return PyMember_Set((char *)self, memberlist, name, v);
+	return PyObject_GenericSetAttr(self, obname, v);
 }
 
 /*static*/ void PyBITMAP::deallocFunc(PyObject *ob)
@@ -1177,12 +1237,9 @@ public:
 
 	static void deallocFunc(PyObject *ob);
 
-	static PyObject *getattr(PyObject *self, char *name);
-	static int setattr(PyObject *self, char *name, PyObject *v);
-#pragma warning( disable : 4251 )
-	static struct memberlist memberlist[];
-#pragma warning( default : 4251 )
-
+	static PyObject *getattro(PyObject *self, PyObject *obname);
+	static int setattro(PyObject *self, PyObject *obname, PyObject *v);
+	static struct PyMemberDef members[];
 	LOGFONT m_LOGFONT;
 };
 #define PyLOGFONT_Check(ob)	((ob)->ob_type == &PyLOGFONTType)
@@ -1192,28 +1249,49 @@ public:
 // The object can then be passed to any function which takes an LOGFONT object
 PyTypeObject PyLOGFONTType =
 {
-	PyObject_HEAD_INIT(&PyType_Type)
-	0,
+	PYWIN_OBJECT_HEAD
 	"PyLOGFONT",
 	sizeof(PyLOGFONT),
 	0,
-	PyLOGFONT::deallocFunc,		/* tp_dealloc */
-	0,		/* tp_print */
-	PyLOGFONT::getattr,				/* tp_getattr */
-	PyLOGFONT::setattr,				/* tp_setattr */
+	PyLOGFONT::deallocFunc,	/* tp_dealloc */
+	0,						/* tp_print */
+	0,						/* tp_getattr */
+	0,						/* tp_setattr */
 	0,						/* tp_compare */
 	0,						/* tp_repr */
 	0,						/* tp_as_number */
-	0,	/* tp_as_sequence */
+	0,						/* tp_as_sequence */
 	0,						/* tp_as_mapping */
-	0,
+	0,						/* tp_hash */
 	0,						/* tp_call */
-	0,		/* tp_str */
+	0,						/* tp_str */
+	PyLOGFONT::getattro,	/* tp_getattro */
+	PyLOGFONT::setattro,	/* tp_setattro */
+	0,						/* tp_as_buffer */
+	Py_TPFLAGS_DEFAULT,		/* tp_flags */
+	0,						/* tp_doc */
+	0,						/* tp_traverse */
+	0,						/* tp_clear */
+	0,						/* tp_richcompare */
+	0,						/* tp_weaklistoffset */
+	0,						/* tp_iter */
+	0,						/* tp_iternext */
+	0,						/* tp_methods */
+	PyLOGFONT::members,		/* tp_members */
+	0,						/* tp_getset */
+	0,						/* tp_base */
+	0,						/* tp_dict */
+	0,						/* tp_descr_get */
+	0,						/* tp_descr_set */
+	0,						/* tp_dictoffset */
+	0,						/* tp_init */
+	0,						/* tp_alloc */
+	0,						/* tp_new */
 };
 #undef OFF
 #define OFF(e) offsetof(PyLOGFONT, e)
 
-/*static*/ struct memberlist PyLOGFONT::memberlist[] = {
+/*static*/ struct PyMemberDef PyLOGFONT::members[] = {
 	{"lfHeight",           T_LONG,  OFF(m_LOGFONT.lfHeight)}, // @prop integer|lfHeight|
 	{"lfWidth",            T_LONG,  OFF(m_LOGFONT.lfWidth)}, // @prop integer|lfWidth|
 	{"lfEscapement",       T_LONG,  OFF(m_LOGFONT.lfEscapement)}, // @prop integer|lfEscapement|
@@ -1250,21 +1328,27 @@ PyLOGFONT::~PyLOGFONT(void)
 {
 }
 
-PyObject *PyLOGFONT::getattr(PyObject *self, char *name)
+PyObject *PyLOGFONT::getattro(PyObject *self, PyObject *obname)
 {
+	char *name=PYWIN_ATTR_CONVERT(obname);
+	if (name==NULL)
+		return NULL;
 	PyLOGFONT *pL = (PyLOGFONT *)self;
 	if (strcmp("lfFaceName", name)==0) {
 		return PyWinObject_FromTCHAR(pL->m_LOGFONT.lfFaceName);
 	}
-	return PyMember_Get((char *)self, memberlist, name);
+	return PyObject_GenericGetAttr(self, obname);
 }
 
-int PyLOGFONT::setattr(PyObject *self, char *name, PyObject *v)
+int PyLOGFONT::setattro(PyObject *self, PyObject *obname, PyObject *v)
 {
 	if (v == NULL) {
 		PyErr_SetString(PyExc_AttributeError, "can't delete LOGFONT attributes");
 		return -1;
 	}
+	char *name=PYWIN_ATTR_CONVERT(obname);
+	if (name==NULL)
+		return -1;
 	if (strcmp("lfFaceName", name)==0) {
 		PyLOGFONT *pL = (PyLOGFONT *)self;
 		TCHAR *face;
@@ -1280,7 +1364,7 @@ int PyLOGFONT::setattr(PyObject *self, char *name, PyObject *v)
 		PyWinObject_FreeTCHAR(face);
 		return 0;
 	}
-	return PyMember_Set((char *)self, memberlist, name, v);
+	return PyObject_GenericSetAttr(self, obname, v);
 }
 
 /*static*/ void PyLOGFONT::deallocFunc(PyObject *ob)
@@ -1520,17 +1604,19 @@ static PyObject *PyGetString(PyObject *self, PyObject *args)
 	// string must be NULL terminated.
 	if (!PyArg_ParseTuple(args, input_fmt, &addr, &len))
 		return NULL;
-
-	if (len==-1)
-		len = strlen(addr);
-
-    if (len == 0) return PyString_FromString("");
-    if (IsBadReadPtr(addr, len)) {
-        PyErr_SetString(PyExc_ValueError,
-                        "The value is not a valid address for reading");
-        return NULL;
-    }
-    return PyString_FromStringAndSize(addr, len);
+	if (addr==NULL){
+		PyErr_SetString(PyExc_ValueError, "PyGetString: NULL is not valid pointer");
+		return NULL;
+		}
+	if (len != -1){
+		if (IsBadReadPtr(addr, len)) {
+			PyErr_SetString(PyExc_ValueError, "The value is not a valid address for reading");
+			return NULL;
+			}
+		return PyWinObject_FromTCHAR(addr, len);
+		}
+	// This should probably be in a __try just in case.
+	return PyWinObject_FromTCHAR(addr);
 }
 %}
 %native (PyGetString) PyGetString;
@@ -1606,7 +1692,6 @@ static PyObject *PySetMemory(PyObject *self, PyObject *args)
 %native (PySetMemory) PySetMemory;
 
 
-
 %{
 // @pyswig object|PyGetArraySignedLong|Returns a signed long from an array object at specified index
 static PyObject *PyGetArraySignedLong(PyObject *self, PyObject *args)
@@ -1619,25 +1704,15 @@ static PyObject *PyGetArraySignedLong(PyObject *self, PyObject *args)
 	// @pyparm int|index||index of offset
 	if (!PyArg_ParseTuple(args, "Oi:PyGetArraySignedLong",&ob,&offset))
 		return NULL;
+	long *l;
+	if (PyObject_AsReadBuffer(ob, (const void **) &l, &maxlen)==-1)
+		return NULL;
 
-	PyBufferProcs *pb = ob->ob_type->tp_as_buffer;
-	if (pb != NULL && pb->bf_getreadbuffer) {
-		long *l;
-		maxlen = pb->bf_getreadbuffer(ob,0,(void **) &l);
-		if(-1 == maxlen) {
-			PyErr_SetString(PyExc_ValueError,"Could not get array address");
-			return NULL;
+	if(offset * sizeof(*l) > maxlen) {
+		PyErr_SetString(PyExc_ValueError,"array index out of bounds");
+		return NULL;
 		}
-		if(offset * sizeof(*l) > (unsigned)maxlen) {
-			PyErr_SetString(PyExc_ValueError,"array index out of bounds");
-			return NULL;
-		}
-		return PyInt_FromLong(l[offset]);
-
-	} else {
-			PyErr_SetString(PyExc_TypeError,"array passed is not an array");
-			return NULL;
-	}
+	return PyInt_FromLong(l[offset]);
 }
 %}
 %native (PyGetArraySignedLong) PyGetArraySignedLong;
@@ -1646,28 +1721,16 @@ static PyObject *PyGetArraySignedLong(PyObject *self, PyObject *args)
 // @pyswig object|PyGetBufferAddressAndLen|Returns a buffer object address and len
 static PyObject *PyGetBufferAddressAndLen(PyObject *self, PyObject *args)
 {
-	PyObject *O = NULL;
-	void *addr = NULL;
+	PyObject *ob;
+	const void *addr;
 	Py_ssize_t len = 0;
 
-	// @pyparm int|obj||the buffer object
-	if (!PyArg_ParseTuple(args, "O:PyGetBufferAddressAndLen", &O))
+	// @pyparm buffer|obj||the buffer object
+	if (!PyArg_ParseTuple(args, "O:PyGetBufferAddressAndLen", &ob))
 		return NULL;
-
-	if(!PyBuffer_Check(O)) {
-		PyErr_SetString(PyExc_TypeError,"item must be a buffer type");
+	if (PyObject_AsReadBuffer(ob, &addr, &len) == -1)
 		return NULL;
-	}
-
-	PyBufferProcs *pb = O->ob_type->tp_as_buffer;
-	if (NULL != pb  && NULL != pb->bf_getreadbuffer) 
-		len = pb->bf_getreadbuffer(O,0,&addr);
-
-	if(NULL == addr) {
-		PyErr_SetString(PyExc_ValueError,"Could not get buffer address");
-		return NULL;
-	}
-	return Py_BuildValue("Nl", PyWinLong_FromVoidPtr(addr), len);
+	return Py_BuildValue("NN", PyWinLong_FromVoidPtr(addr), PyInt_FromSsize_t(len));
 }
 %}
 %native (PyGetBufferAddressAndLen) PyGetBufferAddressAndLen;
@@ -2126,7 +2189,7 @@ static PyObject *PyDialogBoxIndirect(PyObject *self, PyObject *args)
 
 	if (!PyArg_ParseTuple(args, "OOOO|O", 
 		&obhinst,		// @pyparm <o PyHANDLE>|hInstance||Handle to module creating the dialog box
-		&obList,		// @pyparm list|controlList||List containing a <o Dialog Header Tuple>, followed by variable number of <o Dialog Item Tuple>s
+		&obList,		// @pyparm <o PyDialogTemplate>|controlList||Sequence of items defining the dialog box and subcontrols
 		&obhwnd,		// @pyparm <o PyHANDLE>|hWndParent||Handle to dialog's parent window
 		&obDlgProc,		// @pyparm function|DialogFunc||Dialog box procedure to process messages
 		&obParam))		// @pyparm long|InitParam|0|Initialization data to be passed to above procedure during WM_INITDIALOG processing
@@ -2183,7 +2246,7 @@ static PyObject *PyCreateDialogIndirect(PyObject *self, PyObject *args)
 	BOOL bFreeString = FALSE;
 	if (!PyArg_ParseTuple(args, "OOOO|l",
 		&obhinst,		// @pyparm <o PyHANDLE>|hInstance||Handle to module creating the dialog box
-		&obList,		// @pyparm list|controlList||List containing a <o Dialog Header Tuple>, followed by variable number of <o Dialog Item Tuple>s
+		&obList,		// @pyparm <o PyDialogTemplate>|controlList||Sequence containing a <o PyDLGTEMPLATE>, followed by variable number of <o PyDLGITEMTEMPLATE>s
 		&obhwnd,		// @pyparm <o PyHANDLE>|hWndParent||Handle to dialog's parent window
 		&obDlgProc,		// @pyparm function|DialogFunc||Dialog box procedure to process messages
 		&param))		// @pyparm int|InitParam|0|Initialization data to be passed to above procedure during WM_INITDIALOG processing

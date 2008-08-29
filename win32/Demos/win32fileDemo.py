@@ -28,7 +28,7 @@ def SimpleFileDemo():
     rc, data = win32file.ReadFile(handle, 1024)
     handle.Close()
     if data == test_data:
-        print "Successfully wrote and read a file"
+        print("Successfully wrote and read a file")
     os.unlink(testName)
 
 if __name__=='__main__':

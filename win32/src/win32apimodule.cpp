@@ -11,7 +11,6 @@ generates Windows .hlp files.
 @doc
 
 ******************************************************************/
-// #define UNICODE
 #include "PyWinTypes.h"
 #include "PyWinObjects.h"
 #include "win32api_display.h"
@@ -21,6 +20,7 @@ generates Windows .hlp files.
 
 #define SECURITY_WIN32 // required by below
 #include "security.h"  // for GetUserNameEx
+#include "PowrProf.h"
 
 // Identical to PyW32_BEGIN_ALLOW_THREADS except no script "{" !!!
 // means variables can be declared between the blocks
@@ -3788,7 +3788,6 @@ PyRegQueryInfoKey( PyObject *self, PyObject *args)
   long rc;
   DWORD nSubKeys, nValues;
   FILETIME ft;
-  PyObject *l;
 
   // @pyparm <o PyHKEY>/int|key||An already open key, or or any one of the following win32con
   // constants:<nl>HKEY_CLASSES_ROOT<nl>HKEY_CURRENT_USER<nl>HKEY_LOCAL_MACHINE<nl>HKEY_USERS
@@ -3804,11 +3803,7 @@ PyRegQueryInfoKey( PyObject *self, PyObject *args)
     &ft)
        )!=ERROR_SUCCESS)
     return ReturnAPIError("RegQueryInfoKey", rc);
-  if (!(l=PyLong_FromTwoInts(ft.dwHighDateTime, ft.dwLowDateTime)))
-      return NULL;
-  PyObject *ret = Py_BuildValue("iiO",nSubKeys,nValues,l);
-  Py_DECREF(l);
-  return ret;
+  return Py_BuildValue("iiN",nSubKeys,nValues, PyWinObject_FromFILETIME(ft));
 }
 
 // @pymethod dict|win32api|RegQueryInfoKeyW|Returns information about an open registry key 
@@ -5455,7 +5450,7 @@ int PyApplyExceptionFilter(
 		if (PyInt_Check(obRet)) {
 			ret = PyInt_AsLong(obRet);
 		// Exception instance to be raised.
-		} else if (PyInstance_Check(obRet)) {
+		} else if (PyObject_IsSubclass(obRet, PyExc_Exception)) {
 			*ppExcType = obRet;
 			Py_INCREF(obRet);
 			*ppExcValue = NULL;
@@ -5511,13 +5506,13 @@ static PyObject *PyApply(PyObject *self, PyObject *args)
 		PyThreadState *stateCur = PyThreadState_Swap(NULL);
 		if (stateCur == NULL) stateCur = stateSave;
 		PyThreadState_Swap(stateCur);
-		if (PyInstance_Check(exc_type)) {
+		if (PyObject_IsSubclass(exc_type, PyExc_Exception)) {
 			if (exc_value != NULL)
 				PyErr_SetString(PyExc_TypeError, "instance exception returned from exception handler may not have a separate value");
 			else {
 				// Normalize to class, instance
 				exc_value = exc_type;
-				exc_type = (PyObject*) ((PyInstanceObject*)exc_type)->in_class;
+				exc_type = (PyObject *)exc_value->ob_type;
 				Py_INCREF(exc_type);
 				PyErr_SetObject(exc_type, exc_value);
 			}
@@ -5955,6 +5950,60 @@ PyObject *PySetSystemPowerState(PyObject *self, PyObject *args)
 	return Py_None;
 }
 
+PyObject *PyWinObject_FromBATTERY_REPORTING_SCALE(PBATTERY_REPORTING_SCALE pbrs)
+{
+	return Py_BuildValue("{s:N, s:N}",
+		"Granularity", PyLong_FromUnsignedLong(pbrs->Granularity),
+		"Capacity", PyLong_FromUnsignedLong(pbrs->Capacity));
+}
+
+/*
+// @pymethod dict|win32api|GetPwrCapabilities|Retrieves system's power capabilities
+// @pyseeapi GetPwrCapabilities
+// @comm Requires Win2k or later.
+// @rdesc Returns a dict representing a SYSTEM_POWER_CAPABILITIES struct
+PyObject *PyGetPwrCapabilities(PyObject *self, PyObject *args)
+{
+	SYSTEM_POWER_CAPABILITIES spc;
+	if (!GetPwrCapabilities(&spc))
+		return PyWin_SetAPIError("GetPwrCapabilities");
+	return Py_BuildValue(
+		"{s:N, s:N, s:N, s:N, s:N, s:N, s:N, s:N, s:N, s:N, s:N, s:N, s:N, s:N, s:N,"
+		" s:N, s:N, s:N, s:O, s:N, s:O, s:N, s:N, s:O, s:N, s:N, s:N, s:N, s:N}",
+		"PowerButtonPresent", PyBool_FromLong(spc.PowerButtonPresent),
+		"SleepButtonPresent", PyBool_FromLong(spc.SleepButtonPresent),
+		"LidPresent", PyBool_FromLong(spc.LidPresent),
+		"SystemS1", PyBool_FromLong(spc.SystemS1),
+		"SystemS2", PyBool_FromLong(spc.SystemS2),
+		"SystemS3", PyBool_FromLong(spc.SystemS3),
+		"SystemS4", PyBool_FromLong(spc.SystemS4),
+		"SystemS5", PyBool_FromLong(spc.SystemS5),
+		"HiberFilePresent", PyBool_FromLong(spc.HiberFilePresent),
+		"FullWake", PyBool_FromLong(spc.FullWake),
+		"VideoDimPresent", PyBool_FromLong(spc.VideoDimPresent),
+		"ApmPresent", PyBool_FromLong(spc.ApmPresent),
+		"UpsPresent", PyBool_FromLong(spc.UpsPresent),
+		"ThermalControl", PyBool_FromLong(spc.ThermalControl),
+		"ProcessorThrottle", PyBool_FromLong(spc.ProcessorThrottle),
+		"ProcessorMinThrottle", PyInt_FromLong(spc.ProcessorMinThrottle),
+		"ProcessorMaxThrottle", PyInt_FromLong(spc.ProcessorMaxThrottle),
+		"FastSystemS4", PyBool_FromLong(spc.FastSystemS4),
+		"spare2", Py_None,	// reserved
+		"DiskSpinDown", PyBool_FromLong(spc.DiskSpinDown),
+		"spare3", Py_None,	// reserved
+		"SystemBatteriesPresent", PyBool_FromLong(spc.SystemBatteriesPresent),
+		"BatteriesAreShortTerm", PyBool_FromLong(spc.BatteriesAreShortTerm),
+		"BatteryScale", Py_BuildValue("NNN",
+			PyWinObject_FromBATTERY_REPORTING_SCALE(&spc.BatteryScale[0]),
+			PyWinObject_FromBATTERY_REPORTING_SCALE(&spc.BatteryScale[1]),
+			PyWinObject_FromBATTERY_REPORTING_SCALE(&spc.BatteryScale[2])),
+		"AcOnLineWake", PyInt_FromLong(spc.AcOnLineWake),
+		"SoftLidWake", PyInt_FromLong(spc.SoftLidWake),
+		"RtcWake", PyInt_FromLong(spc.RtcWake),
+		"MinDeviceWakeState", PyInt_FromLong(spc.MinDeviceWakeState),
+		"DefaultLowLatencyWake", PyInt_FromLong(spc.DefaultLowLatencyWake));
+}
+*/
 
 /* List of functions exported by this module */
 // @module win32api|A module, encapsulating the Windows Win32 API.
@@ -6053,6 +6102,9 @@ static struct PyMethodDef win32api_functions[] = {
 #endif
 	{"GetModuleFileNameW",	PyGetModuleFileNameW,1}, // @pymeth GetModuleFileNameW|Retrieves the unicode filename of the specified module.
 	{"GetModuleHandle",     PyGetModuleHandle,1},   // @pymeth GetModuleHandle|Returns the handle of an already loaded DLL.
+
+	//	{"GetPwrCapabilities",	PyGetPwrCapabilities, METH_NOARGS},	// @pymeth GetPwrCapabilities|Retrieves system's power capabilities
+
 	{"GetProfileSection",	PyGetProfileSection,1}, // @pymeth GetProfileSection|Returns a list of entries in an INI file.
 	{"GetProcAddress",      PyGetProcAddress,1},    // @pymeth GetProcAddress|Returns the address of the specified exported dynamic-link library (DLL) function.
 	{"GetProfileVal",		PyGetProfileVal,    1}, // @pymeth GetProfileVal|Returns a value from an INI file.
@@ -6189,17 +6241,41 @@ static struct PyMethodDef win32api_functions[] = {
 	{NULL,			NULL}
 };
 
-extern "C" __declspec(dllexport) void
-initwin32api(void)
+extern "C" __declspec(dllexport)
+#if (PY_VERSION_HEX < 0x03000000)
+void initwin32api(void)
+#else
+PyObject *PyInit_win32api(void)
+#endif
 {
-  PyObject *dict, *module;
-  PyWinGlobals_Ensure();
-  module = Py_InitModule("win32api", win32api_functions);
-  if (!module) /* Eeek - some serious error! */
-    return;
-  dict = PyModule_GetDict(module);
-  if (!dict) return; /* Another serious error!*/
-  Py_INCREF(PyWinExc_ApiError);
+	PyObject *dict, *module;
+	PyWinGlobals_Ensure();
+
+#if (PY_VERSION_HEX < 0x03000000)
+#define RETURN_ERROR return;
+	module = Py_InitModule("win32api", win32api_functions);
+	if (!module)
+		return;
+	dict = PyModule_GetDict(module);
+	if (!dict)
+		return;
+#else
+#define RETURN_ERROR return NULL;
+	static PyModuleDef win32api_def = {
+		PyModuleDef_HEAD_INIT,
+		"win32api",
+		"Wraps general API functions that are not subsumed in the more specific modules",
+		-1,
+		win32api_functions
+		};
+	module = PyModule_Create(&win32api_def);
+	if (!module)
+		return NULL;
+	dict = PyModule_GetDict(module);
+	if (!dict)
+		return NULL;
+#endif
+
   PyDict_SetItemString(dict, "error", PyWinExc_ApiError);
   PyDict_SetItemString(dict,"STD_INPUT_HANDLE",
 		       PyInt_FromLong(STD_INPUT_HANDLE));
@@ -6207,7 +6283,12 @@ initwin32api(void)
 		       PyInt_FromLong(STD_OUTPUT_HANDLE));
   PyDict_SetItemString(dict,"STD_ERROR_HANDLE",
 		       PyInt_FromLong(STD_ERROR_HANDLE));
-  PyDict_SetItemString(dict, "PyDISPLAY_DEVICEType", (PyObject *)&PyDISPLAY_DEVICEType);
+
+  if (PyType_Ready(&PyDISPLAY_DEVICEType) == -1
+	  || PyDict_SetItemString(dict, "PyDISPLAY_DEVICEType", (PyObject *)&PyDISPLAY_DEVICEType) == -1)
+	  RETURN_ERROR;
+  
+
   PyModule_AddIntConstant(module, "NameUnknown", NameUnknown);
   PyModule_AddIntConstant(module, "NameFullyQualifiedDN", NameFullyQualifiedDN);
   PyModule_AddIntConstant(module, "NameSamCompatible", NameSamCompatible);
@@ -6312,4 +6393,7 @@ initwin32api(void)
 	pfnRegOverridePredefKey=(RegOverridePredefKeyfunc)GetProcAddress(hmodule, "RegOverridePredefKey");
   }
 
+#if (PY_VERSION_HEX >= 0x03000000)
+  return module;
+#endif
 }  

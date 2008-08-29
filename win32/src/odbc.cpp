@@ -15,6 +15,8 @@
 #include <string.h>
 
 #include "PyWinTypes.h"
+#include "structmember.h"
+
 #include <sql.h>
 #include <sqlext.h>
 
@@ -54,7 +56,8 @@ typedef struct
 	HDBC hdbc;
 	int  connected;
 	int  connect_id;
-	char *connectionString;
+	TCHAR *connectionString;
+	PyObject *connectionError;
 } connectionObject;
 
 static connectionObject *connection(PyObject *o)
@@ -93,7 +96,8 @@ typedef struct
 	long max_width;
 	connectionObject *my_conx;
 	int  connect_id;
-	PyObject *description;  
+	PyObject *description;
+	PyObject *cursorError;
 	int n_columns;
 	bool bGetDataIsNeeded;
 } cursorObject;
@@ -104,37 +108,95 @@ static cursorObject *cursor(PyObject *o)
 }
 
 static void cursorDealloc(PyObject *self);
-static PyObject * cursorGetAttr(PyObject *self, char *name);
-
+PyMethodDef cursorMethods[];
+PyMemberDef cursorMembers[];
 
 static PyTypeObject Cursor_Type =
 {
-	PyObject_HEAD_INIT (&PyType_Type)
-	0,			/*ob_size */
-	"odbccur",		/*tp_name */
+	PYWIN_OBJECT_HEAD
+	"odbccur",				/*tp_name */
 	sizeof(cursorObject),	/*tp_basicsize */
-	0,			/*tp_itemsize */
-	cursorDealloc,	/*tp_dealloc */
-	0,			/*tp_print */
-	cursorGetAttr,	/*tp_getattr */
-	/* drop the rest */
+	0,						/*tp_itemsize */
+	cursorDealloc,			/*tp_dealloc */
+	0,						/*tp_print */
+	0,						/*tp_getattr */
+	0,						/*tp_setattr */
+	0,						/*tp_compare */
+	0,						/*tp_repr */
+	0,						/*tp_as_number */
+	0,						/* tp_as_sequence */
+	0,						/* tp_as_mapping */
+	0,						/* tp_hash */
+	0,						/* tp_call */
+	0,						/*tp_str */
+	PyObject_GenericGetAttr,	/* tp_getattro dbiGetAttr */
+	PyObject_GenericSetAttr,	/* tp_setattro */
+	0,						/*tp_as_buffer*/
+	Py_TPFLAGS_DEFAULT,		/* tp_flags */
+	0,						/* tp_doc */
+	0,						/* tp_traverse */
+	0,						/* tp_clear */
+	0,						/* tp_richcompare */
+	0,						/* tp_weaklistoffset */
+	0,						/* tp_iter */
+	0,						/* tp_iternext */
+	cursorMethods,			/* tp_methods */
+	cursorMembers,			/* tp_members */
+	0,						/* tp_getset */
+	0,						/* tp_base */
+	0,						/* tp_dict */
+	0,						/* tp_descr_get */
+	0,						/* tp_descr_set */
+	0,						/* tp_dictoffset */
+	0,						/* tp_init */
+	0,						/* tp_alloc */
+	0,						/* tp_new */
 };
 
 
 static void connectionDealloc(PyObject *self);
-static PyObject * connectionGetAttr(PyObject *self, char *name);
-
+PyMethodDef connectionMethods[];
+PyMemberDef connectionMembers[];
 static PyTypeObject Connection_Type =
 {
-	PyObject_HEAD_INIT (&PyType_Type)
-	0,				/*ob_size */
-	"odbcconn",		/*tp_name */
+	PYWIN_OBJECT_HEAD
+	"odbcconn",				/*tp_name */
 	sizeof (connectionObject),	/*tp_basicsize */
-	0,				/*tp_itemsize */
+	0,						/*tp_itemsize */
 	connectionDealloc,		/*tp_dealloc */
-	0,				/*tp_print */
-	connectionGetAttr,		/*tp_getattr */
-	/* drop the rest */
+	0,						/*tp_print */
+	0,						/*tp_getattr */
+	0,						/*tp_setattr */
+	0,						/*tp_compare */
+	0,						/*tp_repr */
+	0,						/*tp_as_number */
+	0,						/* tp_as_sequence */
+	0,						/* tp_as_mapping */
+	0,						/* tp_hash */
+	0,						/* tp_call */
+	0,						/*tp_str */
+	PyObject_GenericGetAttr,	/* tp_getattro dbiGetAttr */
+	PyObject_GenericSetAttr,	/* tp_setattro */
+	0,						/*tp_as_buffer*/
+	Py_TPFLAGS_DEFAULT,		/* tp_flags */
+	0,						/* tp_doc */
+	0,						/* tp_traverse */
+	0,						/* tp_clear */
+	0,						/* tp_richcompare */
+	0,						/* tp_weaklistoffset */
+	0,						/* tp_iter */
+	0,						/* tp_iternext */
+	connectionMethods,		/* tp_methods */
+	connectionMembers,		/* tp_members */
+	0,						/* tp_getset */
+	0,						/* tp_base */
+	0,						/* tp_dict */
+	0,						/* tp_descr_get */
+	0,						/* tp_descr_set */
+	0,						/* tp_dictoffset */
+	0,						/* tp_init */
+	0,						/* tp_alloc */
+	0,						/* tp_new */
 };
 
 static int unsuccessful(RETCODE rc)
@@ -150,13 +212,13 @@ int connectionDied(const char *sqlState)
 
 
 typedef struct {
-	const char *state;
+	const TCHAR *state;
 	int  index;
 	int  connected;
 } odbcErrorDesc;
 
 
-static odbcErrorDesc *lookupError(const char *sqlState);
+static odbcErrorDesc *lookupError(const TCHAR *sqlState);
 static PyObject *dbiErrors[6]; /* 'cause I know about six DBI errors */
 
 static void odbcPrintError
@@ -164,31 +226,31 @@ static void odbcPrintError
 	HENV env,
 	connectionObject *conn,
 	HSTMT cur,
-	const char *action
+	const TCHAR *action
 )
 {
-	char  sqlState[256];
+	TCHAR  sqlState[256];
 	long  nativeError;    
 	short   pcbErrorMsg;  
-	char    errorMsg[1000];
+	TCHAR    errorMsg[1000];
 	PyObject *error;
 
 	if (unsuccessful(SQLError(
 		env,
 		conn ? conn->hdbc : 0,
 		cur, 
-		(unsigned char *) sqlState,
+		(SQLTCHAR *)sqlState,
 		&nativeError, 
-		(unsigned char *) errorMsg,
-		sizeof(errorMsg), &pcbErrorMsg)))
+		(SQLTCHAR *)errorMsg,
+		sizeof(errorMsg)/sizeof(errorMsg[0]), &pcbErrorMsg)))
 	{
 		error = odbcError;
-		strcpy(errorMsg, "Could not find error ");
+		_tcscpy(errorMsg, _T("Could not find error "));
 	}
 	else
 	{
-		strcat(errorMsg, " in ");
-		strcat(errorMsg, action);
+		_tcscat(errorMsg, _T(" in "));
+		_tcscat(errorMsg, action);
 
 		odbcErrorDesc *errorType = lookupError(sqlState);
 
@@ -203,15 +265,15 @@ static void odbcPrintError
 		error = dbiErrors[errn];
 	}
 
-	PyErr_SetString(error, errorMsg);
+	PyErr_SetObject(error, PyWinObject_FromTCHAR(errorMsg));
 }
 
-static void connectionError(connectionObject *conn, const char *action)
+static void connectionError(connectionObject *conn, const TCHAR *action)
 {
 	odbcPrintError(Env, conn, SQL_NULL_HSTMT, action);
 }
 
-static void cursorError(cursorObject *cur, const char *action)
+static void cursorError(cursorObject *cur, const TCHAR *action)
 {
 	odbcPrintError(Env, cur->my_conx, cur->hstmt, action);
 }
@@ -224,7 +286,7 @@ static int doConnect(connectionObject *conn)
 	rc = SQLDriverConnect(
 		conn->hdbc,
 		NULL,
-		(unsigned char *) conn->connectionString,
+		(SQLTCHAR *)conn->connectionString,
 		SQL_NTS,
 		NULL,
 		0,
@@ -233,7 +295,7 @@ static int doConnect(connectionObject *conn)
 	Py_END_ALLOW_THREADS
 	if  (unsuccessful(rc))
 	{
-		odbcPrintError(Env, conn, SQL_NULL_HSTMT, "LOGIN");
+		odbcPrintError(Env, conn, SQL_NULL_HSTMT, _T("LOGIN"));
 		return 1;
 	}
 	conn->connected = 1;
@@ -264,7 +326,7 @@ static int attemptReconnect(cursorObject *cur)
 		}
 		if (unsuccessful(SQLAllocStmt(cur->my_conx->hdbc, &cur->hstmt)))
 		{
-			connectionError(cur->my_conx, "REOPEN");
+			connectionError(cur->my_conx, _T("REOPEN"));
 			return 1;
 		}
 		cur->connect_id = cur->my_conx->connect_id;
@@ -273,6 +335,7 @@ static int attemptReconnect(cursorObject *cur)
 
 	return 0;
 }
+
 
 /* @pymethod |connection|setautocommit|Sets the autocommit mode. */
 static PyObject *odbcSetAutoCommit(PyObject *self, PyObject *args)
@@ -290,7 +353,7 @@ static PyObject *odbcSetAutoCommit(PyObject *self, PyObject *args)
 			SQL_AUTOCOMMIT,
 			SQL_AUTOCOMMIT_OFF)))
 		{
-			connectionError(conn, "SETAUTOCOMMIT");
+			connectionError(conn, _T("SETAUTOCOMMIT"));
 			return NULL;
 		}
 	}
@@ -301,7 +364,7 @@ static PyObject *odbcSetAutoCommit(PyObject *self, PyObject *args)
 			SQL_AUTOCOMMIT,
 			SQL_AUTOCOMMIT_ON)))
 		{
-			connectionError(conn, "SETAUTOCOMMIT");
+			connectionError(conn, _T("SETAUTOCOMMIT"));
 			return NULL;
 		};
 	}
@@ -323,7 +386,7 @@ static PyObject *odbcCommit(PyObject *self, PyObject *args)
 	Py_END_ALLOW_THREADS
 	if (unsuccessful(rc))
 	{
-		connectionError(connection(self), "COMMIT");
+		connectionError(connection(self), _T("COMMIT"));
 		return 0;
 	}
 	else
@@ -345,7 +408,7 @@ static PyObject *odbcRollback(PyObject *self, PyObject *args)
 	Py_END_ALLOW_THREADS
 	if (unsuccessful(rc))
 	{
-		connectionError(connection(self), "ROLLBACK");
+		connectionError(connection(self), _T("ROLLBACK"));
 		return 0;
 	}
 	else {
@@ -377,10 +440,11 @@ static PyObject *odbcCursor(PyObject *self, PyObject *args)
 	cur->my_conx = 0;
 	cur->bGetDataIsNeeded = false;
 	cur->hstmt=NULL;
-
+	cur->cursorError=odbcError;
+	Py_INCREF(odbcError);
 	if (unsuccessful(SQLAllocStmt(conn->hdbc, &cur->hstmt)))
 	{
-		connectionError(cur->my_conx, "OPEN");
+		connectionError(cur->my_conx, _T("OPEN"));
 		Py_DECREF(cur);
 		return NULL;
 	}
@@ -398,7 +462,7 @@ static PyObject *odbcClose(PyObject *self, PyObject *args)
 }
 
 /* @object connection|An object representing an ODBC connection */
-static PyMethodDef connectionMethods[] = {
+static struct PyMethodDef connectionMethods[] = {
 	{ "setautocommit", odbcSetAutoCommit, 1 }, /* @pymeth setautocommit|Sets the autocommit mode. */
 	{ "commit", odbcCommit, 1 } , /* @pymeth commit|Commits a transaction. */
 	{ "rollback", odbcRollback, 1 } , /* @pymeth rollback|Rollsback a transaction. */
@@ -407,20 +471,14 @@ static PyMethodDef connectionMethods[] = {
 	{0,     0}
 };
 
-static PyObject *connectionGetAttr(PyObject *self,
-       char *name)
-{
-	if (!strcmp(name, "error"))
-	{
-		Py_INCREF(odbcError);
-		return odbcError;
-	}
-
-	return Py_FindMethod(connectionMethods, self, name);
-}
+static PyMemberDef connectionMembers[] = {
+	{"error", T_OBJECT, offsetof(connectionObject, connectionError), READONLY},
+	{NULL}
+};
 
 static void connectionDealloc(PyObject *self)
 {
+	Py_XDECREF(connection(self)->connectionError);
 	SQLDisconnect(connection(self)->hdbc);
 	SQLFreeConnect(connection(self)->hdbc);
 	if (connection(self)->connectionString)
@@ -474,10 +532,8 @@ static void cursorDealloc(PyObject *self)
 	{
 		Py_DECREF((PyObject*)cur->my_conx);
 	}
-	if (cur->description)
-	{
-		Py_DECREF(cur->description);
-	}
+	Py_XDECREF(cur->description);
+	Py_XDECREF(cur->cursorError);
 	PyObject_Del(self);
 }
 
@@ -540,7 +596,7 @@ static void bindOutputVar
 			vsize,
 			(SQLLEN *)&ob->rcode)))
 		{
-			cursorError(cur, "BIND");
+			cursorError(cur, _T("BIND"));
 		}
 	}
 }
@@ -581,22 +637,22 @@ static PyObject *rawCopy(const void *v, int sz)
 }
 
 typedef struct {
-	const char *ptr;
+	const TCHAR *ptr;
 	int parmCount;
 	int parmIdx;
 	int isParm;
-	char state;
-	char prev;
+	TCHAR state;
+	TCHAR prev;
 } parseContext;
 
-static void initParseContext(parseContext *ct, const char *c)
+static void initParseContext(parseContext *ct, const TCHAR *c)
 {
   ct->state = 0;
   ct->ptr = c;
   ct->parmCount = 0;
 }
 
-static char doParse(parseContext *ct) 
+static TCHAR doParse(parseContext *ct) 
 {
 	ct->isParm = 0;
 	if (ct->state == *ct->ptr)
@@ -617,7 +673,7 @@ static char doParse(parseContext *ct)
 		}
 		else if ((*ct->ptr == ':') && !isalnum(ct->prev))
 		{
-			const char *m = ct->ptr + 1;
+			const TCHAR *m = ct->ptr + 1;
 			int n = 0;
 			while (isdigit(*m))
 			{
@@ -689,7 +745,7 @@ static int ibindInt(cursorObject *cur, int column, PyObject *item)
 		len,
 		&ib->len)))
 	{
-		cursorError(cur, "input-binding");
+		cursorError(cur, _T("input-binding"));
 		return 0;
 	}
 
@@ -719,7 +775,7 @@ static int ibindLong(cursorObject*cur,int column, PyObject *item)
 		len,
 		&ib->len)))
 	{
-		cursorError(cur, "input-binding");
+		cursorError(cur, _T("input-binding"));
 		return 0;
 	}
 
@@ -749,7 +805,7 @@ static int ibindNull(cursorObject*cur, int column)
 	  0,
 	  &nl)))
   {
-      cursorError(cur, "input-binding");
+      cursorError(cur, _T("input-binding"));
       return 0;
   }
 
@@ -788,7 +844,7 @@ static int ibindDate(cursorObject*cur, int column, PyObject *item)
 		len,
 		&ib->len)))
 	{
-		cursorError(cur, "input-binding");
+		cursorError(cur, _T("input-binding"));
 		return 0;
 	}
 
@@ -822,7 +878,7 @@ static int ibindRaw(cursorObject *cur, int column, PyObject *item)
 	  &ib->len);
   if (unsuccessful(rc))
   {
-      cursorError(cur, "input-binding");
+      cursorError(cur, _T("input-binding"));
       return 0;
   }
 
@@ -851,7 +907,7 @@ static int ibindFloat(cursorObject *cur, int column, PyObject *item)
 		sizeof(double),
 		&ib->len)))
 	{
-		cursorError(cur, "input-binding");
+		cursorError(cur, _T("input-binding"));
 		return 0;
 	}
 
@@ -894,7 +950,7 @@ static int ibindString(cursorObject *cur, int column, PyObject *item)
 	  &NTS);
   if (unsuccessful(rc))
   {
-      cursorError(cur, "input-binding");
+      cursorError(cur, _T("input-binding"));
       return 0;
   }
 
@@ -939,7 +995,7 @@ static int ibindUnicode(cursorObject *cur, int column, PyObject *item)
 	  &NTS);
   if (unsuccessful(rc))
   {
-      cursorError(cur, "input-binding");
+      cursorError(cur, _T("input-binding"));
       return 0;
   }
 
@@ -948,8 +1004,8 @@ static int ibindUnicode(cursorObject *cur, int column, PyObject *item)
 
 static int rewriteQuery
 (
-	char *out,
-	const char *in
+	TCHAR *out,
+	const TCHAR *in
 )
 {
 	parseContext ctx;
@@ -1029,7 +1085,7 @@ static int bindInput
 	return 1;
 }
 
-static int display_size(short coltype, int collen, const char *colname) 
+static int display_size(short coltype, int collen, const TCHAR *colname) 
 {
 
   switch (coltype)
@@ -1039,21 +1095,21 @@ static int display_size(short coltype, int collen, const char *colname)
     case SQL_DATE:
     case SQL_TIMESTAMP:
     case SQL_BIT:
-      return(max(collen, (int)strlen(colname)));
+      return(max(collen, (int)_tcslen(colname)));
     case SQL_SMALLINT:
     case SQL_INTEGER:
     case SQL_TINYINT:
-      return(max(collen+1, (int)strlen(colname)));
+      return(max(collen+1, (int)_tcslen(colname)));
     case SQL_DECIMAL:
     case SQL_NUMERIC:
-      return(max(collen+2, (int)strlen(colname)));
+      return(max(collen+2, (int)_tcslen(colname)));
     case SQL_REAL:
     case SQL_FLOAT:
     case SQL_DOUBLE:
-      return(max(20, (int)strlen(colname)));
+      return(max(20, (int)_tcslen(colname)));
     case SQL_BINARY:
     case SQL_VARBINARY:
-      return(max(2*collen, (int)strlen(colname)));
+      return(max(2*collen, (int)_tcslen(colname)));
     case SQL_LONGVARBINARY:
     case SQL_LONGVARCHAR:
     default:
@@ -1066,7 +1122,7 @@ static int bindOutput(cursorObject *cur)
 {
 	short vtype;
 	SQLULEN vsize;
-	char name[256];
+	TCHAR name[256];
 	int pos = 1;
 	short n_columns;
 	SQLNumResultCols(cur->hstmt, &n_columns);
@@ -1083,8 +1139,8 @@ static int bindOutput(cursorObject *cur)
 		SQLDescribeCol(
 			cur->hstmt,
 			pos,
-			(unsigned char *) name,
-			(short) sizeof(name),
+			(SQLTCHAR *)name,
+			sizeof(name)/sizeof(name[0]),
 			&nsize,
 			&vtype,
 			&vsize,
@@ -1254,8 +1310,9 @@ static PyObject *odbcCurExec(PyObject *self, PyObject *args)
 {
 	cursorObject *cur = cursor(self);
 	PyObject *temp = NULL;
-	const char *sql;
-	char *sqlbuf;
+	TCHAR *sql=NULL;
+	PyObject *obsql;
+	TCHAR *sqlbuf;
 	PyObject *inputvars = 0;
 	PyObject *rv = 0;
 	PyObject *rows = 0;
@@ -1270,13 +1327,16 @@ static PyObject *odbcCurExec(PyObject *self, PyObject *args)
 
 	/* @pyparm string|sql||The SQL to execute */
 	/* @pyparm sequence|[var, ...]|[]|Input variables. */
-	if (!PyArg_ParseTuple(args, "s|O", &sql, &inputvars))
+	if (!PyArg_ParseTuple(args, "O|O", &obsql, &inputvars))
 	{
 		return NULL;
 	}
+	if (!PyWinObject_AsTCHAR(obsql, &sql, FALSE))
+		return NULL;
 
 	if (inputvars && !PySequence_Check(inputvars))
 	{
+		PyWinObject_FreeTCHAR(sql);
 		PyErr_SetString(odbcError, "expected sequence as second parameter");
 		return NULL;
 	}
@@ -1301,16 +1361,18 @@ static PyObject *odbcCurExec(PyObject *self, PyObject *args)
 	cur->description = PyList_New(0);
 	if (!cur->description)
 	{
+		PyWinObject_FreeTCHAR(sql);
 		return NULL;
 	}
 
 	cur->n_columns = 0;
 
-	sqlbuf = (char *) malloc(strlen(sql) + 100);
+	sqlbuf = (TCHAR *) malloc((_tcslen(sql) + 100) * sizeof(TCHAR));
 	if (!sqlbuf)
 	{
 		Py_DECREF(cur->description);
-                cur->description = NULL;
+		cur->description = NULL;
+		PyWinObject_FreeTCHAR(sql);
 		OutOfMemory();
 		return NULL;
 	}
@@ -1319,11 +1381,11 @@ static PyObject *odbcCurExec(PyObject *self, PyObject *args)
 	RETCODE rc = SQL_SUCCESS;
 	n_columns = rewriteQuery(sqlbuf, sql);
 	Py_BEGIN_ALLOW_THREADS
-	rc = SQLPrepare(cur->hstmt, (unsigned char *)sqlbuf, SQL_NTS);
+	rc = SQLPrepare(cur->hstmt, (SQLTCHAR *)sqlbuf, SQL_NTS);
 	Py_END_ALLOW_THREADS
 	if (unsuccessful(rc))
 	{
-		cursorError(cur, "EXEC");
+		cursorError(cur, _T("EXEC"));
 		goto Error;
 	}
 
@@ -1349,7 +1411,7 @@ static PyObject *odbcCurExec(PyObject *self, PyObject *args)
 				goto Error;
 			}
 			Py_BEGIN_ALLOW_THREADS
-			rc = SQLExecDirect(cur->hstmt, (unsigned char *) sqlbuf,
+			rc = SQLExecDirect(cur->hstmt, (SQLTCHAR *)sqlbuf,
 							   SQL_NTS);
 			Py_END_ALLOW_THREADS
 			/* move data here. */
@@ -1359,7 +1421,7 @@ static PyObject *odbcCurExec(PyObject *self, PyObject *args)
 			}
 			if (unsuccessful(rc))
 			{
-				cursorError(cur, "EXEC");
+				cursorError(cur, _T("EXEC"));
 				goto Error;
 			}
 			/* Success! */
@@ -1380,7 +1442,7 @@ static PyObject *odbcCurExec(PyObject *self, PyObject *args)
 			goto Error;
 		}
 		Py_BEGIN_ALLOW_THREADS
-		rc = SQLExecDirect(cur->hstmt, (unsigned char *) sqlbuf,
+		rc = SQLExecDirect(cur->hstmt, (SQLTCHAR *)sqlbuf,
 						   SQL_NTS);
 		Py_END_ALLOW_THREADS
 		if (rc == SQL_NEED_DATA)
@@ -1389,7 +1451,7 @@ static PyObject *odbcCurExec(PyObject *self, PyObject *args)
 		}
 		if (unsuccessful(rc))
 		{
-			cursorError(cur, "EXEC");
+			cursorError(cur, _T("EXEC"));
 			goto Error;
 		}
 		else if (!bindOutput(cur))
@@ -1410,8 +1472,9 @@ static PyObject *odbcCurExec(PyObject *self, PyObject *args)
 		}
 	}
 	
-	rv = PyInt_FromSsize_t(n_rows);
+	rv = PyLong_FromLongLong(n_rows);
 Cleanup:
+	PyWinObject_FreeTCHAR(sql);
 	free(sqlbuf);
 	return rv;
 Error:
@@ -1478,7 +1541,7 @@ static PyObject *processOutput(cursorObject *cur)
 				if (unsuccessful(rc))
 				{
 					Py_DECREF(row);
-	 				cursorError(cur, "FETCH");
+	 				cursorError(cur, _T("FETCH"));
 					return NULL;
 				}
 
@@ -1563,7 +1626,7 @@ static PyObject *fetchOne(cursorObject *cur)
   }
   else if (unsuccessful(rc))
   {
-    cursorError(cur, "FETCH");
+    cursorError(cur, _T("FETCH"));
     return 0;
   }
   return processOutput(cur);
@@ -1655,55 +1718,41 @@ static PyMethodDef cursorMethods[] = {
   {0,     0}
 };
 
-static PyObject *cursorGetAttr(PyObject *self,
-        char *name)
-{
-	if (!strcmp(name, "error"))
-	{
-		Py_INCREF(odbcError);
-		return odbcError;
-	}
-	if (!strcmp(name, "description"))
-	{
-		if (!cursor(self)->description) {
-			Py_INCREF(Py_None);
-			return Py_None;
-		}
-		Py_INCREF(cursor(self)->description);
-		return cursor(self)->description;
-	}
-	return Py_FindMethod(cursorMethods, self, name);
-}
+static PyMemberDef cursorMembers[] = {
+	{"description", T_OBJECT, offsetof(cursorObject, description), READONLY},
+	{"error", T_OBJECT, offsetof(cursorObject, cursorError), READONLY},
+	{NULL}
+};
 
-static void parseInfo(connectionObject *conn, const char *c)
+static void parseInfo(connectionObject *conn, const TCHAR *c)
 {
-	char *p;
-	char buf[255];
-	const char *firstEqualsSign;
-	const char *firstSlash;
-	char dsn[MAX_STR];
-	char uid[MAX_STR];
-	char pwd[MAX_STR];
+	TCHAR *p;
+	TCHAR buf[255];
+	const TCHAR *firstEqualsSign;
+	const TCHAR *firstSlash;
+	TCHAR dsn[MAX_STR];
+	TCHAR uid[MAX_STR];
+	TCHAR pwd[MAX_STR];
 	size_t connectionStringLength;
 
-	firstEqualsSign = strchr(c, '=');
-	firstSlash = strchr(c, '/');
+	firstEqualsSign = _tcschr(c, _T('='));
+	firstSlash = _tcschr(c, _T('/'));
 
 	if (!firstEqualsSign || (firstSlash && firstSlash < firstEqualsSign))
 	{
-		strncpy(buf, c, sizeof(buf));
-		p = strtok(buf, "/");
+		_tcsncpy(buf, c, sizeof(buf)/sizeof(TCHAR));
+		p = _tcstok(buf, _T("/"));
 		if (p)
 		{
-			strncpy(dsn, p, sizeof(dsn));
-			p = strtok(0, "/");
+			_tcsncpy(dsn, p, sizeof(dsn)/sizeof(TCHAR));
+			p = _tcstok(0, _T("/"));
 			if (p)
 			{
-				strncpy(uid, p, sizeof(uid));
-				p = strtok(0, "/");
+				_tcsncpy(uid, p, sizeof(uid)/sizeof(TCHAR));
+				p = _tcstok(0, _T("/"));
 				if (p)
 				{
-					strncpy(pwd, p, sizeof(pwd));
+					_tcsncpy(pwd, p, sizeof(pwd)/sizeof(TCHAR));
 				}
 				else
 				{
@@ -1718,37 +1767,38 @@ static void parseInfo(connectionObject *conn, const char *c)
 		}
 		else
 		{
-			strncpy(dsn, c, sizeof(dsn));
+			_tcsncpy(dsn, c, sizeof(dsn));
 			uid[0] = 0;
 			pwd[0] = 0;
 		}
 
-		connectionStringLength = strlen(dsn) + strlen(uid) + strlen(pwd) + 15; /* add room for DSN=;UID=;PWD=\0 */
-		conn->connectionString = (char *) malloc(connectionStringLength);
-		strcpy(conn->connectionString, "DSN=");
-		strcat(conn->connectionString, dsn);
-		if (strlen(uid))
+		connectionStringLength = _tcslen(dsn) + _tcslen(uid) + _tcslen(pwd) + 15; /* add room for DSN=;UID=;PWD=\0 */
+		conn->connectionString = (TCHAR *) malloc(connectionStringLength);
+		_tcscpy(conn->connectionString, _T("DSN="));
+		_tcscat(conn->connectionString, dsn);
+		if (_tcslen(uid))
 		{
-			strcat(conn->connectionString, ";UID=");
-			strcat(conn->connectionString, uid);
+			_tcscat(conn->connectionString, _T(";UID="));
+			_tcscat(conn->connectionString, uid);
 		}
-		if (strlen(pwd))
+		if (_tcslen(pwd))
 		{
-			strcat(conn->connectionString, ";PWD=");
-			strcat(conn->connectionString, pwd);
+			_tcscat(conn->connectionString, _T(";PWD="));
+			_tcscat(conn->connectionString, pwd);
 		}
 	}
 	else
 	{
-		conn->connectionString = (char *) malloc(strlen(c) + 1);
-		strcpy(conn->connectionString, c);
+		conn->connectionString = (TCHAR *) malloc((_tcslen(c) + 1) * sizeof(TCHAR));
+		_tcscpy(conn->connectionString, c);
 	}
 }
 
 /* @pymethod <o connection>|odbc|odbc|Creates an ODBC connection */
 static PyObject *odbcLogon(PyObject *self, PyObject *args)
 {
-	const char *connectionString;
+	TCHAR *connectionString=NULL;
+	PyObject *obconnectionString;
 	connectionObject *conn;
 
 	/* @pyparm string|connectionString||An ODBC connection string.
@@ -1756,24 +1806,30 @@ static PyObject *odbcLogon(PyObject *self, PyObject *args)
 	   DSN[/username[/password]] (e.g. "myDSN/myUserName/myPassword").
 	   Alternatively, a full ODBC connection string can be used (e.g.,
 	   "Driver={SQL Server};Server=(local);Database=myDatabase"). */
-	if (!PyArg_ParseTuple(args, "s", &connectionString))
+	if (!PyArg_ParseTuple(args, "O", &obconnectionString))
 	{
 		return NULL;
 	}
+	if (!PyWinObject_AsTCHAR(obconnectionString, &connectionString, FALSE))
+		return NULL;
 
 	conn = PyObject_New(connectionObject, &Connection_Type);
 	if (!conn)
 	{
+		PyWinObject_FreeTCHAR(connectionString);
 		return NULL;
 	}
 
+	conn->connectionError=odbcError;
+	Py_INCREF(odbcError);
 	conn->connect_id = 0; /* initialize it to anything */
 	conn->hdbc = SQL_NULL_HDBC;
 	conn->connectionString = NULL;
 	if (unsuccessful(SQLAllocConnect(Env, &conn->hdbc)))
 	{
-		connectionError(conn, "ALLOCATION");
+		connectionError(conn, _T("ALLOCATION"));
 		Py_DECREF(conn);
+		PyWinObject_FreeTCHAR(connectionString);
 		return NULL;
 	}
 
@@ -1781,10 +1837,11 @@ static PyObject *odbcLogon(PyObject *self, PyObject *args)
 
 	if (doConnect(conn))
 	{
+		PyWinObject_FreeTCHAR(connectionString);
 		Py_DECREF(conn);
 		return NULL;
 	}
-
+	PyWinObject_FreeTCHAR(connectionString);
 	return (PyObject*)conn;
 }
 
@@ -1798,8 +1855,8 @@ static PyObject *odbcSQLDataSources(PyObject *self, PyObject *args)
 		return NULL;
 
 	PyObject *ret;
-	SQLCHAR svr[256];
-	SQLCHAR desc[1024];
+	SQLTCHAR svr[256];
+	SQLTCHAR desc[1024];
 	SQLSMALLINT svr_size = sizeof(svr) / sizeof(svr[0]);
 	SQLSMALLINT desc_size = sizeof(desc) / sizeof(desc[0]);
 	RETCODE rc;
@@ -1813,7 +1870,7 @@ static PyObject *odbcSQLDataSources(PyObject *self, PyObject *args)
 		ret = Py_None;
 		Py_INCREF(Py_None);
 	} else if (unsuccessful(rc)){
-		connectionError(NULL, "SQLDataSources");
+		connectionError(NULL, _T("SQLDataSources"));
 		ret = NULL;
 	} else
 		ret = Py_BuildValue("NN",
@@ -1846,150 +1903,177 @@ int AddConstant(PyObject *dict, char *key, long value)
 #define ADD_CONSTANT(tok) AddConstant(dict,#tok, tok)
 
 
-extern "C" __declspec(dllexport) void initodbc()
+extern "C" __declspec(dllexport)
+#if (PY_VERSION_HEX < 0x03000000)
+void initodbc(void)
+#else
+PyObject *PyInit_odbc(void)
+#endif
 {
-	odbcError = PyString_FromString("OdbcError");
+	PyObject *dict, *module;
+	PyWinGlobals_Ensure();
+
+#if (PY_VERSION_HEX < 0x03000000)
+	module = Py_InitModule("odbc", globalMethods);
+	if (!module)
+		return;
+	dict = PyModule_GetDict(module);
+	if (!dict)
+		return;
+	if (!PyImport_ImportModule("dbi"))
+		return;
+
+#else
+	static PyModuleDef odbc_def = {
+		PyModuleDef_HEAD_INIT,
+		"odbc",
+		"A Python wrapper around the ODBC API.",
+		-1,
+		globalMethods
+		};
+	module = PyModule_Create(&odbc_def);
+	if (!module)
+		return NULL;
+	dict = PyModule_GetDict(module);
+	if (!dict)
+		return NULL;
+	if (!PyImport_ImportModule("dbi"))
+		return NULL;
+#endif
 
     if (unsuccessful(SQLAllocEnv(&Env)))
 	{
-		odbcPrintError(SQL_NULL_HENV, 0, SQL_NULL_HSTMT, "INIT");
+		odbcPrintError(SQL_NULL_HENV, 0, SQL_NULL_HSTMT, _T("INIT"));
     }
-    else if (PyImport_ImportModule("dbi"))
-	{
-		PyObject *m = Py_InitModule("odbc", globalMethods);
-		if (!m) /* Eeek - some serious error! */
-			return;
-		if (m)
-		{
-			PyObject *dict = PyModule_GetDict (m);
-			/* The indices go to indices in the ODBC error table */
-			dbiErrors[0] = DbiNoError;
-			dbiErrors[1] = DbiOpError;
-			dbiErrors[2] = DbiProgError;
-			dbiErrors[3] = DbiIntegrityError;
-			dbiErrors[4] = DbiDataError;
-			dbiErrors[5] = DbiInternalError;
-			PyDict_SetItemString(dict, "error", odbcError);
-			ADD_CONSTANT(SQL_FETCH_NEXT);
-			ADD_CONSTANT(SQL_FETCH_FIRST);
-			ADD_CONSTANT(SQL_FETCH_LAST);
-			ADD_CONSTANT(SQL_FETCH_PRIOR);
-			ADD_CONSTANT(SQL_FETCH_ABSOLUTE);
-			ADD_CONSTANT(SQL_FETCH_RELATIVE);
-			ADD_CONSTANT(SQL_FETCH_FIRST_USER);
-			ADD_CONSTANT(SQL_FETCH_FIRST_SYSTEM);
-		}
-    }
-    else
-	{
-		PyErr_SetString(PyString_FromString("odbc"),
-						"Cannot import dbi module");
-    }
+
+	odbcError = PyString_FromString("OdbcError");
+	PyDict_SetItemString(dict, "error", odbcError);
+
+	/* The indices go to indices in the ODBC error table */
+	dbiErrors[0] = DbiNoError;
+	dbiErrors[1] = DbiOpError;
+	dbiErrors[2] = DbiProgError;
+	dbiErrors[3] = DbiIntegrityError;
+	dbiErrors[4] = DbiDataError;
+	dbiErrors[5] = DbiInternalError;
+
+	ADD_CONSTANT(SQL_FETCH_NEXT);
+	ADD_CONSTANT(SQL_FETCH_FIRST);
+	ADD_CONSTANT(SQL_FETCH_LAST);
+	ADD_CONSTANT(SQL_FETCH_PRIOR);
+	ADD_CONSTANT(SQL_FETCH_ABSOLUTE);
+	ADD_CONSTANT(SQL_FETCH_RELATIVE);
+	ADD_CONSTANT(SQL_FETCH_FIRST_USER);
+	ADD_CONSTANT(SQL_FETCH_FIRST_SYSTEM);
+
+#if (PY_VERSION_HEX >= 0x03000000)
+	return module;
+#endif
 }
 
 static odbcErrorDesc errorTable[] = {
-	{ "01000", 5, 0 }, /* General warning */
-	{ "01002", 1, 1 }, /* Disconnect error */
-	{ "01004", 0, 1 }, /* Data truncated */
-	{ "01006", 5, 1 }, /* Privilege not revoked */
-	{ "01S00", 2, 1 }, /* Invalid connection string attribute */
-	{ "01S01", 5, 1 }, /* Error in row */
-	{ "01S02", 5, 1 }, /* Option value changed */
-	{ "01S03", 0, 1 }, /* No rows updated or deleted */
-	{ "01S04", 0, 1 }, /* More than one row updated or deleted */
-	{ "01S05", 0, 1 }, /* Cancel treated as SQLFreeStmt with the SQL_CLOSE */
-	{ "01S06", 2, 1 }, /* Attempt to fetch before the result set returned */
-	{ "07001", 2, 1 }, /* Wrong number of parameters */
-	{ "07006", 2, 1 }, /* Restricted data type attribute violation */
-	{ "07S01", 2, 1 }, /* Invalid use of default parameter */
-	{ "08001", 1, 1 }, /* Unable to connect to data source */
-	{ "08002", 1, 1 }, /* Connection in use */
-	{ "08003", 1, 1 }, /* Connection not open */
-	{ "08004", 1, 1 }, /* Data source rejected establishment of connection */
-	{ "08007", 1, 1 }, /* Connection failure during transaction */
-	{ "08S01", 1, 0 }, /* Communication link failure */
-	{ "21S01", 2, 1 }, /* Insert value list does not match column list */
-	{ "21S02", 2, 1 }, /* Degree of derived table does not match column list */
-	{ "22001", 0, 1 }, /* String data right truncation */
-	{ "22002", 5, 1 }, /* Indicator variable required but not supplied */
-	{ "22003", 4, 1 }, /* Numeric value out of range */
-	{ "22005", 4, 1 }, /* Error in assignment */
-	{ "22008", 4, 1 }, /* Datetime field overflow */
-	{ "22012", 4, 1 }, /* Division by zero */
-	{ "22026", 4, 1 }, /* String data, length mismatch */
-	{ "23000", 3, 1 }, /* Integrity constraint violation */
-	{ "24000", 5, 1 }, /* Invalid cursor state */
-	{ "25000", 5, 1 }, /* Invalid transaction state */
-	{ "28000", 1, 1 }, /* Invalid authorization specification */
-	{ "34000", 5, 1 }, /* Invalid cursor name */
-	{ "37000", 2, 1 }, /* Syntax error or access violation */
-	{ "3C000", 5, 1 }, /* Duplicate cursor name */
-	{ "40001", 5, 1 }, /* Serialization failure */
-	{ "42000", 2, 1 }, /* Syntax error or access violation */
-	{ "70100", 1, 1 }, /* Operation aborted */
-	{ "IM001", 1, 1 }, /* Driver does not support this function */
-	{ "IM002", 1, 1 }, /* Data source name not found and no default driver  */
-	{ "IM003", 1, 1 }, /* Specified driver could not be loaded */
-	{ "IM004", 1, 1 }, /* Driver's SQLAllocEnv failed */
-	{ "IM005", 1, 1 }, /* Driver's SQLAllocConnect failed */
-	{ "IM006", 1, 1 }, /* Driver's SQLSetConnect-Option failed */
-	{ "IM007", 1, 1 }, /* No data source or driver specified; dialog prohibited */
-	{ "IM008", 1, 1 }, /* Dialog failed */
-	{ "IM009", 1, 1 }, /* Unable to load translation DLL */
-	{ "IM010", 1, 1 }, /* Data source name too long */
-	{ "IM011", 1, 1 }, /* Driver name too long */
-	{ "IM012", 1, 1 }, /* DRIVER keyword syntax error */
-	{ "IM013", 1, 1 }, /* Trace file error */
-	{ "S0001", 2, 1 }, /* Base table or view already exists */
-	{ "S0002", 2, 1 }, /* Base table not found */
-	{ "S0011", 2, 1 }, /* Index already exists */
-	{ "S0012", 2, 1 }, /* Index not found */
-	{ "S0021", 2, 1 }, /* Column already exists */
-	{ "S0022", 2, 1 }, /* Column not found */
-	{ "S0023", 2, 1 }, /* No default for column */
-	{ "S1000", 1, 1 }, /* General error */
-	{ "S1001", 1, 1 }, /* Memory allocation failure */
-	{ "S1002", 5, 1 }, /* Invalid column number */
-	{ "S1003", 5, 1 }, /* Program type out of range */
-	{ "S1004", 5, 1 }, /* SQL data type out of range */
-	{ "S1008", 1, 1 }, /* Operation canceled */
-	{ "S1009", 5, 1 }, /* Invalid argument value */
-	{ "S1010", 5, 1 }, /* Function sequence error */
-	{ "S1011", 5, 1 }, /* Operation invalid at this time */
-	{ "S1012", 5, 1 }, /* Invalid transaction operation code specified */
-	{ "S1015", 5, 1 }, /* No cursor name available */
-	{ "S1090", 5, 1 }, /* Invalid string or buffer length */
-	{ "S1091", 5, 1 }, /* Descriptor type out of range */
-	{ "S1092", 5, 1 }, /* Option type out of range */
-	{ "S1093", 5, 1 }, /* Invalid parameter number */
-	{ "S1095", 5, 1 }, /* Function type out of range */
-	{ "S1096", 5, 1 }, /* Information type out of range */
-	{ "S1097", 5, 1 }, /* Column type out of range */
-	{ "S1098", 5, 1 }, /* Scope type out of range */
-	{ "S1099", 5, 1 }, /* Nullable type out of range */
-	{ "S1100", 5, 1 }, /* Uniqueness option type out of range */
-	{ "S1101", 5, 1 }, /* Accuracy option type out of range */
-	{ "S1103", 5, 1 }, /* Direction option out of range */
-	{ "S1105", 5, 1 }, /* Invalid parameter type */
-	{ "S1106", 5, 1 }, /* Fetch type out of range */
-	{ "S1107", 5, 1 }, /* Row value out of range */
-	{ "S1108", 5, 1 }, /* Concurrency option out of range */
-	{ "S1109", 5, 1 }, /* Invalid cursor position */
-	{ "S1110", 5, 1 }, /* Invalid driver completion */
-	{ "S1111", 5, 1 }, /* Invalid bookmark value */
-	{ "S1C00", 1, 1 }, /* Driver not capable */
-	{ "S1T00", 1, 1 }  /* Timeout expired */
+	{ _T("01000"), 5, 0 }, /* General warning */
+	{ _T("01002"), 1, 1 }, /* Disconnect error */
+	{ _T("01004"), 0, 1 }, /* Data truncated */
+	{ _T("01006"), 5, 1 }, /* Privilege not revoked */
+	{ _T("01S00"), 2, 1 }, /* Invalid connection string attribute */
+	{ _T("01S01"), 5, 1 }, /* Error in row */
+	{ _T("01S02"), 5, 1 }, /* Option value changed */
+	{ _T("01S03"), 0, 1 }, /* No rows updated or deleted */
+	{ _T("01S04"), 0, 1 }, /* More than one row updated or deleted */
+	{ _T("01S05"), 0, 1 }, /* Cancel treated as SQLFreeStmt with the SQL_CLOSE */
+	{ _T("01S06"), 2, 1 }, /* Attempt to fetch before the result set returned */
+	{ _T("07001"), 2, 1 }, /* Wrong number of parameters */
+	{ _T("07006"), 2, 1 }, /* Restricted data type attribute violation */
+	{ _T("07S01"), 2, 1 }, /* Invalid use of default parameter */
+	{ _T("08001"), 1, 1 }, /* Unable to connect to data source */
+	{ _T("08002"), 1, 1 }, /* Connection in use */
+	{ _T("08003"), 1, 1 }, /* Connection not open */
+	{ _T("08004"), 1, 1 }, /* Data source rejected establishment of connection */
+	{ _T("08007"), 1, 1 }, /* Connection failure during transaction */
+	{ _T("08S01"), 1, 0 }, /* Communication link failure */
+	{ _T("21S01"), 2, 1 }, /* Insert value list does not match column list */
+	{ _T("21S02"), 2, 1 }, /* Degree of derived table does not match column list */
+	{ _T("22001"), 0, 1 }, /* String data right truncation */
+	{ _T("22002"), 5, 1 }, /* Indicator variable required but not supplied */
+	{ _T("22003"), 4, 1 }, /* Numeric value out of range */
+	{ _T("22005"), 4, 1 }, /* Error in assignment */
+	{ _T("22008"), 4, 1 }, /* Datetime field overflow */
+	{ _T("22012"), 4, 1 }, /* Division by zero */
+	{ _T("22026"), 4, 1 }, /* String data, length mismatch */
+	{ _T("23000"), 3, 1 }, /* Integrity constraint violation */
+	{ _T("24000"), 5, 1 }, /* Invalid cursor state */
+	{ _T("25000"), 5, 1 }, /* Invalid transaction state */
+	{ _T("28000"), 1, 1 }, /* Invalid authorization specification */
+	{ _T("34000"), 5, 1 }, /* Invalid cursor name */
+	{ _T("37000"), 2, 1 }, /* Syntax error or access violation */
+	{ _T("3C000"), 5, 1 }, /* Duplicate cursor name */
+	{ _T("40001"), 5, 1 }, /* Serialization failure */
+	{ _T("42000"), 2, 1 }, /* Syntax error or access violation */
+	{ _T("70100"), 1, 1 }, /* Operation aborted */
+	{ _T("IM001"), 1, 1 }, /* Driver does not support this function */
+	{ _T("IM002"), 1, 1 }, /* Data source name not found and no default driver  */
+	{ _T("IM003"), 1, 1 }, /* Specified driver could not be loaded */
+	{ _T("IM004"), 1, 1 }, /* Driver's SQLAllocEnv failed */
+	{ _T("IM005"), 1, 1 }, /* Driver's SQLAllocConnect failed */
+	{ _T("IM006"), 1, 1 }, /* Driver's SQLSetConnect-Option failed */
+	{ _T("IM007"), 1, 1 }, /* No data source or driver specified; dialog prohibited */
+	{ _T("IM008"), 1, 1 }, /* Dialog failed */
+	{ _T("IM009"), 1, 1 }, /* Unable to load translation DLL */
+	{ _T("IM010"), 1, 1 }, /* Data source name too long */
+	{ _T("IM011"), 1, 1 }, /* Driver name too long */
+	{ _T("IM012"), 1, 1 }, /* DRIVER keyword syntax error */
+	{ _T("IM013"), 1, 1 }, /* Trace file error */
+	{ _T("S0001"), 2, 1 }, /* Base table or view already exists */
+	{ _T("S0002"), 2, 1 }, /* Base table not found */
+	{ _T("S0011"), 2, 1 }, /* Index already exists */
+	{ _T("S0012"), 2, 1 }, /* Index not found */
+	{ _T("S0021"), 2, 1 }, /* Column already exists */
+	{ _T("S0022"), 2, 1 }, /* Column not found */
+	{ _T("S0023"), 2, 1 }, /* No default for column */
+	{ _T("S1000"), 1, 1 }, /* General error */
+	{ _T("S1001"), 1, 1 }, /* Memory allocation failure */
+	{ _T("S1002"), 5, 1 }, /* Invalid column number */
+	{ _T("S1003"), 5, 1 }, /* Program type out of range */
+	{ _T("S1004"), 5, 1 }, /* SQL data type out of range */
+	{ _T("S1008"), 1, 1 }, /* Operation canceled */
+	{ _T("S1009"), 5, 1 }, /* Invalid argument value */
+	{ _T("S1010"), 5, 1 }, /* Function sequence error */
+	{ _T("S1011"), 5, 1 }, /* Operation invalid at this time */
+	{ _T("S1012"), 5, 1 }, /* Invalid transaction operation code specified */
+	{ _T("S1015"), 5, 1 }, /* No cursor name available */
+	{ _T("S1090"), 5, 1 }, /* Invalid string or buffer length */
+	{ _T("S1091"), 5, 1 }, /* Descriptor type out of range */
+	{ _T("S1092"), 5, 1 }, /* Option type out of range */
+	{ _T("S1093"), 5, 1 }, /* Invalid parameter number */
+	{ _T("S1095"), 5, 1 }, /* Function type out of range */
+	{ _T("S1096"), 5, 1 }, /* Information type out of range */
+	{ _T("S1097"), 5, 1 }, /* Column type out of range */
+	{ _T("S1098"), 5, 1 }, /* Scope type out of range */
+	{ _T("S1099"), 5, 1 }, /* Nullable type out of range */
+	{ _T("S1100"), 5, 1 }, /* Uniqueness option type out of range */
+	{ _T("S1101"), 5, 1 }, /* Accuracy option type out of range */
+	{ _T("S1103"), 5, 1 }, /* Direction option out of range */
+	{ _T("S1105"), 5, 1 }, /* Invalid parameter type */
+	{ _T("S1106"), 5, 1 }, /* Fetch type out of range */
+	{ _T("S1107"), 5, 1 }, /* Row value out of range */
+	{ _T("S1108"), 5, 1 }, /* Concurrency option out of range */
+	{ _T("S1109"), 5, 1 }, /* Invalid cursor position */
+	{ _T("S1110"), 5, 1 }, /* Invalid driver completion */
+	{ _T("S1111"), 5, 1 }, /* Invalid bookmark value */
+	{ _T("S1C00"), 1, 1 }, /* Driver not capable */
+	{ _T("S1T00"), 1, 1 }  /* Timeout expired */
 };
 
 static int odbcCompare(const void * v1, const void * v2)
 {
-	return strcmp(((const odbcErrorDesc *) v1)->state,
+	return _tcscmp(((const odbcErrorDesc *) v1)->state,
 				  ((const odbcErrorDesc *) v2)->state);
 }
 
 
 
-static odbcErrorDesc *lookupError(const char *sqlState)
+static odbcErrorDesc *lookupError(const TCHAR *sqlState)
 {
 	odbcErrorDesc key;
 

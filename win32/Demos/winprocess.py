@@ -163,14 +163,14 @@ def run(cmd, mSec=None, stdin=None, stdout=None, stderr=None, **kw):
     child = Process(cmd, **kw)
     if child.wait(mSec) != win32event.WAIT_OBJECT_0:
         child.kill()
-        raise WindowsError, 'process timeout exceeded'
+        raise WindowsError('process timeout exceeded')
     return child.exitCode()
 
 
 if __name__ == '__main__':
 
     # Pipe commands to a shell and display the output in notepad
-    print 'Testing winprocess.py...'
+    print('Testing winprocess.py...')
 
     import tempfile
 
@@ -183,13 +183,15 @@ net user\r
 _this_is_a_test_of_stderr_\r
 """ % timeoutSeconds
 
-    cmd, out = tempfile.TemporaryFile(), tempfile.TemporaryFile()
-    cmd.write(cmdString)
+    cmd = tempfile.NamedTemporaryFile(delete=False)
+    out = tempfile.NamedTemporaryFile(suffix='.txt', delete=False)
+    cmd.write(cmdString.encode('mbcs'))
     cmd.seek(0)
-    print 'CMD.EXE exit code:', run('cmd.exe', show=0, stdin=cmd,
-                                    stdout=out, stderr=out)
+    print('CMD.EXE exit code:', run('cmd.exe', show=0, stdin=cmd,
+                                    stdout=out, stderr=out))
     cmd.close()
-    print 'NOTEPAD exit code:', run('notepad.exe %s' % out.file.name,
+    out.close()
+    print('NOTEPAD exit code:', run('notepad.exe %s' % out.name,
                                     show=win32con.SW_MAXIMIZE,
-                                    mSec=timeoutSeconds*1000)
+                                    mSec=timeoutSeconds*1000))
     out.close()

@@ -4,9 +4,8 @@
 import warnings
 warnings.warn("The regcheck module has been pending deprecation since build 210",
 	      category=PendingDeprecationWarning)
-
-import win32con
-import regutil
+from . import win32con
+from . import regutil
 import win32api
 import os
 import sys
@@ -17,7 +16,7 @@ def CheckRegisteredExe(exename):
 		os.stat(win32api.RegQueryValue(regutil.GetRootKey()  , regutil.GetAppPathsKey() + "\\" + exename))
 #	except SystemError:
 	except (os.error,win32api.error):
-		print "Registration of %s - Not registered correctly" % exename
+		print("Registration of %s - Not registered correctly" % exename)
 
 def CheckPathString(pathString):
 	import string
@@ -27,18 +26,19 @@ def CheckPathString(pathString):
 	return None
 
 def CheckPythonPaths(verbose):
-	if verbose: print "Python Paths:"
+	if verbose: print("Python Paths:")
 	# Check the core path
-	if verbose: print "\tCore Path:",
+	if verbose: print("\tCore Path:", end=' ')
 	try:
 		appPath = win32api.RegQueryValue(regutil.GetRootKey(), regutil.BuildDefaultPythonKey() + "\\PythonPath")
-	except win32api.error, (code, fn, desc):
-		print "** does not exist - ", desc
+	except win32api.error as xxx_todo_changeme:
+		(code, fn, desc) = xxx_todo_changeme.args
+		print("** does not exist - ", desc)
 	problem = CheckPathString(appPath)
 	if problem:
-		print problem
+		print(problem)
 	else:
-		if verbose: print appPath
+		if verbose: print(appPath)
 	
 	key = win32api.RegOpenKey(regutil.GetRootKey(), regutil.BuildDefaultPythonKey() + "\\PythonPath", 0, win32con.KEY_READ)
 	try:
@@ -47,15 +47,15 @@ def CheckPythonPaths(verbose):
 			try:
 				appName = win32api.RegEnumKey(key, keyNo)
 				appPath = win32api.RegQueryValue(key, appName)
-				if verbose: print "\t"+appName+":",
+				if verbose: print("\t"+appName+":", end=' ')
 				if appPath:
 					problem = CheckPathString(appPath)
 					if problem:
-						print problem
+						print(problem)
 					else:
-						if verbose: print appPath
+						if verbose: print(appPath)
 				else:
-					if verbose: print "(empty)"
+					if verbose: print("(empty)")
 				keyNo = keyNo + 1
 			except win32api.error:
 				break
@@ -63,13 +63,14 @@ def CheckPythonPaths(verbose):
 		win32api.RegCloseKey(key)
 
 def CheckHelpFiles(verbose):
-	if verbose: print "Help Files:"
+	if verbose: print("Help Files:")
 	try:
 		key = win32api.RegOpenKey(regutil.GetRootKey(), regutil.BuildDefaultPythonKey() + "\\Help", 0, win32con.KEY_READ)
-	except win32api.error, (code, fn, details):
-		import winerror
+	except win32api.error as xxx_todo_changeme1:
+		(code, fn, details) = xxx_todo_changeme1.args
+		from . import winerror
 		if code!=winerror.ERROR_FILE_NOT_FOUND:
-			raise win32api.error, (code, fn, details)
+			raise win32api.error(code, fn, details)
 		return
 		
 	try:
@@ -78,18 +79,19 @@ def CheckHelpFiles(verbose):
 			try:
 				helpDesc = win32api.RegEnumKey(key, keyNo)
 				helpFile = win32api.RegQueryValue(key, helpDesc)
-				if verbose: print "\t"+helpDesc+":",
+				if verbose: print("\t"+helpDesc+":", end=' ')
 				# query the os section.
 				try:
 					os.stat(helpFile )
-					if verbose: print helpFile
+					if verbose: print(helpFile)
 				except os.error:
-					print "** Help file %s does not exist" % helpFile
+					print("** Help file %s does not exist" % helpFile)
 				keyNo = keyNo + 1
-			except win32api.error, (code, fn, desc):
-				import winerror
+			except win32api.error as xxx_todo_changeme2:
+				(code, fn, desc) = xxx_todo_changeme2.args
+				from . import winerror
 				if code!=winerror.ERROR_NO_MORE_ITEMS:
-					raise win32api.error, (code, fn, desc)
+					raise win32api.error(code, fn, desc)
 				break
 	finally:
 		win32api.RegCloseKey(key)
@@ -99,17 +101,18 @@ def CheckRegisteredModules(verbose):
 	k=regutil.BuildDefaultPythonKey() + "\\Modules"
 	try:
 		keyhandle = win32api.RegOpenKey(regutil.GetRootKey(), k)
-		print "WARNING: 'Modules' registry entry is deprectated and evil!"
-	except win32api.error, (code, fn, details):
-		import winerror
+		print("WARNING: 'Modules' registry entry is deprectated and evil!")
+	except win32api.error as xxx_todo_changeme3:
+		(code, fn, details) = xxx_todo_changeme3.args
+		from . import winerror
 		if code!=winerror.ERROR_FILE_NOT_FOUND:
-			raise win32api.error, (code, fn, details)
+			raise win32api.error(code, fn, details)
 		return
 
 def CheckRegistry(verbose=0):
 	# check the registered modules
-	if verbose and os.environ.has_key('pythonpath'):
-		print "Warning - PythonPath in environment - please check it!"
+	if verbose and 'pythonpath' in os.environ:
+		print("Warning - PythonPath in environment - please check it!")
 	# Check out all paths on sys.path
 	
 	CheckPythonPaths(verbose)

@@ -243,12 +243,40 @@ static PyMethodDef win32transaction_functions[] = {
 	{ NULL, NULL }
 };
 
-extern "C" __declspec(dllexport) void
-initwin32transaction(void)
+extern "C" __declspec(dllexport)
+#if (PY_VERSION_HEX < 0x03000000)
+void initwin32transaction(void)
+#else
+PyObject *PyInit_win32transaction(void)
+#endif
 {
-	PyObject *dict, *mod;
+	PyObject *dict, *module;
 	PyWinGlobals_Ensure();
-	mod = Py_InitModule("win32transaction", win32transaction_functions);
+
+#if (PY_VERSION_HEX < 0x03000000)
+	module = Py_InitModule("win32transaction", win32transaction_functions);
+	if (!module)
+		return;
+	dict = PyModule_GetDict(module);
+	if (!dict)
+		return;
+
+#else
+	static PyModuleDef win32transaction_def = {
+		PyModuleDef_HEAD_INIT,
+		"win32transaction",
+		"Module wrapping Kernal Transaction Manager functions, as used with"
+			" transacted NTFS and transacted registry functions.",
+		-1,
+		win32transaction_functions
+		};
+	module = PyModule_Create(&win32transaction_def);
+	if (!module)
+		return NULL;
+	dict = PyModule_GetDict(module);
+	if (!dict)
+		return NULL;
+#endif
 
 	// Load dll and function pointers to avoid dependency on newer libraries and headers
 	HMODULE hmodule=GetModuleHandle(L"Ktmw32.dll");
@@ -272,8 +300,10 @@ initwin32transaction(void)
 		pfnOpenTransactionManager=(OpenTransactionManagerfunc)GetProcAddress(hmodule, "OpenTransactionManager");
 		}
 
-	dict = PyModule_GetDict(mod);
 	Py_INCREF(PyWinExc_ApiError);
 	PyDict_SetItemString(dict, "error", PyWinExc_ApiError);
 
+#if (PY_VERSION_HEX >= 0x03000000)
+	return module;
+#endif
 }

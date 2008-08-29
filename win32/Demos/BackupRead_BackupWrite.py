@@ -11,7 +11,7 @@ all_sd_info=win32security.DACL_SECURITY_INFORMATION|win32security.DACL_SECURITY_
 tempdir=win32api.GetTempPath()
 tempfile=win32api.GetTempFileName(tempdir,'bkr')[0]
 outfile=win32api.GetTempFileName(tempdir,'out')[0]
-print 'Filename:',tempfile,'Output file:',outfile
+print('Filename:',tempfile,'Output file:',outfile)
 
 f=open(tempfile,'w')
 f.write('some random junk'+'x'*100)
@@ -66,15 +66,15 @@ while 1:
     if bytes_read==0:
         break
     bytes_written, outctxt=win32file.BackupWrite(outh, bytes_read, buf, False, True, outctxt)
-    print 'Written:',bytes_written,'Context:',outctxt
+    print('Written:',bytes_written,'Context:',outctxt)
 win32file.BackupRead(h, 0, buf, True, True, ctxt)
-win32file.BackupWrite(outh, 0, '', True, True, outctxt)
+win32file.BackupWrite(outh, 0, b'', True, True, outctxt)
 win32file.CloseHandle(h)
 win32file.CloseHandle(outh)
 
 assert open(tempfile).read()==open(outfile).read(),"File contents differ !"
 assert open(tempfile+':streamdata').read()==open(outfile+':streamdata').read(),"streamdata contents differ !"
 assert open(tempfile+':anotherstream').read()==open(outfile+':anotherstream').read(),"anotherstream contents differ !"
-assert buffer(win32security.GetFileSecurity(tempfile,all_sd_info))[:]== \
-       buffer(win32security.GetFileSecurity(outfile, all_sd_info))[:], "Security descriptors are different !"
+assert bytes(win32security.GetFileSecurity(tempfile,all_sd_info))[:]== \
+       bytes(win32security.GetFileSecurity(outfile, all_sd_info))[:], "Security descriptors are different !"
 ## also should check Summary Info programatically

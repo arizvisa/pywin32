@@ -100,7 +100,18 @@ PyObject *PyHANDLE::Detach(PyObject *self, PyObject *args)
 // <nl>Most functions which accept a handle object also accept an integer - however,
 // use of the handle object is encouraged.
 
-static struct PyMethodDef PyHANDLE_methods[] = {
+// @prop long|handle|Integer value of the handle
+PyObject *PyHANDLE::get_handle(PyObject *self, void *unused)
+{
+	return PyWinLong_FromHANDLE(((PyHANDLE *)self)->m_handle);
+}
+
+PyGetSetDef PyHANDLE::getset[] = {
+    {"handle", PyHANDLE::get_handle, NULL},
+    {NULL}
+};
+
+struct PyMethodDef PyHANDLE::methods[] = {
 	{"Close",     PyHANDLE::Close, 1}, 	// @pymeth Close|Closes the handle
 	{"close",     PyHANDLE::Close, 1}, 	// @pymeth close|Synonym for <om PyHANDLE.Close>
 	{"Detach",     PyHANDLE::Detach, 1}, 	// @pymeth Detach|Detaches the Win32 handle from the handle object.
@@ -112,7 +123,9 @@ static PyNumberMethods PyHANDLE_NumberMethods =
 	PyHANDLE::binaryFailureFunc,	/* nb_add */
 	PyHANDLE::binaryFailureFunc,	/* nb_subtract */
 	PyHANDLE::binaryFailureFunc,	/* nb_multiply */
-	PyHANDLE::binaryFailureFunc,	/* nb_divide */
+#if (PY_VERSION_HEX < 0x03000000)
+	PyHANDLE::binaryFailureFunc,	/* nb_divide - removed in Py3k */
+#endif
 	PyHANDLE::binaryFailureFunc,	/* nb_remainder */
 	PyHANDLE::binaryFailureFunc,	/* nb_divmod */
 	PyHANDLE::ternaryFailureFunc,	/* nb_power */
@@ -120,52 +133,73 @@ static PyNumberMethods PyHANDLE_NumberMethods =
 	PyHANDLE::unaryFailureFunc,	/* nb_positive */
 	PyHANDLE::unaryFailureFunc,	/* nb_absolute */
 	// @pymeth  __nonzero__|Used for detecting true/false.
-	PyHANDLE::nonzeroFunc,
+	PyHANDLE::nonzeroFunc,		/* is nb_bool in Python 3.0 */
 	PyHANDLE::unaryFailureFunc,	/* nb_invert */
 	PyHANDLE::binaryFailureFunc,	/* nb_lshift */
 	PyHANDLE::binaryFailureFunc,	/* nb_rshift */
 	PyHANDLE::binaryFailureFunc,	/* nb_and */
 	PyHANDLE::binaryFailureFunc,	/* nb_xor */
 	PyHANDLE::binaryFailureFunc,	/* nb_or */
-	0,							/* nb_coerce (allowed to be zero) */
+#if (PY_VERSION_HEX < 0x03000000)
+	0,							/* nb_coerce (allowed to be zero) - removed in 3.0 */
+#endif
 	PyHANDLE::intFunc,			/* nb_int */
 	PyHANDLE::longFunc,			/* nb_long */
 	PyHANDLE::unaryFailureFunc,	/* nb_float */
+	// These removed in 3.0
+#if (PY_VERSION_HEX < 0x03000000)
 	PyHANDLE::unaryFailureFunc,	/* nb_oct */
 	PyHANDLE::unaryFailureFunc,	/* nb_hex */
+#endif
 };
 // @pymeth __int__|Used when an integer representation of the handle object is required.
 
 PYWINTYPES_EXPORT PyTypeObject PyHANDLEType =
 {
-	PyObject_HEAD_INIT(&PyType_Type)
-	0,
+	PYWIN_OBJECT_HEAD
 	"PyHANDLE",
 	sizeof(PyHANDLE),
 	0,
 	PyHANDLE::deallocFunc,		/* tp_dealloc */
 	// @pymeth __print__|Used when the object is printed.
 	PyHANDLE::printFunc,		/* tp_print */
-	PyHANDLE::getattr,				/* tp_getattr */
-	0, // PyHANDLE::setattr,				/* tp_setattr */
+	0,							/* tp_getattr */
+	0,							/* tp_setattr */
 	// @pymeth __cmp__|Used when HANDLE objects are compared.
-	PyHANDLE::compareFunc,	/* tp_compare */
-	PyHANDLE::strFunc,		/* tp_repr */
+	PyHANDLE::compareFunc,		/* tp_compare */
+	PyHANDLE::strFunc,			/* tp_repr */
 	&PyHANDLE_NumberMethods,	/* tp_as_number */
-	0,	/* tp_as_sequence */
-	0,						/* tp_as_mapping */
+	0,							/* tp_as_sequence */
+	0,							/* tp_as_mapping */
 	// @pymeth __hash__|Used when the hash value of an object is required
-	PyHANDLE::hashFunc,		/* tp_hash */
-	0,						/* tp_call */
+	PyHANDLE::hashFunc,			/* tp_hash */
+	0,							/* tp_call */
 	// @pymeth __str__|Used when a string representation is required
-	PyHANDLE::strFunc,		/* tp_str */
+	PyHANDLE::strFunc,			/* tp_str */
+	0,							/* tp_getattro */
+	0,							/* tp_setattro */
+	0,							/*tp_as_buffer*/
+	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,	/* tp_flags */
+	0,							/* tp_doc */
+	0,							/* tp_traverse */
+	0,							/* tp_clear */
+	0,							/* tp_richcompare */
+	0,							/* tp_weaklistoffset */
+	0,							/* tp_iter */
+	0,							/* tp_iternext */
+	PyHANDLE::methods,			/* tp_methods */
+	0,							/* tp_members */
+	PyHANDLE::getset,			/* tp_getset */
+	0,							/* tp_base */
+	0,							/* tp_dict */
+	0,							/* tp_descr_get */
+	0,							/* tp_descr_set */
+	0,							/* tp_dictoffset */
+	0,							/* tp_init */
+	0,							/* tp_alloc */
+	0,							/* tp_new */
 };
 
-#define OFF(e) offsetof(PyHANDLE, e)
-
-/*static*/ struct memberlist PyHANDLE::memberlist[] = {
-	{NULL}	/* Sentinel */
-};
 
 PyHANDLE::PyHANDLE(HANDLE hInit)
 {
@@ -185,11 +219,11 @@ BOOL PyHANDLE::Close(void)
 	BOOL rc = TRUE;
 	if (m_handle) {
 		Py_BEGIN_ALLOW_THREADS
-#ifdef Py_DEBUG
+#ifdef Py_DEBUG_xxx
 		__try {
 #endif // Py_DEBUG
 			rc = CloseHandle(m_handle);
-#ifdef Py_DEBUG
+#ifdef Py_DEBUG_xxx
 		} __except(1) {
 			// according to the docs on CloseHandle(), this
 			// can happen when run under the debugger.  This is a
@@ -312,28 +346,6 @@ PyObject * PyHANDLE::asStr(void)
 	wsprintf(resBuf, _T("<%s:%Id>"), GetTypeName(), m_handle);
 	return PyString_FromTCHAR(resBuf);
 }
-
-PyObject *PyHANDLE::getattr(PyObject *self, char *name)
-{
-	PyObject *res;
-
-	res = Py_FindMethod(PyHANDLE_methods, self, name);
-	if (res != NULL)
-		return res;
-	PyErr_Clear();
-	if (strcmp(name, "handle")==0)
-		return PyWinLong_FromHANDLE(((PyHANDLE *)self)->m_handle);
-	return PyMember_Get((char *)self, memberlist, name);
-}
-
-/*int PyHANDLE::setattr(PyObject *self, char *name, PyObject *v)
-{
-	if (v == NULL) {
-		PyErr_SetString(PyExc_AttributeError, "can't delete HANDLE attributes");
-		return -1;
-	}
-	return PyMember_Set((char *)self, memberlist, name, v);
-} */
 
 char *failMsg = "bad operand type";
 /*static*/ PyObject *PyHANDLE::unaryFailureFunc(PyObject *ob)

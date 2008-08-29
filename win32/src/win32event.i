@@ -243,7 +243,7 @@ static PyObject * MyMsgWaitForMultipleObjectsEx(
 	// @comm This method does not exist on NT3.5x or Win95.  If there
 	// is an attempt to use it on these platforms, a COM error with
 	// E_NOTIMPL will be raised.
-	HMODULE hMod = GetModuleHandle("user32.dll");
+	HMODULE hMod = GetModuleHandle(_T("user32.dll"));
 	if (hMod==0) return PyWin_SetBasicCOMError(E_HANDLE);
 	FARPROC fp = GetProcAddress(hMod, "MsgWaitForMultipleObjectsEx");
 	if (fp==NULL) return PyWin_SetBasicCOMError(E_NOTIMPL);

@@ -44,7 +44,7 @@ class MainWindow:
             icon_flags = win32con.LR_LOADFROMFILE | win32con.LR_DEFAULTSIZE
             hicon = LoadImage(hinst, iconPathName, win32con.IMAGE_ICON, 0, 0, icon_flags)
         else:
-            print "Can't find a Python icon file - using default"
+            print("Can't find a Python icon file - using default")
             hicon = LoadIcon(0, win32con.IDI_APPLICATION)
 
         flags = NIF_ICON | NIF_MESSAGE | NIF_TIP
@@ -54,7 +54,7 @@ class MainWindow:
         except error:
             # This is common when windows is starting, and this code is hit
             # before the taskbar has been created.
-            print "Failed to add the taskbar icon - is explorer running?"
+            print("Failed to add the taskbar icon - is explorer running?")
             # but keep running anyway - when explorer starts, we get the
             # TaskbarCreated message.
 
@@ -68,12 +68,12 @@ class MainWindow:
 
     def OnTaskbarNotify(self, hwnd, msg, wparam, lparam):
         if lparam==win32con.WM_LBUTTONUP:
-            print "You clicked me."
+            print("You clicked me.")
         elif lparam==win32con.WM_LBUTTONDBLCLK:
-            print "You double-clicked me - goodbye"
+            print("You double-clicked me - goodbye")
             DestroyWindow(self.hwnd)
         elif lparam==win32con.WM_RBUTTONUP:
-            print "You right clicked me."
+            print("You right clicked me.")
             menu = CreatePopupMenu()
             AppendMenu( menu, win32con.MF_STRING, 1023, "Display Dialog")
             AppendMenu( menu, win32con.MF_STRING, 1024, "Say Hello")
@@ -88,15 +88,15 @@ class MainWindow:
     def OnCommand(self, hwnd, msg, wparam, lparam):
         id = LOWORD(wparam)
         if id == 1023:
-            import win32gui_dialog
+            from . import win32gui_dialog
             win32gui_dialog.DemoModal()
         elif id == 1024:
-            print "Hello"
+            print("Hello")
         elif id == 1025:
-            print "Goodbye"
+            print("Goodbye")
             DestroyWindow(self.hwnd)
         else:
-            print "Unknown command -", id
+            print("Unknown command -", id)
 
 def main():
     w=MainWindow()

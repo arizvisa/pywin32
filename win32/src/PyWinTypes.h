@@ -20,6 +20,45 @@
 #include "Python.h"
 #include "windows.h"
 
+
+#if (PY_VERSION_HEX < 0x03000000)
+#define PYWIN_OBJECT_HEAD PyObject_HEAD_INIT(&PyType_Type) 0,
+#define PYWIN_ATTR_CONVERT PyString_AsString
+
+#else	// Py3k definitions
+// Macro to handle PyObject layout changes in Py3k
+#define PYWIN_OBJECT_HEAD PyVarObject_HEAD_INIT(NULL, 0)
+
+/* Attribute names are passed as Unicode in Py3k, so use a macro to
+	switch between string and unicode conversion.  This function is not
+	documented, but is used extensively in the Python codebase itself,
+	so it's reasonable to assume it won't disappear anytime soon.
+*/
+#define PYWIN_ATTR_CONVERT _PyUnicode_AsString
+
+/* Some API functions changed/removed in python 3.0
+	Definitions for the string functions are in stringobject.h,
+	but comments indicate that this header is likely to go away in 3.1.
+*/
+#define PyString_Check PyBytes_Check
+#define PyString_Size PyBytes_Size
+#define PyString_AsString PyBytes_AsString
+#define PyString_AsStringAndSize PyBytes_AsStringAndSize
+#define PyString_FromString PyBytes_FromString
+#define PyString_FromStringAndSize PyBytes_FromStringAndSize
+#define _PyString_Resize _PyBytes_Resize
+#define PyString_AS_STRING PyBytes_AS_STRING
+#define PyString_GET_SIZE PyBytes_GET_SIZE
+#define PyString_Concat PyBytes_Concat
+#define PyInt_Check PyLong_Check
+#define PyInt_FromLong PyLong_FromLong
+#define PyInt_AsLong PyLong_AsLong
+#define PyInt_AS_LONG PyLong_AS_LONG
+#define PyInt_FromSsize_t PyLong_FromSsize_t
+#define PyInt_AsSsize_t PyLong_AsSsize_t
+#define PyInt_AsUnsignedLongMask PyLong_AsUnsignedLongMask
+#endif	// (PY_VERSION_HEX < 0x03000000)
+
 // See PEP-353 - this is the "official" test...
 #if PY_VERSION_HEX < 0x02050000 && !defined(PY_SSIZE_T_MIN)
 // 2.3 and before have no Py_ssize_t
@@ -41,8 +80,6 @@ typedef int Py_ssize_t;
 // Lars: for WAVEFORMATEX
 #include "mmsystem.h"
 
-// This can be removed once we are confident noone else uses it...
-#define PYWIN_USE_PYUNICODE
 
 // *** NOTE *** FREEZE_PYWINTYPES is deprecated.  It used to be used
 // by the 'freeze' tool, but now py2exe etc do a far better job, and 
@@ -67,6 +104,13 @@ typedef int Py_ssize_t;
 #	endif // BUILD_PYWINTYPES
 #endif // FREEZE_PYWINTYPES
 
+#if (PY_VERSION_HEX >= 0x03000000)
+// Py3k uses memoryview object in place of buffer
+extern PYWINTYPES_EXPORT PyObject *PyBuffer_New(Py_ssize_t size);
+extern PYWINTYPES_EXPORT PyObject *PyBuffer_FromReadWriteMemory(void *buf, Py_ssize_t size);
+extern PYWINTYPES_EXPORT PyObject *PyBuffer_FromMemory(void *buf, Py_ssize_t size);
+#endif
+
 #include <tchar.h>
 /*
 ** Error/Exception handling
@@ -90,35 +134,6 @@ PYWINTYPES_EXPORT PyObject *PyWin_SetAPIError(char *fnName, long err = 0);
 */
 extern PYWINTYPES_EXPORT PyObject *PyWinExc_COMError;
 PYWINTYPES_EXPORT PyObject *PyWin_SetBasicCOMError(HRESULT hr);
-
-/*
-** String/UniCode support
-*/
-#ifdef PYWIN_USE_PYUNICODE
-	/* Python has built-in Unicode String support */
-#define PyUnicodeType PyUnicode_Type
-// PyUnicode_Check is defined.
-
-#else
-
-/* If a Python Unicode object exists, disable it. */
-#ifdef PyUnicode_Check
-#undef PyUnicode_Check
-#define PyUnicode_Check(ob)	((ob)->ob_type == &PyUnicodeType)
-#endif /* PyUnicode_Check */
-
-	/* Need our custom Unicode object */
-extern PYWINTYPES_EXPORT PyTypeObject PyUnicodeType; // the Type for PyUnicode
-#define PyUnicode_Check(ob)	((ob)->ob_type == &PyUnicodeType)
-
-
-// PyUnicode_AsUnicode clashes with the standard Python name - 
-// so if we are not using Python Unicode objects, we hide the
-// name with a #define.
-#define PyUnicode_AsUnicode(op) (((PyUnicode *)op)->m_bstrValue)
-//extern PYWINTYPES_EXPORT WCHAR *PyUnicode_AsUnicode(PyObject *op);
-
-#endif /* PYWIN_USE_PYUNICODE */
 
 extern PYWINTYPES_EXPORT int PyUnicode_Size(PyObject *op);
 
@@ -145,6 +160,8 @@ PYWINTYPES_EXPORT void PyWinObject_FreeWCHAR(WCHAR *pResult);
 // Its not clear how to resolve this, but while VS2003 is the default
 // compiler, that is what must work.
 // py2.5 on x64 also needs it, and that is min x64 we support
+
+/*
 #if (PY_VERSION_HEX >= 0x02060000) || defined(_WIN64)
 inline BOOL PyWinObject_AsWCHAR(PyObject *stringObject, unsigned short **pResult, BOOL bNoneOK = FALSE, DWORD *pResultLen = NULL)
 {
@@ -155,6 +172,7 @@ inline void PyWinObject_FreeWCHAR(unsigned short *pResult)
     PyWinObject_FreeWCHAR((WCHAR *)pResult);
 }
 #endif
+*/
 
 // Given a PyObject (string, Unicode, etc) create a "char *" with the value
 // if pResultLen != NULL, it will be set to the result size NOT INCLUDING 
@@ -193,7 +211,7 @@ inline BOOL PyWinObject_AsReadBuffer(PyObject *ob, void **buf, int *buf_len, BOO
 #else /* not UNICODE */
 #define PyWinObject_AsTCHAR PyWinObject_AsString
 #define PyWinObject_FreeTCHAR PyWinObject_FreeString
-inline PyObject *PyWinObject_FromTCHAR( TCHAR *str )
+inline PyObject *PyWinObject_FromTCHAR(const char *str )
 {
 	if (str==NULL){
 		Py_INCREF(Py_None);
@@ -201,7 +219,20 @@ inline PyObject *PyWinObject_FromTCHAR( TCHAR *str )
 		}
 	return PyString_FromString(str);
 }
-inline PyObject *PyWinObject_FromTCHAR( TCHAR *str, int numChars )
+
+/* ??? In ANSI mode, compiler won't select either one of the other
+	overloads even when the CString is explicitely cast to (TCHAR *) or (char *).
+	However, it does work when UNICODE is defined, maybe something
+	to do with inline ????
+*/
+/*
+inline PyObject *PyWinObject_FromTCHAR(CString *str )
+{
+	return PyWinObject_FromTCHAR((TCHAR *)str);
+}
+*/
+
+inline PyObject *PyWinObject_FromTCHAR(const char *str, int numChars )
 {
 	if (str==NULL){
 		Py_INCREF(Py_None);
@@ -258,6 +289,11 @@ PYWINTYPES_EXPORT BOOL PyWin_String_AsWCHAR(char *input, DWORD inLen, WCHAR **pR
 PYWINTYPES_EXPORT void PyWinObject_FreeString(char *str);
 PYWINTYPES_EXPORT void PyWinObject_FreeString(WCHAR *str);
 
+// Copy null terminated string with same allocator as PyWinObject_AsWCHAR, etc
+PYWINTYPES_EXPORT WCHAR *PyWin_CopyString(const WCHAR *input);
+PYWINTYPES_EXPORT char *PyWin_CopyString(const char *input);
+
+
 // Pointers.
 // Substitute for Python's inconsistent PyLong_AsVoidPtr
 PYWINTYPES_EXPORT BOOL PyWinLong_AsVoidPtr(PyObject *ob, void **pptr);
@@ -266,15 +302,7 @@ PYWINTYPES_EXPORT PyObject *PyWinLong_FromVoidPtr(const void *ptr);
 /*
 ** LARGE_INTEGER objects
 */
-// These need to be renamed.  For now, the old names still appear in the DLL.
-PYWINTYPES_EXPORT BOOL PyLong_AsTwoInts(PyObject *ob, int *hiint, unsigned *loint);
-PYWINTYPES_EXPORT PyObject *PyLong_FromTwoInts(int hidword, unsigned lodword);
-
-// These seem (to MH anyway :) to be better names than using "int".
-inline BOOL PyLong_AsTwoI32(PyObject *ob, int *hiint, unsigned *loint) {return PyLong_AsTwoInts(ob, hiint, loint);}
-inline PyObject *PyLong_FromTwoI32(int hidword, unsigned lodword) {return PyLong_FromTwoInts(hidword, lodword);}
-
-//AsLARGE_INTEGER takes either PyInteger, PyLong, (PyInteger, PyInteger)
+//AsLARGE_INTEGER takes either int or long
 PYWINTYPES_EXPORT BOOL PyWinObject_AsLARGE_INTEGER(PyObject *ob, LARGE_INTEGER *pResult);
 PYWINTYPES_EXPORT BOOL PyWinObject_AsULARGE_INTEGER(PyObject *ob, ULARGE_INTEGER *pResult);
 PYWINTYPES_EXPORT PyObject *PyWinObject_FromLARGE_INTEGER(LARGE_INTEGER &val);
@@ -289,9 +317,6 @@ PYWINTYPES_EXPORT PyObject *PyWinObject_FromULARGE_INTEGER(ULARGE_INTEGER &val);
 #define PyWinObject_AsUPY_LONG_LONG(ob, pResult) PyWinObject_AsULARGE_INTEGER((ob), (ULARGE_INTEGER *)(pResult))
 #define PyWinObject_FromPY_LONG_LONG(val) PyWinObject_FromLARGE_INTEGER((LARGE_INTEGER)val)
 #define PyWinObject_FromUPY_LONG_LONG(val) PyWinObject_FromULARGE_INTEGER((ULARGE_INTEGER)val)
-
-PyObject *PyLong_FromI64(__int64 ival);
-BOOL PyLong_AsI64(PyObject *val, __int64 *lval);
 
 // A DWORD_PTR and ULONG_PTR appear to mean "integer long enough to hold a pointer"
 // It is *not* actually a pointer (but is the same size as a pointer)

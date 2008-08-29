@@ -2,55 +2,6 @@
 #ifndef __PYWINOBJECTS_H__
 #define __PYWINTYPES_H__
 
-
-#ifndef PYWIN_USE_PYUNICODE
-
-class PYWINTYPES_EXPORT PyUnicode : public PyObject
-{
-public:
-	BSTR	m_bstrValue;
-
-	PyUnicode(void);
-	PyUnicode(const char *value);
-	PyUnicode(const char *value, unsigned int numBytes);
-	PyUnicode(const OLECHAR *value);
-	PyUnicode(const OLECHAR *value, int numChars);
-	PyUnicode(const BSTR value, BOOL takeOwnership=FALSE);
-	PyUnicode(PyObject *value);
-	~PyUnicode();
-
-	/* Python support */
-	int compare(PyObject *ob);
-	PyObject * concat(PyObject *ob);
-	PyObject * repeat(int count);
-	PyObject * item(int index);
-	PyObject * slice(int start, int end);
-	PyObject * getattr(char *name);
-	long hash(void);
-	PyObject *asStr(void);
-	int print(FILE *fp, int flags);
-	PyObject *repr();
-	PyObject * upper(void);
-	PyObject * lower(void);
-
-	static void deallocFunc(PyObject *ob);
-	static int compareFunc(PyObject *ob1, PyObject *ob2);
-	static long hashFunc(PyObject *ob);
-	static PyObject * strFunc(PyObject *ob);
-	static int printFunc(PyObject *ob, FILE *fp, int flags);
-	static PyObject * reprFunc(PyObject *ob);
-	static int lengthFunc(PyObject *ob);
-	static PyObject * concatFunc(PyObject *ob1, PyObject *ob2);
-	static PyObject * repeatFunc(PyObject *ob1, int count);
-	static PyObject * itemFunc(PyObject *ob1, int index);
-	static PyObject * sliceFunc(PyObject *ob1, int start, int end);
-	static PyObject * getattrFunc(PyObject *ob, char *name);
-	static PyObject * upperFunc(PyObject *ob, PyObject *args);
-	static PyObject * lowerFunc(PyObject *ob, PyObject *args);
-};
-
-#endif // PYWIN_USE_PYUNICODE
-
 #ifndef  NO_PYWINTYPES_IID
 // NOTE - In general, you should not use "new PyIID", but use the
 // API PyCom_PyIIDObjectFromIID
@@ -67,6 +18,7 @@ public:
 
 	/* Python support */
 	int compare(PyObject *ob);
+	PyObject *richcompare(PyObject *other, int op);
 	long hash(void);
 	PyObject *str(void);
 	PyObject *repr(void);
@@ -74,6 +26,7 @@ public:
 	static void deallocFunc(PyObject *ob);
 	static int printFunc(PyObject *ob, FILE *fp, int flags);
 	static int compareFunc(PyObject *ob1, PyObject *ob2);
+	static PyObject *richcompareFunc(PyObject *self, PyObject *other, int op);
 	static long hashFunc(PyObject *ob);
 	static PyObject * strFunc(PyObject *ob);
 	static PyObject * reprFunc(PyObject *ob);
@@ -101,8 +54,9 @@ public:
 	PyObject *str();
 	PyObject *repr();
 	int compare(PyObject *ob);
+	PyObject *PyTime::richcompare(PyObject *other, int op);
+
 	int print(FILE *fp, int flags);
-	PyObject *getattr(char *name);
 	long hash(void);
 	//PyObject *str(void);
 	long asLong(void);
@@ -112,8 +66,9 @@ public:
 	static PyObject * ternaryFailureFunc(PyObject *ob1, PyObject *ob2, PyObject *ob3);
 	static void deallocFunc(PyObject *ob);
 	static int printFunc(PyObject *ob, FILE *fp, int flags);
-	static PyObject *getattrFunc(PyObject *ob, char *attr);
+	static PyObject *getattro(PyObject *self, PyObject *obname);
 	static int compareFunc(PyObject *ob1, PyObject *ob2);
+	static PyObject *richcompareFunc(PyObject *self, PyObject *other, int op);
 	static long hashFunc(PyObject *ob);
 	//static PyObject * strFunc(PyObject *ob);
 	static int nonzeroFunc(PyObject *ob);
@@ -121,6 +76,7 @@ public:
 	static PyObject * floatFunc(PyObject *ob);
 	static PyObject * strFunc(PyObject *ob);
 	static PyObject * reprFunc(PyObject *ob);
+	static struct PyMethodDef methods[];
 	// Methods
 	static PyObject *Format(PyObject *self, PyObject *args);
 };
@@ -153,18 +109,21 @@ public:
 	static void deallocFunc(PyObject *ob);
 	static int compareFunc(PyObject *ob1, PyObject *ob2);
 
-	static PyObject *getattr(PyObject *self, char *name);
-	static int setattr(PyObject *self, char *name, PyObject *v);
+	static PyObject *getattro(PyObject *self, PyObject *obname);
+	static int setattro(PyObject *self, PyObject *obname, PyObject *v);
 	static long hashFunc(PyObject *self);
-#ifdef _MSC_VER
-#pragma warning( disable : 4251 )
-#endif // _MSC_VER
-	static struct memberlist memberlist[];
-#ifdef _MSC_VER
-#pragma warning( default : 4251 )
-#endif // _MSC_VER
+	static struct PYWINTYPES_EXPORT PyMemberDef members[];
+
+	static PyObject *get_hEvent(PyObject *self, void *unused);
+	static int set_hEvent(PyObject *self, PyObject *v, void *unused);
+	static PyObject *get_Internal(PyObject *self, void *unused);
+	static int set_Internal(PyObject *self, PyObject *v, void *unused);
+	static PyObject *get_InternalHigh(PyObject *self, void *unused);
+	static int set_InternalHigh(PyObject *self, PyObject *v, void *unused);
+	static PyGetSetDef getset[];
+
 	sMyOverlapped m_overlapped;
-	PyObject *m_obHandle;
+	PyObject *m_obhEvent;
 };
 
 class PYWINTYPES_EXPORT PyHANDLE : public PyObject
@@ -189,6 +148,7 @@ public:
 	static int compareFunc(PyObject *ob1, PyObject *ob2);
 	static int nonzeroFunc(PyObject *ob);
 	static long hashFunc(PyObject *ob);
+
 	static PyObject * strFunc(PyObject *ob);
 	static PyObject * intFunc(PyObject *ob);
 	static PyObject * longFunc(PyObject *ob);
@@ -196,18 +156,12 @@ public:
 	static PyObject * binaryFailureFunc(PyObject *ob1, PyObject *ob2);
 	static PyObject * ternaryFailureFunc(PyObject *ob1, PyObject *ob2, PyObject *ob3);
 
+	static PyObject *get_handle(PyObject *self, void *unused);
+	static PyGetSetDef getset[];
+
 	static PyObject *Close(PyObject *self, PyObject *args);
 	static PyObject *Detach(PyObject *self, PyObject *args);
-
-	static PyObject *getattr(PyObject *self, char *name);
-	static int setattr(PyObject *self, char *name, PyObject *v);
-#ifdef _MSC_VER
-#pragma warning( disable : 4251 )
-#endif // _MSC_VER
-	static struct memberlist memberlist[];
-#ifdef _MSC_VER
-#pragma warning( default : 4251 )
-#endif // _MSC_VER
+	static struct PyMethodDef methods[];
 
 protected:
 	HANDLE m_handle;
@@ -225,28 +179,27 @@ public:
 class PYWINTYPES_EXPORT PyDEVMODE : public PyObject
 {
 public:
-#ifdef _MSC_VER
-#pragma warning( disable : 4251 )
-#endif // _MSC_VER
 	static struct PyMemberDef members[];
 	static struct PyMethodDef methods[];
-#ifdef _MSC_VER
-#pragma warning( default : 4251 )
-#endif // _MSC_VER
+
+	static PyObject *get_DeviceName(PyObject *self, void *unused);
+	static int set_DeviceName(PyObject *self, PyObject *obsd, void *unused);
+	static PyObject *get_FormName(PyObject *self, void *unused);
+	static int set_FormName(PyObject *self, PyObject *obsd, void *unused);
+	static PyObject *get_DriverData(PyObject *self, void *unused);
+	static int set_DriverData(PyObject *self, PyObject *obsd, void *unused);
+	static PyGetSetDef getset[];
 
 	static void deallocFunc(PyObject *ob);
 	PyDEVMODE(PDEVMODE);
 	PyDEVMODE(void);
 	PyDEVMODE(USHORT);
-	static PyObject *getattro(PyObject *self, PyObject *name);
-	static int setattro(PyObject *self, PyObject *obname, PyObject *obvalue);
 	static PyObject *Clear(PyObject *self, PyObject *args);
 	static PyObject *tp_new(PyTypeObject *, PyObject *, PyObject *);
 	// use this where a function modifies a passed-in PyDEVMODE to make changes visible to Python
 	void modify_in_place(void)
 		{memcpy(&devmode, pdevmode, pdevmode->dmSize);}
 	PDEVMODE GetDEVMODE(void);
-	PyObject *obdummy;
 protected:
 	// Pointer to variable length DEVMODE with dmDriverExtra bytes allocated at end, always use this externally
 	PDEVMODE pdevmode;
@@ -259,28 +212,27 @@ protected:
 class PYWINTYPES_EXPORT PyDEVMODEW : public PyObject
 {
 public:
-#ifdef _MSC_VER
-#pragma warning( disable : 4251 )
-#endif // _MSC_VER
 	static struct PyMemberDef members[];
 	static struct PyMethodDef methods[];
-#ifdef _MSC_VER
-#pragma warning( default : 4251 )
-#endif // _MSC_VER
+
+	static PyObject *get_DeviceName(PyObject *self, void *unused);
+	static int set_DeviceName(PyObject *self, PyObject *obsd, void *unused);
+	static PyObject *get_FormName(PyObject *self, void *unused);
+	static int set_FormName(PyObject *self, PyObject *obsd, void *unused);
+	static PyObject *get_DriverData(PyObject *self, void *unused);
+	static int set_DriverData(PyObject *self, PyObject *obsd, void *unused);
+	static PyGetSetDef getset[];
 
 	static void deallocFunc(PyObject *ob);
 	PyDEVMODEW(PDEVMODEW);
 	PyDEVMODEW(void);
 	PyDEVMODEW(USHORT);
-	static PyObject *getattro(PyObject *self, PyObject *name);
-	static int setattro(PyObject *self, PyObject *obname, PyObject *obvalue);
 	static PyObject *Clear(PyObject *self, PyObject *args);
 	static PyObject *tp_new(PyTypeObject *, PyObject *, PyObject *);
 	// use this where a function modifies a passed-in PyDEVMODE to make changes visible to Python
 	void modify_in_place(void)
 		{memcpy(&devmode, pdevmode, pdevmode->dmSize);}
 	PDEVMODEW GetDEVMODE(void);
-	PyObject *obdummy;
 protected:
 	// Pointer to variable length DEVMODE with dmDriverExtra bytes allocated at end, always use this externally
 	PDEVMODEW pdevmode;

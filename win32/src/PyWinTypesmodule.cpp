@@ -28,6 +28,58 @@ const GUID GUID_NULL \
                 = { 0, 0, 0, { 0, 0,  0,  0,  0,  0,  0,  0 } };
 #endif
 
+
+#if (PY_VERSION_HEX >= 0x03000000)
+// For py3k, a function that returns new memoryview object instead of buffer.
+// ??? Byte array object is mutable, maybe just use that directly as a substitute ???
+// Docs do not specify that you can pass NULL buffer to PyByteArray_FromStringAndSize, but it works
+PyObject *PyBuffer_New(Py_ssize_t size){
+	PyObject *bah = PyByteArray_FromStringAndSize(NULL, size);
+	if (bah==NULL)
+		return NULL;
+	PyObject *ret = PyMemoryView_FromObject(bah);
+	Py_DECREF(bah);	// Memory view keeps its own ref to base object
+	return ret;
+}
+
+PyObject *PyBuffer_FromReadWriteMemory(void *buf, Py_ssize_t size){
+	// buf is not freed by returned object !!!!!!!
+	Py_buffer info={
+		buf,
+		NULL,			// obj added in 3.0b3
+		size,
+		FALSE,			// readonly
+		NULL,			// format
+		0,				// ndim
+		NULL,			// shape
+		NULL,			// strided
+		NULL,			// suboffsets
+		0,				// itemsize
+		NULL,			// internal
+		};
+	return PyMemoryView_FromBuffer(&info);
+}
+
+PyObject *PyBuffer_FromMemory(void *buf, Py_ssize_t size){
+	// buf is not freed by returned object !!!!!!!
+	Py_buffer info={
+		buf,
+		NULL,			// obj added in 3.0b3
+		size,
+		TRUE,			// readonly
+		NULL,			// format
+		0,				// ndim
+		NULL,			// shape
+		NULL,			// strided
+		NULL,			// suboffsets
+		0,				// itemsize
+		NULL,			// internal
+		};
+	return PyMemoryView_FromBuffer(&info);
+}
+#endif
+
+
 // See comments in pywintypes.h for why we need this!
 void PyWin_MakePendingCalls()
 {
@@ -270,11 +322,17 @@ PyObject *PyWin_SetAPIError(char *fnName, long err /*= 0*/)
 	else
 		if (end>0 && (buf[end]==_T('\n') || buf[end]==_T('\r')))
 			buf[end]=_T('\0');
-	PyObject *obBuf = PyString_FromTCHAR(buf);
+
+	PyObject *v = Py_BuildValue("(iNN)",
+		errorCode,
+		#if (PY_VERSION_HEX >= 0x03000000)
+			PyUnicode_FromString(fnName),
+		#else
+			PyString_FromString(fnName),
+		#endif
+		PyWinObject_FromTCHAR(buf));
 	if (free_buf && buf)
-		LocalFree(buf);
-	PyObject *v = Py_BuildValue("(isO)", errorCode, fnName, obBuf);
-	Py_XDECREF(obBuf);
+		LocalFree(buf);		
 	if (v != NULL) {
 		PyErr_SetObject(PyWinExc_ApiError, v);
 		Py_DECREF(v);
@@ -313,24 +371,11 @@ PyObject *PyWin_SetBasicCOMError(HRESULT hr)
 // @pymethod <o PyUnicode>|pywintypes|Unicode|Creates a new Unicode object
 PYWINTYPES_EXPORT PyObject *PyWin_NewUnicode(PyObject *self, PyObject *args)
 {
-#ifdef PYWIN_USE_PYUNICODE
 	char *string;
 	int slen;
 	if (!PyArg_ParseTuple(args, "t#", &string, &slen))
 		return NULL;
     return PyUnicode_DecodeMBCS(string, slen, NULL);
-#else
-	PyObject *obString;
-	// @pyparm string|str||The string to convert.
-	if (!PyArg_ParseTuple(args, "O", &obString))
-		return NULL;
-	PyUnicode *result = new PyUnicode(obString);
-	if ( result->m_bstrValue )
-		return result;
-	Py_DECREF(result);
-	/* an error should have been raised */
-	return NULL;
-#endif
 }
 
 // @pymethod <o PyUnicode>|pywintypes|UnicodeFromRaw|Creates a new Unicode object from raw binary data
@@ -342,17 +387,7 @@ static PyObject *PyWin_NewUnicodeFromRaw(PyObject *self, PyObject *args)
 	// @pyparm string|str||The string containing the binary data.
 	if (!PyArg_ParseTuple(args, "s#", &value, &numBytes))
 		return NULL;
-
-#ifdef PYWIN_USE_PYUNICODE
 	return PyWinObject_FromOLECHAR( (OLECHAR *)value, numBytes/sizeof(OLECHAR) );
-#else
-	PyUnicode *result = new PyUnicode(value, numBytes);
-	if ( result->m_bstrValue )
-		return result;
-	Py_DECREF(result);
-	/* an error should have been raised */
-	return NULL;
-#endif
 }
 
 #ifndef MS_WINCE /* This code is not available on Windows CE */
@@ -632,17 +667,17 @@ BOOL PyWinObject_AsPARAM(PyObject *ob, WPARAM *pparam)
 		return TRUE;
 		}
 #endif
-	PyBufferProcs *pb = ob->ob_type->tp_as_buffer;
-	if (pb != NULL && pb->bf_getreadbuffer)
-		return pb->bf_getreadbuffer(ob,0,(VOID **)pparam)!=-1;
+	DWORD bufsize;
+	if (PyWinObject_AsReadBuffer(ob, (VOID **)pparam, &bufsize))
+		return TRUE;
 
+	PyErr_Clear();
 	if (PyWinLong_AsVoidPtr(ob, (void **)pparam))
 		return TRUE;
 
-	if (!PyErr_Occurred())
-		PyErr_Format(PyExc_TypeError,
-		             "WPARAM must be a " TCHAR_DESC ", int, or buffer object (got %s)",
-		             ob->ob_type->tp_name);
+	PyErr_Format(PyExc_TypeError,
+		"WPARAM must be a " TCHAR_DESC ", int, or buffer object (got %s)",
+		ob->ob_type->tp_name);
 	return FALSE;
 }
 
@@ -738,28 +773,28 @@ PyObject *PyWinSequence_Tuple(PyObject *obseq, DWORD *len)
 
 BOOL PyWinObject_AsMSG(PyObject *ob, MSG *pMsg)
 {
-	PyObject *obhwnd;
-	if (!PyArg_ParseTuple(ob, "Oiiii(ii):MSG param",
+	PyObject *obhwnd, *obwParam, *oblParam;
+	if (!PyArg_ParseTuple(ob, "OiOOi(ii):MSG param",
 			&obhwnd,
 			&pMsg->message,
-			&pMsg->wParam,
-			&pMsg->lParam,
+			&obwParam,
+			&oblParam,
 			&pMsg->time,
 			&pMsg->pt.x,
 			&pMsg->pt.y))
 		return FALSE;
-	if (!PyWinObject_AsHANDLE(obhwnd, (HANDLE *)&pMsg->hwnd))
-		return FALSE;
-	return TRUE;
+	return PyWinObject_AsHANDLE(obhwnd, (HANDLE *)&pMsg->hwnd)
+		&&PyWinObject_AsPARAM(obwParam, &pMsg->wParam)
+		&&PyWinObject_AsPARAM(oblParam, &pMsg->lParam);
 }
 
 PyObject *PyWinObject_FromMSG(const MSG *pMsg)
 {
-	return Py_BuildValue("Niiii(ii)",
+	return Py_BuildValue("NiNNi(ii)",
 				PyWinLong_FromHANDLE(pMsg->hwnd),
 				pMsg->message,
-				pMsg->wParam,
-				pMsg->lParam,
+				PyWinObject_FromPARAM(pMsg->wParam),
+				PyWinObject_FromPARAM(pMsg->lParam),
 				pMsg->time,
 				pMsg->pt.x,
 				pMsg->pt.y);
@@ -844,64 +879,89 @@ void PyWin_ReleaseGlobalLock(void)
 	LeaveCriticalSection(&g_csMain);
 }
 
-static int AddConstant(PyObject *dict, const char *key, long value)
-{
-	PyObject *oval = PyInt_FromLong(value);
-	if (!oval)
-	{
-		return 1;
-	}
-	int rc = PyDict_SetItemString(dict, (char*)key, oval);
-	Py_DECREF(oval);
-	return rc;
-}
 
-#define ADD_CONSTANT(tok) AddConstant(dict, #tok, tok)
+#define ADD_CONSTANT(tok) if (PyModule_AddIntConstant(module, #tok, tok) == -1) RETURN_ERROR;
+
+#define ADD_TYPE(type_name)	\
+	if (PyType_Ready(&Py##type_name)==-1		\
+		|| PyDict_SetItemString(dict, #type_name, (PyObject *)&Py##type_name) == -1)	\
+		RETURN_ERROR;
 
 extern "C" __declspec(dllexport)
+#if (PY_VERSION_HEX < 0x03000000)
 void initpywintypes(void)
+#else
+PyObject *PyInit_pywintypes(void)
+#endif
 {
-  // ensure the framework has a valid thread state to work with.
-  PyWinGlobals_Ensure();
+	// ensure the framework has a valid thread state to work with.
+	PyWinGlobals_Ensure();
+	// Note we assume the Python global lock has been acquired for us already.
+	PyObject *dict, *module;
 
-  // Note we assume the Python global lock has been acquired for us already.
-  PyObject *dict, *module;
-  module = Py_InitModule("pywintypes", pywintypes_functions);
-  if (!module) /* Eeek - some serious error! */
-    return;
-  dict = PyModule_GetDict(module);
-  if (!dict) return; /* Another serious error!*/
-  if (PyWinExc_ApiError == NULL || PyWinExc_COMError == NULL) {
-	  PyErr_SetString(PyExc_MemoryError, "Could not initialise the error objects");
-	  return;
-  }
+#if (PY_VERSION_HEX < 0x03000000)
+#define RETURN_ERROR return;
+	module = Py_InitModule("pywintypes", pywintypes_functions);
+	if (!module) /* Eeek - some serious error! */
+		return;
+	dict = PyModule_GetDict(module);
+	if (!dict)
+		return; /* Another serious error!*/
 
-  PyDict_SetItemString(dict, "error", PyWinExc_ApiError);
-  PyDict_SetItemString(dict, "com_error", PyWinExc_COMError);
+#else
+#define RETURN_ERROR return NULL;
+	static PyModuleDef pywintypes_def = {
+		PyModuleDef_HEAD_INIT,
+		"pywintypes",
+		"Module containing common objects and functions used by various Pywin32 modules",
+		-1,
+		pywintypes_functions
+		};
+	module = PyModule_Create(&pywintypes_def);
+	if (!module)
+		return NULL;
+	dict = PyModule_GetDict(module);
+	if (!dict)
+		return NULL;
+#endif
 
-  PyDict_SetItemString(dict, "TRUE", Py_True);
-  PyDict_SetItemString(dict, "FALSE", Py_False);
-  ADD_CONSTANT(WAVE_FORMAT_PCM);
+	if (PyWinExc_ApiError == NULL || PyWinExc_COMError == NULL) {
+		PyErr_SetString(PyExc_MemoryError, "Could not initialise the error objects");
+		RETURN_ERROR;
+		}
+
+	if (PyDict_SetItemString(dict, "error", PyWinExc_ApiError) == -1
+		|| PyDict_SetItemString(dict, "com_error", PyWinExc_COMError) == -1
+		|| PyDict_SetItemString(dict, "TRUE", Py_True) == -1
+		|| PyDict_SetItemString(dict, "FALSE", Py_False) == -1)
+		RETURN_ERROR;
+	ADD_CONSTANT(WAVE_FORMAT_PCM);
 
   // Add a few types.
+	if (PyDict_SetItemString(dict, "UnicodeType", (PyObject *)&PyUnicode_Type) == -1)
+		RETURN_ERROR;
+
 #ifndef NO_PYWINTYPES_TIME
-  PyDict_SetItemString(dict, "TimeType", (PyObject *)&PyTimeType);
+	ADD_TYPE(TimeType);
 #endif // NO_PYWINTYPES_TIME
 #ifndef NO_PYWINTYPES_IID
-  PyDict_SetItemString(dict, "IIDType", (PyObject *)&PyIIDType);
+	ADD_TYPE(IIDType);
 #endif // NO_PYWINTYPES_IID
-  PyDict_SetItemString(dict, "UnicodeType", (PyObject *)&PyUnicodeType);
 #ifndef NO_PYWINTYPES_SECURITY
-  PyDict_SetItemString(dict, "SECURITY_ATTRIBUTESType", (PyObject *)&PySECURITY_ATTRIBUTESType);
-  PyDict_SetItemString(dict, "SIDType", (PyObject *)&PySIDType);
-  PyDict_SetItemString(dict, "ACLType", (PyObject *)&PyACLType);
+	ADD_TYPE(SECURITY_DESCRIPTORType);
+	ADD_TYPE(SECURITY_ATTRIBUTESType);
+	ADD_TYPE(SIDType);
+	ADD_TYPE(ACLType);
 #endif
-  PyDict_SetItemString(dict, "HANDLEType", (PyObject *)&PyHANDLEType);
-  PyDict_SetItemString(dict, "OVERLAPPEDType", (PyObject *)&PyOVERLAPPEDType);
-  PyDict_SetItemString(dict, "DEVMODEType", (PyObject *)&PyDEVMODEType);
-  PyDict_SetItemString(dict, "DEVMODEWType", (PyObject *)&PyDEVMODEWType);
-  PyDict_SetItemString(dict, "WAVEFORMATEXType", (PyObject *)&PyWAVEFORMATEXType);
+	ADD_TYPE(HANDLEType);
+	ADD_TYPE(OVERLAPPEDType);
+	ADD_TYPE(DEVMODEType);
+	ADD_TYPE(DEVMODEWType);
+	ADD_TYPE(WAVEFORMATEXType);
 
+#if (PY_VERSION_HEX >= 0x03000000)
+  return module;
+#endif
 }
 
 #ifndef MS_WINCE
@@ -912,9 +972,9 @@ BOOL WINAPI DllMain(HANDLE hInstance, DWORD dwReason, LPVOID lpReserved)
 #ifndef NO_PYWINTYPES_SECURITY
 	FARPROC fp;
 	// dll usually will already be loaded
-	HMODULE hmodule=GetModuleHandle("AdvAPI32.dll");
+	HMODULE hmodule=GetModuleHandle(_T("AdvAPI32.dll"));
 	if (hmodule==NULL)
-		hmodule=LoadLibrary("AdvAPI32.dll");
+		hmodule=LoadLibrary(_T("AdvAPI32.dll"));
 	if (hmodule){
 		fp=GetProcAddress(hmodule,"AddAccessAllowedAce");
 		if (fp)

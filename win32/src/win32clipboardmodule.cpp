@@ -866,10 +866,10 @@ py_set_clipboard_data(PyObject* self, PyObject* args)
 {
 
 	// @pyparm int|format||Specifies a clipboard format. For a description of
-	// the standard clipboard formats, see Standard Clipboard Formats.
-
+	//	the standard clipboard formats, see Standard Clipboard Formats.
 	// @pyparm int/buffer|hMem||Integer handle to the data in the specified
-        // format, or a buffer object (eg, string).
+	//	format, or string, unicode, or any object that supports the buffer interface.
+	//	A global memory object is allocated, and the object's buffer is copied to the new memory.
 	// This parameter can be 0, indicating that the window provides data in
 	// the specified clipboard format (renders the format) upon request. If a
 	// window delays rendering, it must process the WM_RENDERFORMAT and
@@ -888,22 +888,23 @@ py_set_clipboard_data(PyObject* self, PyObject* args)
 		return NULL;
 	if (!PyWinObject_AsHANDLE(obhandle , &handle)){
 		PyErr_Clear();
-		// @pyparmalt1 int|format||Specifies a clipboard format. For a description of
-		// the standard clipboard formats, see Standard Clipboard Formats.
-		// @pyparmalt1 object|ob||An object that has a read-buffer interface.
-		// A global memory object is allocated, and the objects buffer is copied
-		// to the new memory.
+
 		const void * buf = NULL;
 		Py_ssize_t bufSize = 0;
-
-		if (PyObject_AsReadBuffer(obhandle,&buf,&bufSize)==-1) 
-			RETURN_TYPE_ERR("The object must support the buffer interfaces");
-		// size doesnt include nulls!
-		if (PyString_Check(obhandle))
-			bufSize += 1;
-		else if (PyUnicode_Check(obhandle))
-			bufSize += sizeof(wchar_t);
-		// else assume buffer needs no terminator...
+		// In py3k, unicode no longer supports buffer interface
+		if (PyUnicode_Check(obhandle)){
+			wchar_t *wchar_buf=PyUnicode_AS_UNICODE(obhandle);
+			// ??? WTF None of the of Python Api functions return the correct size ???
+			bufSize = (wcslen(wchar_buf)+1) * sizeof(wchar_buf[0]);
+			buf=(void *)wchar_buf;
+			}
+		else{
+			if (PyObject_AsReadBuffer(obhandle,&buf,&bufSize)==-1)
+				return NULL;
+			if (PyString_Check(obhandle))
+				bufSize++;	// size doesnt include nulls!
+			// else assume buffer needs no terminator...
+			}
 		handle = GlobalAlloc(GHND, bufSize);
 		if (handle == NULL) {
 			return ReturnAPIError("GlobalAlloc");
@@ -1131,24 +1132,9 @@ static struct PyMethodDef clipboard_functions[] = {
 };
 
 
-static int AddConstant(PyObject *dict, char *key, long value)
-{
-	PyObject *okey = PyString_FromString(key);
-	PyObject *oval = PyInt_FromLong(value);
-	if (!okey || !oval) {
-		Py_XDECREF(okey);
-		Py_XDECREF(oval);
-		return 1;
-	}
-	int rc = PyDict_SetItem(dict,okey, oval);
-	Py_XDECREF(okey);
-	Py_XDECREF(oval);
-	return rc;
-}
+#define ADD_CONSTANT(tok) if (rc=PyModule_AddIntConstant(module, #tok, tok)) return rc
 
-#define ADD_CONSTANT(tok) if (rc=AddConstant(dict,#tok, tok)) return rc
-
-static int AddConstants(PyObject *dict)
+static int AddConstants(PyObject *module)
 {
 	int rc;
 	ADD_CONSTANT(CF_TEXT);
@@ -1178,17 +1164,44 @@ static int AddConstants(PyObject *dict)
 }
 
 
-extern "C" __declspec(dllexport) void
-initwin32clipboard(void)
+extern "C" __declspec(dllexport)
+#if (PY_VERSION_HEX < 0x03000000)
+void initwin32clipboard(void)
 {
-  PyObject *dict, *module;
-  module = Py_InitModule("win32clipboard", clipboard_functions);
-  if (!module) /* Eeek - some serious error! */
-    return;
-  dict = PyModule_GetDict(module);
-  if (!dict) return; /* Another serious error!*/
-  PyWinGlobals_Ensure();
-  AddConstants(dict);
-  Py_INCREF(PyWinExc_ApiError);
-  PyDict_SetItemString(dict, "error", PyWinExc_ApiError);
+	PyObject *dict, *module;
+	PyWinGlobals_Ensure();
+	module = Py_InitModule("win32clipboard", clipboard_functions);
+	if (!module) /* Eeek - some serious error! */
+		return;
+	dict = PyModule_GetDict(module);
+	if (!dict) return; /* Another serious error!*/
+
+	AddConstants(module);
+	PyDict_SetItemString(dict, "error", PyWinExc_ApiError);
 }
+
+#else
+PyObject *PyInit_win32clipboard(void)
+{
+	PyObject *dict, *module;
+	PyWinGlobals_Ensure();
+	static PyModuleDef win32clipboard_def = {
+		PyModuleDef_HEAD_INIT,
+		"win32clipboard",
+		"A module which supports the Windows Clipboard API.",
+		-1,
+		clipboard_functions
+		};
+	module = PyModule_Create(&win32clipboard_def);
+	if (!module)
+		return NULL;
+	dict = PyModule_GetDict(module);
+	if (!dict)
+		return NULL;
+	if (AddConstants(module) != 0)
+		return NULL;
+	if (PyDict_SetItemString(dict, "error", PyWinExc_ApiError)==-1)
+		return NULL;
+	return module;
+}
+#endif

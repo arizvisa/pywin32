@@ -24,11 +24,11 @@ from ntsecuritycon import *
 import servicemanager
 
 import traceback
-import thread
+import _thread
 
 def ApplyIgnoreError(fn, args):
     try:
-        return apply(fn, args)
+        return fn(*args)
     except error: # Ignore win32api errors.
         return None
 
@@ -73,7 +73,7 @@ class TestPipeService(win32serviceutil.ServiceFramework):
                 while hr==winerror.ERROR_MORE_DATA:
                     hr, thisd = ReadFile(pipeHandle, 256)
                     d = d + thisd
-                print "Read", d
+                print("Read", d)
                 ok = 1
             except error:
                 # Client disconnection - do nothing
@@ -125,8 +125,8 @@ class TestPipeService(win32serviceutil.ServiceFramework):
                     self.CreatePipeSecurityObject())
             try:
                 hr = ConnectNamedPipe(pipeHandle, self.overlapped)
-            except error, details:
-                print "Error connecting pipe!", details
+            except error as details:
+                print("Error connecting pipe!", details)
                 CloseHandle(pipeHandle)
                 break
             if hr==winerror.ERROR_PIPE_CONNECTED:
@@ -138,7 +138,7 @@ class TestPipeService(win32serviceutil.ServiceFramework):
                 break
             else:
                 # Pipe event - spawn thread to deal with it.
-                thread.start_new_thread(self.ProcessClient, (pipeHandle,))
+                _thread.start_new_thread(self.ProcessClient, (pipeHandle,))
                 num_connections = num_connections + 1
 
         # Sleep to ensure that any new threads are in the list, and then
@@ -147,7 +147,7 @@ class TestPipeService(win32serviceutil.ServiceFramework):
         Sleep(500)
         while self.thread_handles:
             self.ReportServiceStatus(win32service.SERVICE_STOP_PENDING, 5000)
-            print "Waiting for %d threads to finish..." % (len(self.thread_handles))
+            print("Waiting for %d threads to finish..." % (len(self.thread_handles)))
             WaitForMultipleObjects(self.thread_handles, 1, 3000)
         # Write another event log record.
         servicemanager.LogMsg(

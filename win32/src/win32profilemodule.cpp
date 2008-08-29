@@ -462,18 +462,38 @@ static struct PyMethodDef win32profile_functions[] = {
 };
 
 
-
-extern "C" __declspec(dllexport) void
-initwin32profile(void)
+extern "C" __declspec(dllexport)
+#if (PY_VERSION_HEX < 0x03000000)
+void initwin32profile(void)
+#else
+PyObject *PyInit_win32profile(void)
+#endif
 {
 	PyObject *dict, *module;
 	PyWinGlobals_Ensure();
+
+#if (PY_VERSION_HEX < 0x03000000)
 	module = Py_InitModule("win32profile", win32profile_functions);
-	if (module==NULL)
+	if (!module)
 		return;
 	dict = PyModule_GetDict(module);
-	if (dict==NULL)
+	if (!dict)
 		return;
+#else
+	static PyModuleDef win32profile_def = {
+		PyModuleDef_HEAD_INIT,
+		"win32profile",
+		"Interface to the Terminal Services Api.",
+		-1,
+		win32profile_functions
+		};
+	module = PyModule_Create(&win32profile_def);
+	if (!module)
+		return NULL;
+	dict = PyModule_GetDict(module);
+	if (!dict)
+		return NULL;
+#endif
 
 	// PROFILEINFO flags
 	PyModule_AddIntConstant(module, "PI_NOUI",PI_NOUI);
@@ -499,5 +519,8 @@ initwin32profile(void)
 		pfnLoadUserProfile=(LoadUserProfilefunc)GetProcAddress(hmodule,"LoadUserProfileW");
 		pfnUnloadUserProfile=(UnloadUserProfilefunc)GetProcAddress(hmodule,"UnloadUserProfile");
 		}
+
+#if (PY_VERSION_HEX >= 0x03000000)
+	return module;
+#endif
 }  
-  

@@ -23,7 +23,7 @@ import win32api
 import win32con, winerror
 import struct, array
 import commctrl
-import Queue
+import queue
 import os
 
 IDC_SEARCHTEXT = 1024
@@ -43,14 +43,14 @@ class _WIN32MASKEDSTRUCT:
                 full_fmt += "pi"
             else:
                 full_fmt += fmt
-        for name, val in kw.items():
-            if not self.__dict__.has_key(name):
-                raise ValueError, "LVITEM structures do not have an item '%s'" % (name,)
+        for name, val in list(kw.items()):
+            if name not in self.__dict__:
+                raise ValueError("LVITEM structures do not have an item '%s'" % (name,))
             self.__dict__[name] = val
 
     def __setattr__(self, attr, val):
-        if not attr.startswith("_") and not self.__dict__.has_key(attr):
-            raise AttributeError, attr
+        if not attr.startswith("_") and attr not in self.__dict__:
+            raise AttributeError(attr)
         self.__dict__[attr] = val
 
     def toparam(self):
@@ -71,7 +71,7 @@ class _WIN32MASKEDSTRUCT:
                     vals.append(0)
                     vals.append(0)
                 else:
-                    str_buf = array.array("c", val+'\0')
+                    str_buf = array.array("b", val+'\0')
                     vals.append(str_buf.buffer_info()[0])
                     vals.append(len(val))
                     self._buffs.append(str_buf) # keep alive during the call.
@@ -80,7 +80,7 @@ class _WIN32MASKEDSTRUCT:
                     val = default
                 vals.append(val)
             full_fmt += fmt
-        return apply(struct.pack, (full_fmt,) + tuple(vals) )
+        return struct.pack(*(full_fmt,) + tuple(vals))
 
 
 # NOTE: See the win32gui_struct module for an alternative way of dealing 
@@ -138,8 +138,8 @@ class DemoWindowBase:
             wc.hIcon=win32gui.LoadIcon(this_app, 135)  ## pythonwin's icon
         try:
             classAtom = win32gui.RegisterClass(wc)
-        except win32gui.error, err_info:
-            if err_info[0]!=winerror.ERROR_CLASS_ALREADY_EXISTS:
+        except win32gui.error as err_info:
+            if err_info.args[0]!=winerror.ERROR_CLASS_ALREADY_EXISTS:
                 raise
         return className
 
@@ -149,7 +149,7 @@ class DemoWindowBase:
         title = "Dynamic Dialog Demo"
 
         # Window frame and title
-        dlg = [ [title, (0, 0, 210, 250), style, None, (8, "MS Sans Serif"), None, dlgClassName], ]
+        dlg = [ [title, (0, 0, 210, 250), style, 0, (8, "MS Sans Serif"), None, dlgClassName], ]
 
         # ID label and text box
         dlg.append([130, "Enter something", -1, (5, 5, 200, 9), cs | win32con.SS_LEFT])
@@ -247,8 +247,8 @@ class DemoWindowBase:
         desktop = win32gui.GetDesktopWindow()
         l,t,r,b = win32gui.GetWindowRect(self.hwnd)
         dt_l, dt_t, dt_r, dt_b = win32gui.GetWindowRect(desktop)
-        centre_x, centre_y = win32gui.ClientToScreen( desktop, ( (dt_r-dt_l)/2, (dt_b-dt_t)/2) )
-        win32gui.MoveWindow(hwnd, centre_x-(r/2), centre_y-(b/2), r-l, b-t, 0)
+        centre_x, centre_y = win32gui.ClientToScreen( desktop, ( (dt_r-dt_l)//2, (dt_b-dt_t)//2) )
+        win32gui.MoveWindow(hwnd, centre_x-(r//2), centre_y-(b//2), r-l, b-t, 0)
         self._SetupList()
         l,t,r,b = win32gui.GetClientRect(self.hwnd)
         self._DoSize(r-l,b-t, 1)
@@ -285,12 +285,12 @@ class DemoWindowBase:
         try:
             while 1:
                 params = self.result_queue.get(0)
-                apply(self.AddListItem, params)
-        except Queue.Empty:
+                self.AddListItem(*params)
+        except queue.Empty:
             pass
 
     def OnSearchFinished(self, hwnd, msg, wparam, lparam):
-        print "OnSearchFinished"
+        print("OnSearchFinished")
 
     def OnNotify(self, hwnd, msg, wparam, lparam):
         format = "iiiiiiiiiii"
@@ -304,7 +304,7 @@ class DemoWindowBase:
         # this too.
         code += commctrl.PY_0U
         if code == commctrl.NM_DBLCLK:
-            print "Double click on item", iItem+1
+            print("Double click on item", iItem+1)
         return 1
 
     def OnCommand(self, hwnd, msg, wparam, lparam):
@@ -320,13 +320,13 @@ class DemoWindowBase:
                 win32gui.PostMessage(hwnd, WM_SEARCH_FINISHED, 0, 0)
 
             import threading
-            self.result_queue = Queue.Queue()
+            self.result_queue = queue.Queue()
             thread = threading.Thread(target = fill_slowly, args=(self.result_queue, self.hwnd) )
             thread.start()
         elif id == IDC_BUTTON_DISPLAY:
-            print "Display button selected"
+            print("Display button selected")
             sel = win32gui.SendMessage(self.hwndList, commctrl.LVM_GETNEXTITEM, -1, commctrl.LVNI_SELECTED)
-            print "The selected item is", sel+1
+            print("The selected item is", sel+1)
 
     # These function differ based on how the window is used, so may be overridden
     def OnClose(self, hwnd, msg, wparam, lparam):
