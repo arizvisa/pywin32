@@ -70,14 +70,8 @@ To build 64bit versions of this:
 import os, string, sys
 import types, glob
 import re
-import _winreg
+import winreg
 
-# Python version compatibility hacks
-try:
-    True; False
-except NameError:
-    True=0==0
-    False=1==0
 
 # The rest of our imports.
 from distutils.core import setup, Extension, Command
@@ -103,9 +97,9 @@ try:
 except ImportError:
     class Log:
         def debug(self, msg, *args):
-            print msg % args
+            print (msg % args)
         def info(self, msg, *args):
-            print msg % args
+            print (msg % args)
     log = Log()
 
 
@@ -121,7 +115,7 @@ if not "." in build_id_patch:
     build_id_patch = build_id_patch + ".0"
 pywin32_version="%d.%d.%s" % (sys.version_info[0], sys.version_info[1],
                               build_id_patch)
-print "Building pywin32", pywin32_version
+print ("Building pywin32", pywin32_version)
 
 try:
     this_file = __file__
@@ -150,7 +144,7 @@ def find_platform_sdk_dir():
     sdkdir = os.environ.get("MSSdk")
     if sdkdir:
         if DEBUG:
-            print "PSDK: try %MSSdk%: '%s'" % sdkdir
+            print ("PSDK: try %MSSdk%: '%s'" % sdkdir)
         if os.path.isfile(os.path.join(sdkdir, landmark)):
             return sdkdir
     # 2. The "Install Dir" value in the
@@ -158,15 +152,15 @@ def find_platform_sdk_dir():
     #    sometimes points to the right thing. However, after upgrading to
     #    the "Platform SDK for Windows Server 2003 SP1" this is dead end.
     try:
-        key = _winreg.OpenKey(_winreg.HKEY_LOCAL_MACHINE,
+        key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE,
                               r"Software\Microsoft\MicrosoftSDK\Directories")
-        sdkdir, ignore = _winreg.QueryValueEx(key, "Install Dir")
+        sdkdir, ignore = winreg.QueryValueEx(key, "Install Dir")
     except EnvironmentError:
         pass
     else:
         if DEBUG:
-            print r"PSDK: try 'HKLM\Software\Microsoft\MicrosoftSDK"\
-                   "\Directories\Install Dir': '%s'" % sdkdir
+            print (r"PSDK: try 'HKLM\Software\Microsoft\MicrosoftSDK"\
+                   "\Directories\Install Dir': '%s'" % sdkdir)
         if os.path.isfile(os.path.join(sdkdir, landmark)):
             return sdkdir
     # 3. Each installed SDK (not just the platform SDK) seems to have GUID
@@ -174,21 +168,21 @@ def find_platform_sdk_dir():
     #    it *looks* like the latest installed Platform SDK will be the
     #    only one with an "Install Dir" sub-value.
     try:
-        key = _winreg.OpenKey(_winreg.HKEY_LOCAL_MACHINE,
+        key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE,
                               r"Software\Microsoft\MicrosoftSDK\InstalledSDKs")
         i = 0
         while True:
-            guid = _winreg.EnumKey(key, i)
-            guidkey = _winreg.OpenKey(key, guid)
+            guid = winreg.EnumKey(key, i)
+            guidkey = winreg.OpenKey(key, guid)
             try:
-                sdkdir, ignore = _winreg.QueryValueEx(guidkey, "Install Dir")
+                sdkdir, ignore = winreg.QueryValueEx(guidkey, "Install Dir")
             except EnvironmentError:
                 pass
             else:
                 if DEBUG:
-                    print r"PSDK: try 'HKLM\Software\Microsoft\MicrosoftSDK"\
+                    print (r"PSDK: try 'HKLM\Software\Microsoft\MicrosoftSDK"\
                            "\InstallSDKs\%s\Install Dir': '%s'"\
-                           % (guid, sdkdir)
+                           % (guid, sdkdir))
                 if os.path.isfile(os.path.join(sdkdir, landmark)):
                     return sdkdir
             i += 1
@@ -196,15 +190,15 @@ def find_platform_sdk_dir():
         pass
     # 4.  Vista's SDK
     try:
-        key = _winreg.OpenKey(_winreg.HKEY_LOCAL_MACHINE,
+        key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE,
                               r"Software\Microsoft\Microsoft SDKs\Windows")
-        sdkdir, ignore = _winreg.QueryValueEx(key, "CurrentInstallFolder")
+        sdkdir, ignore = winreg.QueryValueEx(key, "CurrentInstallFolder")
     except EnvironmentError:
         pass
     else:
         if DEBUG:
-            print r"PSDK: try 'HKLM\Software\Microsoft\MicrosoftSDKs"\
-                   "\Windows\CurrentInstallFolder': '%s'" % sdkdir
+            print (r"PSDK: try 'HKLM\Software\Microsoft\MicrosoftSDKs"\
+                   "\Windows\CurrentInstallFolder': '%s'" % sdkdir)
         if os.path.isfile(os.path.join(sdkdir, landmark)):
             return sdkdir
 
@@ -216,7 +210,7 @@ def find_platform_sdk_dir():
     ]
     for sdkdir in defaultlocs:
         if DEBUG:
-            print "PSDK: try default location: '%s'" % sdkdir
+            print ("PSDK: try default location: '%s'" % sdkdir)
         if os.path.isfile(os.path.join(sdkdir, landmark)):
             return sdkdir
 
@@ -292,12 +286,12 @@ class WinExt (Extension):
         # Extract symbols to export from a def-file
         result = []
         for line in open(path).readlines():
-            line = string.rstrip(line)
+            line = line.rstrip()
             if line and line[0] in string.whitespace:
-                tokens = string.split(line)
-                if not tokens[0][0] in string.letters:
+                tokens = line.split()
+                if not tokens[0][0] in string.ascii_letters:
                     continue
-                result.append(string.join(tokens, ','))
+                result.append(','.join(tokens))
         return result
 
     def get_source_files(self, dsp):
@@ -389,7 +383,7 @@ class WinExt (Extension):
 
 class WinExt_pythonwin(WinExt):
     def __init__ (self, name, **kw):
-        if not kw.has_key("dsp_file") and not kw.get("sources"):
+        if "dsp_file" not in kw and not kw.get("sources"):
             kw["dsp_file"] = "pythonwin/" + name + ".dsp"
         kw.setdefault("extra_compile_args", []).extend(
                             ['-D_AFXDLL', '-D_AFXEXT','-D_MBCS'])
@@ -399,7 +393,7 @@ class WinExt_pythonwin(WinExt):
 
 class WinExt_win32(WinExt):
     def __init__ (self, name, **kw):
-        if not kw.has_key("dsp_file") and not kw.get("sources"):
+        if "dsp_file" not in kw and not kw.get("sources"):
             kw["dsp_file"] = "win32/" + name + ".dsp"
         WinExt.__init__(self, name, **kw)
     def get_pywin32_dir(self):
@@ -413,7 +407,7 @@ class WinExt_ISAPI(WinExt):
 # itself - thus, output is "win32comext"
 class WinExt_win32com(WinExt):
     def __init__ (self, name, **kw):
-        if not kw.has_key("dsp_file") and not kw.get("sources"):
+        if "dsp_file" not in kw and not kw.get("sources"):
             kw["dsp_file"] = "com/" + name + ".dsp"
         kw["libraries"] = kw.get("libraries", "") + " oleaut32 ole32"
 
@@ -436,11 +430,11 @@ class WinExt_win32com_mapi(WinExt_win32com):
         sdk_install_dir = None
         libs = kw.get("libraries", "")
         keyname = "SOFTWARE\Microsoft\Exchange\SDK"
-        for root in _winreg.HKEY_LOCAL_MACHINE, _winreg.HKEY_CURRENT_USER:
+        for root in winreg.HKEY_LOCAL_MACHINE, winreg.HKEY_CURRENT_USER:
             try:
-                keyob = _winreg.OpenKey(root, keyname)
-                value, type_id = _winreg.QueryValueEx(keyob, "INSTALLDIR")
-                if type_id == _winreg.REG_SZ:
+                keyob = winreg.OpenKey(root, keyname)
+                value, type_id = winreg.QueryValueEx(keyob, "INSTALLDIR")
+                if type_id == winreg.REG_SZ:
                     sdk_install_dir = value
                     break
             except WindowsError:
@@ -478,8 +472,8 @@ class my_build(build):
             f = open(ver_fname, "w")
             f.write("%s\n" % build_id)
             f.close()
-        except EnvironmentError, why:
-            print "Failed to open '%s': %s" % (ver_fname, why)
+        except EnvironmentError as why:
+            print ("Failed to open '%s': %s" % (ver_fname, why))
 
 class my_build_ext(build_ext):
 
@@ -631,7 +625,7 @@ class my_build_ext(build_ext):
                 if self.windows_h_version is not None:
                     break
             else:
-                raise RuntimeError, "Can't find a version in Windows.h"
+                raise RuntimeError("Can't find a version in Windows.h")
         if ext.windows_h_version > self.windows_h_version:
             return "WINDOWS.H with version 0x%x is required, but only " \
                    "version 0x%x is installed." \
@@ -741,7 +735,7 @@ class my_build_ext(build_ext):
             try:
                 self.package = ext.get_pywin32_dir()
             except AttributeError:
-                raise RuntimeError, "Not a win32 package!"
+                raise RuntimeError("Not a win32 package!")
             self.build_extension(ext)
 
         for ext in W32_exe_files:
@@ -750,13 +744,13 @@ class my_build_ext(build_ext):
             if why is not None:
                 self.excluded_extensions.append((ext, why))
                 assert why, "please give a reason, or None"
-                print "Skipping %s: %s" % (ext.name, why)
+                print ("Skipping %s: %s" % (ext.name, why))
                 continue
 
             try:
                 self.package = ext.get_pywin32_dir()
             except AttributeError:
-                raise RuntimeError, "Not a win32 package!"
+                raise RuntimeError("Not a win32 package!")
             self.build_exefile(ext)
 
         # Not sure how to make this completely generic, and there is no
@@ -787,12 +781,12 @@ class my_build_ext(build_ext):
                 # system32 (but we can't even use win32api for that!)
                 src = os.path.join(os.environ.get('SystemRoot'), 'System32', 'mfc71.dll')
                 if not os.path.isfile(src):
-                    raise RuntimeError, "Can't find %r" % (src,)
+                    raise RuntimeError("Can't find %r" % (src,))
                 self.copy_file(src, target_dir)
             else:
                 # On a 64bit host, the value we are looking for is actually in
                 # SysWow64Node - but that is only available on xp and later.
-                access = _winreg.KEY_READ
+                access = winreg.KEY_READ
                 if sys.getwindowsversion()[0] >= 5:
                     access = access | 512 # KEY_WOW64_32KEY
                 if self.plat_name == 'win-amd64':
@@ -800,29 +794,29 @@ class my_build_ext(build_ext):
                 else:
                     plat_dir = "x86"
                 # Find the redist directory.
-                vckey = _winreg.OpenKey(_winreg.HKEY_LOCAL_MACHINE,
+                vckey = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE,
                                         r"SOFTWARE\Microsoft\VisualStudio\9.0\Setup\VC",
                                         access)
-                val, val_typ = _winreg.QueryValueEx(vckey, "ProductDir")
+                val, val_typ = winreg.QueryValueEx(vckey, "ProductDir")
                 mfc_dir = os.path.join(val, "redist", plat_dir, "Microsoft.VC90.MFC")
                 if not os.path.isdir(mfc_dir):
-                    raise RuntimeError, "Can't find the redist dir at %r" % (mfc_dir)
+                    raise RuntimeError("Can't find the redist dir at %r" % (mfc_dir))
                 files = "mfc90.dll mfc90u.dll mfcm90.dll mfcm90u.dll Microsoft.VC90.MFC.manifest".split()
                 for f in files:
                     self.copy_file(
                             os.path.join(mfc_dir, f), target_dir)
-        except (EnvironmentError, RuntimeError), exc:
-            print "Can't find an installed VC for the MFC DLLs:", exc
+        except (EnvironmentError, RuntimeError) as exc:
+            print ("Can't find an installed VC for the MFC DLLs:", exc)
 
 
     def build_exefile(self, ext):
         from types import ListType, TupleType
         sources = ext.sources
         if sources is None or type(sources) not in (ListType, TupleType):
-            raise DistutilsSetupError, \
+            raise DistutilsSetupError(
                   ("in 'ext_modules' option (extension '%s'), " +
                    "'sources' must be present and must be " +
-                   "a list of source filenames") % ext.name
+                   "a list of source filenames") % ext.name)
         sources = list(sources)
 
         log.info("building exe '%s'", ext.name)
@@ -939,7 +933,7 @@ class my_build_ext(build_ext):
         if why is not None:
             self.excluded_extensions.append((ext, why))
             assert why, "please give a reason, or None"
-            print "Skipping %s: %s" % (ext.name, why)
+            print ("Skipping %s: %s" % (ext.name, why))
             return
         self.current_extension = ext
 
@@ -994,8 +988,6 @@ class my_build_ext(build_ext):
             return r"pywin32_system32\pythoncom%d%d%s" % (sys.version_info[0], sys.version_info[1], extra_dll)
         elif name.endswith("win32.perfmondata"):
             return r"win32\perfmondata" + extra_dll
-        elif name.endswith("win32.win32popenWin9x"):
-            return r"win32\win32popenWin9x" + extra_exe
         elif name.endswith("win32.pythonservice"):
             return r"win32\pythonservice" + extra_exe
         elif name.endswith("pythonwin.Pythonwin"):
@@ -1113,7 +1105,7 @@ class my_install(install):
         # some 'no wait' executor - spawn seems fine!  We pass the PID of this
         # process so the child will wait for us.
         # XXX - hmm - a closer look at distutils shows it only uses win32api
-        # if _winreg fails - and this never should.  Need to revisit this!
+        # if winreg fails - and this never should.  Need to revisit this!
         # If self.root has a value, it means we are being "installed" into
         # some other directory than Python itself (eg, into a temp directory
         # for bdist_wininst to use) - in which case we must *not* run our
@@ -1122,8 +1114,8 @@ class my_install(install):
             # What executable to use?  This one I guess.
             filename = os.path.join(os.path.dirname(this_file), "pywin32_postinstall.py")
             if not os.path.isfile(filename):
-                raise RuntimeError, "Can't find '%s'" % (filename,)
-            print "Executing post install script..."
+                raise RuntimeError("Can't find '%s'" % (filename,))
+            print ("Executing post install script...")
             os.spawnl(os.P_NOWAIT, sys.executable,
                       sys.executable, filename,
                       "-quiet", "-wait", str(os.getpid()), "-install")
@@ -1134,7 +1126,7 @@ class my_install(install):
 # hacks to get a subclassed compiler in.
 # (otherwise we replace all of build_extension!)
 def my_new_compiler(**kw):
-    if kw.has_key('compiler') and kw['compiler'] in (None, 'msvc'):
+    if 'compiler' in kw and kw['compiler'] in (None, 'msvc'):
         return my_compiler()
     return orig_new_compiler(**kw)
 
@@ -1220,7 +1212,7 @@ class my_compiler(base_compiler):
                 args.append(output_filename)
                 try:
                     self.spawn(args)
-                except DistutilsExecError, msg:
+                except DistutilsExecError as msg:
                     log.info("VersionStamp failed: %s", msg)
                     ok = False
             if not ok:
@@ -1260,7 +1252,7 @@ class my_install_data(install_data):
         if self.install_dir is None:
             installobj = self.distribution.get_command_obj('install')
             self.install_dir = installobj.install_lib
-        print 'Installing data files to %s' % self.install_dir
+        print ('Installing data files to %s' % self.install_dir)
         install_data.finalize_options(self)
 
 ################################################################
@@ -1284,48 +1276,48 @@ win32_extensions.append(
     )
 
 for info in (
-        ("dbi", "", False),
-        ("mmapfile", "", False),
-        ("odbc", "odbc32 odbccp32 dbi", False),
+        ("dbi", "", True),
+        ("mmapfile", "", True),
+        ("odbc", "odbc32 odbccp32 dbi", True),
         ("perfmon", "", True),
-        ("timer", "user32", False),
-        ("win2kras", "rasapi32", False, 0x0500),
-        ("win32api", "user32 advapi32 shell32 version", False, 0x0500, 'win32/src/win32apimodule.cpp win32/src/win32api_display.cpp'),
+        ("timer", "user32", True),
+        ("win2kras", "rasapi32", True, 0x0500),
+        ("win32api", "user32 advapi32 shell32 version", True, 0x0500, 'win32/src/win32apimodule.cpp win32/src/win32api_display.cpp'),
         ("win32cred", "AdvAPI32 credui", True, 0x0501, 'win32/src/win32credmodule.cpp'),
-        ("win32crypt", "Crypt32", False, 0x0500, 'win32/src/win32crypt.i win32/src/win32cryptmodule.cpp'),
-        ("win32file", "oleaut32", False, 0x0500),
-        ("win32event", "user32", False),
-        ("win32clipboard", "gdi32 user32 shell32", False),
-        ("win32evtlog", "advapi32 oleaut32", False),
+        ("win32crypt", "Crypt32", True, 0x0500, 'win32/src/win32crypt.i win32/src/win32cryptmodule.cpp'),
+        ("win32file", "oleaut32", True, 0x0500),
+        ("win32event", "user32", True),
+        ("win32clipboard", "gdi32 user32 shell32", True),
+        ("win32evtlog", "advapi32 oleaut32", True),
         # win32gui handled below
-        ("win32job", "user32", False, 0x0500, 'win32/src/win32job.i win32/src/win32jobmodule.cpp'),
-        ("win32lz", "lz32", False),
+        ("win32job", "user32", True, 0x0500, 'win32/src/win32job.i win32/src/win32jobmodule.cpp'),
+        ("win32lz", "lz32", True),
         ("win32net", "netapi32 advapi32", True, None, """
               win32/src/win32net/win32netfile.cpp    win32/src/win32net/win32netgroup.cpp
               win32/src/win32net/win32netmisc.cpp    win32/src/win32net/win32netmodule.cpp
               win32/src/win32net/win32netsession.cpp win32/src/win32net/win32netuse.cpp
               win32/src/win32net/win32netuser.cpp
               """),
-        ("win32pdh", "", False),
-        ("win32pipe", "", False),
-        ("win32print", "winspool user32 gdi32", False, 0x0500),
-        ("win32process", "advapi32 user32", False, 0x0500),
+        ("win32pdh", "", True),
+        ("win32pipe", "", True),
+        ("win32print", "winspool user32 gdi32", True, 0x0500),
+        ("win32process", "advapi32 user32", True, 0x0500),
         ("win32profile", "Userenv", True, None, 'win32/src/win32profilemodule.cpp'),
-        ("win32ras", "rasapi32 user32", False),
+        ("win32ras", "rasapi32 user32", True),
         ("win32security", "advapi32 user32 netapi32", True, 0x0500, """
             win32/src/win32security.i       win32/src/win32securitymodule.cpp
             win32/src/win32security_sspi.cpp win32/src/win32security_ds.cpp
             """),
         ("win32service", "advapi32 oleaut32 user32", True, 0x0501),
-        ("win32trace", "advapi32", False),
-        ("win32wnet", "netapi32 mpr", False),
-        ("win32inet", "wininet", False, 0x500, """
+        ("win32trace", "advapi32", True),
+        ("win32wnet", "netapi32 mpr", True),
+        ("win32inet", "wininet", True, 0x500, """
             win32/src/win32inet.i           win32/src/win32inetmodule.cpp
             win32/src/win32inet_winhttp.cpp"""
                         ),
         ("win32console", "kernel32", True, 0x0501, "win32/src/win32consolemodule.cpp"),
         ("win32ts", "WtsApi32", True, 0x0501, "win32/src/win32tsmodule.cpp"),
-        ("_win32sysloader", "", False, 0x0501, "win32/src/_win32sysloader.cpp"),
+        ("_win32sysloader", "", True, 0x0501, "win32/src/_win32sysloader.cpp"),
         ("win32transaction", "kernel32", True, 0x0501, "win32/src/win32transactionmodule.cpp"),
 
     ):
@@ -1356,6 +1348,7 @@ win32_extensions += [
            windows_h_version=0x0500,
            libraries="gdi32 user32 comdlg32 comctl32 shell32",
            define_macros = [("WIN32GUI", None)],
+           extra_compile_args = ['-DUNICODE', '-D_UNICODE']
         ),
     # winxpgui is built from win32gui.i, but sets up different #defines before
     # including windows.h.  It also has an XP style manifest.
@@ -1368,6 +1361,7 @@ win32_extensions += [
            windows_h_version=0x0500,
            define_macros = [("WIN32GUI",None), ("WINXPGUI",None)],
            extra_swig_commands=["-DWINXPGUI"],
+           extra_compile_args = ['-DUNICODE', '-D_UNICODE']
         ),
     # winxptheme
     WinExt_win32("_winxptheme",
@@ -1456,12 +1450,12 @@ com_extensions += [
     ),
     # ActiveDebugging is a mess.  See the comments in the docstring of this
     # module for details on getting it built.
-    WinExt_win32com('axdebug',
-            dsp_file=r"com\Active Debugging.dsp",
-            libraries="axscript",
-            pch_header = "stdafx.h",
-            optional_headers = ["activdbg.h"],
-    ),
+##    WinExt_win32com('axdebug',
+##            dsp_file=r"com\Active Debugging.dsp",
+##            libraries="axscript",
+##            pch_header = "stdafx.h",
+##            optional_headers = ["activdbg.h"],
+##    ),
     WinExt_win32com('internet'),
     WinExt_win32com('mapi', libraries="mapi32", pch_header="PythonCOM.h",
                     sources=("""
@@ -1627,9 +1621,6 @@ if sys.hexversion >= 0x2030000:
     )
 
 W32_exe_files = [
-    WinExt_win32("win32popenWin9x",
-                 libraries = "user32",
-                 platforms = ["win32"]),
     WinExt_win32("pythonservice",
                  dsp_file = "win32/PythonService EXE.dsp",
                  extra_compile_args = ['-DUNICODE', '-D_UNICODE', '-DWINNT'],
@@ -1710,11 +1701,11 @@ def convert_data_files(files):
             # dir names.  So any '\.' gets the boot.
             flist.exclude_pattern(re.compile(".*\\\\\."), is_regex=1)
             if not flist.files:
-                raise RuntimeError, "No files match '%s'" % file
+                raise RuntimeError("No files match '%s'" % file)
             files_use = flist.files
         else:
             if not os.path.isfile(file):
-                raise RuntimeError, "No file '%s'" % file
+                raise RuntimeError("No file '%s'" % file)
             files_use = (file,)
         for fname in files_use:
             path_use = os.path.dirname(fname)
@@ -1728,8 +1719,8 @@ def convert_optional_data_files(files):
     for file in files:
         try:
             temp = convert_data_files([file])
-        except RuntimeError, details:
-            if not str(details).startswith("No file"):
+        except RuntimeError as details:
+            if not str(details.args[0]).startswith("No file"):
                 raise
             log.info('NOTE: Optional file %s not found - skipping' % file)
         else:
@@ -1739,8 +1730,8 @@ def convert_optional_data_files(files):
 ################################################################
 if len(sys.argv)==1:
     # distutils will print usage - print our docstring first.
-    print __doc__
-    print "Standard usage information follows:"
+    print (__doc__)
+    print ("Standard usage information follows:")
 
 packages=['win32com',
           'win32com.client',
@@ -1913,10 +1904,10 @@ if dist.command_obj.has_key('build_ext'):
     if dist.command_obj.has_key('build_ext'):
         excluded_extensions = dist.command_obj['build_ext'].excluded_extensions
         if excluded_extensions:
-            print "*** NOTE: The following extensions were NOT %s:" % what_string
+            print ("*** NOTE: The following extensions were NOT %s:" % what_string)
             for ext, why in excluded_extensions:
-                print " %s: %s" % (ext.name, why)
-            print "For more details on installing the correct libraries and headers,"
-            print "please execute this script with no arguments (or see the docstring)"
+                print (" %s: %s" % (ext.name, why))
+            print ("For more details on installing the correct libraries and headers,")
+            print ("please execute this script with no arguments (or see the docstring)")
         else:
-            print "All extension modules %s OK" % (what_string,)
+            print ("All extension modules %s OK" % (what_string,))
