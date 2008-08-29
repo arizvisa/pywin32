@@ -51,7 +51,7 @@ static char BASED_CODE uiModName[] = "win32ui";
 // We can't init exceptionHandler in initwin32ui because the application using
 // us could have called SetExceptionHandler earlier. We do a forward declaration
 // of DefaultExceptionHandler here and assign it to exceptionHandler.
-void DefaultExceptionHandler(int action, const char *context, const char *extraTitleMsg);
+void DefaultExceptionHandler(int action, const TCHAR *context, const TCHAR *extraTitleMsg);
 static ExceptionHandlerFunc exceptionHandler = DefaultExceptionHandler;
 
 PYW_EXPORT PyObject *ui_module_error;
@@ -63,8 +63,11 @@ BOOL bInFatalShutdown = FALSE;
 
 PyObject *ReturnAPIError(const char *fn)
 {
-    CString msg=GetAPIErrorString((char *)fn);
-    PyErr_SetString(ui_module_error,msg.GetBuffer(0));
+	USES_CONVERSION;
+    CString msgBuf=GetAPIErrorString(fn);
+	LPTSTR msg=msgBuf.GetBuffer(msgBuf.GetLength());
+	PyErr_SetString(ui_module_error, T2A(msg));
+	msgBuf.ReleaseBuffer();
     return NULL;
 }
 
@@ -124,32 +127,59 @@ BOOL HookWindowsMessages()
 ui_type::ui_type( const char *name, ui_type *pBase, int typeSize, struct PyMethodDef* methodList, ui_base_class * (* thector)() )
 {
 // originally, this copied the typeobject of the parent, but as it is impossible
-// to gurantee order of static object construction, I went this way.  This is 
+// to guarantee order of static object construction, I went this way.  This is 
 // probably better, as is forces _all_ python objects have the same type sig.
 	static PyTypeObject type_template = {
-		PyObject_HEAD_INIT(&PyType_Type)
-		0,													/*ob_size*/
+		PYWIN_OBJECT_HEAD
 		"template",											/*tp_name*/
 		sizeof(ui_base_class), 								/*tp_size*/
 		0,													/*tp_itemsize*/
-		/* methods */
 		(destructor) ui_base_class::sui_dealloc, 			/*tp_dealloc*/
 		0,													/*tp_print*/
-		(getattrfunc) ui_base_class::sui_getattr, 			/*tp_getattr*/
-		(setattrfunc) ui_base_class::sui_setattr,			/*tp_setattr*/
+		0,													/*tp_getattr*/
+		0,													/*tp_setattr*/
 		0,													/*tp_compare*/
 		(reprfunc)ui_base_class::sui_repr,					/*tp_repr*/
-    	0,													/*tp_as_number*/
+		0,													/*tp_as_number*/
+		0,						/* tp_as_sequence */
+		0,						/* tp_as_mapping */
+		0,						/* tp_hash */
+		0,						/* tp_call */
+		0,						/* tp_str */
+		ui_base_class::sui_getattro,	/* tp_getattro */
+		ui_base_class::sui_setattro,	/* tp_setattro */
+		0,						/* tp_as_buffer */
+		Py_TPFLAGS_DEFAULT,		/* tp_flags */
+		0,						/* tp_doc */
+		0,						/* tp_traverse */
+		0,						/* tp_clear */
+		0,						/* tp_richcompare */
+		0,						/* tp_weaklistoffset */
+		0,						/* tp_iter */
+		0,						/* tp_iternext */
+		0,						/* tp_methods */
+		0,						/* tp_members */
+		0,						/* tp_getset */
+		0,						/* tp_base */
+		0,						/* tp_dict */
+		0,						/* tp_descr_get */
+		0,						/* tp_descr_set */
+		0,						/* tp_dictoffset */
+		0,						/* tp_init */
+		0,						/* tp_alloc */
+		0,						/* tp_new */
 	};
 
 	*((PyTypeObject *)this) = type_template;
-	methods = methodList;
+	((PyObject *)this)->ob_type=&PyType_Type;
+	tp_methods = methodList;
 	// cast away const, as Python doesnt use it.
 	tp_name = (char *)name;
 	tp_basicsize = typeSize;
-	base = pBase;
+	tp_base = pBase;
 	ctor = thector;
 }
+
 ui_type::~ui_type()
 {
 }
@@ -159,8 +189,8 @@ ui_type::~ui_type()
 // ui_type_CObject
 ui_type_CObject::CRuntimeClassTypeMap *ui_type_CObject::typemap = NULL;
 
-ui_type_CObject::ui_type_CObject( const char *name, ui_type *pBaseType, CRuntimeClass *pRT, int typeSize, struct PyMethodDef* methodList, ui_base_class * (* thector)() ):
-	  ui_type(name, pBaseType, typeSize, methodList, thector )
+ui_type_CObject::ui_type_CObject( const char *name, ui_type *pBaseType, CRuntimeClass *pRT, int typeSize, struct PyMethodDef* methodList, ui_base_class * (* thector)() )
+	: ui_type(name, pBaseType, typeSize, methodList, thector )
 {
 	pCObjectClass = pRT;
 	if (pRT) {
@@ -219,47 +249,38 @@ ui_base_class *ui_base_class::make( ui_type &makeTypeRef)
 #endif
 	return pNew;
 }
+
+
 /*static*/ BOOL ui_base_class::is_uiobject(PyObject *&o, ui_type *which)
 {
-	ui_base_class *ob = (ui_base_class *)o;
-	if (ob==NULL || ob==Py_None)
+	if (o==NULL || o==Py_None)
 		return FALSE;
-	// quick fasttrack.
-	if ((ui_type *)ob->ob_type==which)
+
+	/* Make sure GIL is held, called from several places where it's not */
+	CEnterLeavePython _celp;
+	/* MFC objects now use Python's own inheritance */
+	if (PyObject_IsInstance(o, (PyObject *)which))
 		return TRUE;
-	// if Python instance, my be able to derive the paired Python type.
-	if (PyInstance_Check(ob)) {
-		PyObject *obattr= PyObject_GetAttrString(ob, "_obj_");
-		if (obattr==NULL) {
-			PyErr_Clear();
-			TRACE("is_uiobject fails due to object being an instance without an _obj_ attribute!\n");
-			return FALSE;
-		}
-		if (obattr==Py_None) {
-			TRACE("is_uiobject fails due to object being an instance with _obj_==None\n");
-			return FALSE;
-		}
-		o = obattr;
-		ob = (ui_base_class *)o;
-	}
-	if (memcmp(ob->sig, SIG, sizeof(SIG))) {
-		TRACE("is_uiobject fails due to sig failure!\n");
+
+	assert (!PyErr_Occurred());
+	PyObject *obattr= PyObject_GetAttrString(o, "_obj_");
+	if (obattr==NULL){
+		PyErr_Clear();
+		TRACE("is_uiobject fails due to object being an instance without an _obj_ attribute!\n");
 		return FALSE;
-	}
-	return is_nativeuiobject(ob, which);
+		}
+
+	// ??? I think this leaks a ref to obattr ???
+	o = obattr;
+	return is_uiobject(o, which);
 }
 
 /*static*/BOOL ui_base_class::is_nativeuiobject(PyObject *ob, ui_type *which)
 {
 	// check for inheritance.
-	ui_type *thisType = (ui_type *)ob->ob_type;
-	while (thisType) {
-		if (which==thisType)
-			return TRUE;
-		thisType = thisType->base;
-	}
-	return FALSE;
+	return PyObject_IsInstance(ob, (PyObject *)which);
 }
+
 BOOL ui_base_class::is_uiobject(ui_type *which)
 {
 	PyObject *cpy = this;
@@ -271,51 +292,45 @@ BOOL ui_base_class::is_uiobject(ui_type *which)
 }
 
 PyObject *
-ui_base_class::sui_getattr(PyObject *self, char *name)
+ui_base_class::sui_getattro(PyObject *self, PyObject *obname)
 {
-	return ((ui_base_class *)self)->getattr(name);
+	return ((ui_base_class *)self)->getattro(obname);
 }
 
 PyObject *
-ui_base_class::getattr(char *name)
+ui_base_class::getattro(PyObject *obname)
 {
-	// implement inheritance.
-	PyObject *retMethod = NULL;
-	ui_type *thisType = (ui_type *)ob_type;
-	while (thisType) {
-		retMethod = Py_FindMethod(thisType->methods, (PyObject *)this, name);
-		if (retMethod)
-			break;
-		thisType = thisType->base;
-		if (thisType)
-			PyErr_Clear();
-	}
-	return retMethod;
+	// Use python's inheritance to find method in subclass
+	return PyObject_GenericGetAttr(this, obname);
 }
-int
-ui_base_class::sui_setattr(PyObject *op, char *name, PyObject *v)
+
+int ui_base_class::sui_setattro(PyObject *op, PyObject *obname, PyObject *v)
 {
 	ui_base_class* bc = (ui_base_class *)op;
-	return bc->setattr(name,v);
+	return bc->setattro(obname, v);
 }
-int ui_base_class::setattr(char *name, PyObject *v)
+
+int ui_base_class::setattro(PyObject *obname, PyObject *v)
 {
 	char buf[128];
 	sprintf(buf, "%s has read-only attributes", ob_type->tp_name );
 	PyErr_SetString(PyExc_TypeError, buf);
 	return -1;
 }
+
 /*static*/ PyObject *
 ui_base_class::sui_repr( PyObject *op )
 {
 	ui_base_class* w = (ui_base_class *)op;
 	CString ret = w->repr();
-	return PyString_FromString(ret);
+	return PyWinObject_FromTCHAR(ret);
 }
+
 CString ui_base_class::repr()
 {
+	USES_CONVERSION;
 	CString csRet;
-	csRet.Format("object '%s'", ob_type->tp_name);
+	csRet.Format(_T("object '%s'"), A2T(ob_type->tp_name));
 	return csRet;
 }
 void ui_base_class::cleanup()
@@ -329,41 +344,8 @@ void ui_base_class::cleanup()
 	delete (ui_base_class *)window;
 }
 
-// @pymethod |PyAssocObject|GetMethodByType|Given a method name and a type object, return the attribute.
-static PyObject *
-ui_base_class_GetMethodByType(PyObject *self, PyObject *args)
-{
-	// @comm This function allows you to obtain attributes for base types.
-	// For example, calling appObject.GetAttributeByType("Run", threadType) will return
-	// the built-in Run method for the CWinThread object rather than the CWinApp object.
-	PyObject *obType;
-	char *attr;
-	ui_base_class *pAssoc = (ui_base_class *)self;
-	if (pAssoc==NULL) return NULL;
-	if (!PyArg_ParseTuple(args, "sO:GetAttributeByType", &attr, &obType ))
-		return NULL;
-
-	// check it is one of ours.
-	PyObject *retMethod = NULL;
-	ui_type *thisType = (ui_type *)pAssoc->ob_type;
-	while (thisType) {
-		if ((PyObject *)thisType==obType)
-			break;
-		thisType = thisType->base;
-	}
-	if (thisType==NULL)
-		RETURN_TYPE_ERR("The object is not of that type");
-
-	return Py_FindMethod(thisType->methods, self, attr);
-}
-
-
-struct PyMethodDef ui_base_class::empty_methods[] = {
-	{NULL,	NULL}
-};
-
 struct PyMethodDef ui_base_class_methods[] = {
-	{"GetMethodByType", ui_base_class_GetMethodByType, 1},
+	// {"GetMethodByType", ui_base_class_GetMethodByType, 1},
 	{NULL,	NULL}
 };
 
@@ -418,12 +400,11 @@ void ui_base_class::Dump( CDumpContext &dc ) const
 // Helpers for the application.  Avoid pulling python headers everywhere.
 //
 /////////////////////////////////////////////////////////////////////
-extern "C" __declspec(dllimport) void	PySys_SetPath(char *);
-void PYW_EXPORT Python_addpath( const char *paths )
+void PYW_EXPORT Python_addpath(const TCHAR *paths )
 {
-	char workBuf[MAX_PATH+20];
-	char fullThisPath[MAX_PATH+20];
-	char fullWorkBuf[MAX_PATH+20];
+	TCHAR workBuf[MAX_PATH+20];
+	TCHAR fullThisPath[MAX_PATH+20];
+	TCHAR fullWorkBuf[MAX_PATH+20];
 	
 	PyObject *p = PySys_GetObject("path");
 	if (!PyList_Check(p))
@@ -436,28 +417,31 @@ void PYW_EXPORT Python_addpath( const char *paths )
 		while (paths[posFirst]==';')
 			posFirst++;
 		posLast = posFirst;
-		while (paths[posLast]!='\0' && paths[posLast]!=';')
+		while (paths[posLast]!=0 && paths[posLast]!=';')
 			posLast++;
 		int len = min(sizeof(workBuf)-1,posLast - posFirst);
 		if (len>0) {
-			strncpy(workBuf, paths+posFirst, len );
-			workBuf[len]='\0';
+			_tcsncpy(workBuf, paths+posFirst, len );
+			workBuf[len]=0;
 			// Check if it is already on the path...
-			if (!GetFullPath(fullWorkBuf, workBuf)) // not a valid path
+			if (!AfxFullPath(fullWorkBuf, workBuf)) // not a valid path
 				continue;	// ignore it.
 			Py_ssize_t listLen = PyList_Size(p);
 			Py_ssize_t itemNo;
 			for (itemNo=0;itemNo<listLen;itemNo++) {
-				char *thisPath = PyString_AsString(PyList_GetItem(p, itemNo));
-				if (thisPath==NULL) return; // Serious error!!!
-				if (GetFullPath(fullThisPath, thisPath) && strcmpi(fullThisPath, fullWorkBuf)==0) {
+				TCHAR *thisPath;
+				if (!PyWinObject_AsTCHAR(PyList_GetItem(p, itemNo), &thisPath, FALSE))
+					return; // Serious error!!!
+				if (AfxFullPath(fullThisPath, thisPath) && _tcscmp(fullThisPath, fullWorkBuf)==0) {
 					// is there!
+					PyWinObject_FreeTCHAR(thisPath);
 					break;
 				}
+				PyWinObject_FreeTCHAR(thisPath);
 			}
 			if (itemNo>=listLen) { // not in list
 				// Need to add it.
-				PyObject *add = PyString_FromString(fullWorkBuf);
+				PyObject *add = PyWinObject_FromTCHAR(fullWorkBuf);
 				if (add) {
 					PyList_Insert(p, 0, add);
 					Py_DECREF(add);
@@ -482,7 +466,13 @@ static char *GetPythonTraceback(PyObject *exc_tb)
 	PyObject *obResult = NULL;
 
 	/* Import the modules we need - cStringIO and traceback */
+#if (PY_VERSION_HEX < 0x03000000)
 	modStringIO = PyImport_ImportModule("cStringIO");
+#else
+	// In py3k, cStringIO is in "io"
+	modStringIO = PyImport_ImportModule("io");
+#endif
+
 	if (modStringIO==NULL) GPEM_ERROR("cant import cStringIO");
 	modTB = PyImport_ImportModule("traceback");
 	if (modTB==NULL) GPEM_ERROR("cant import traceback");
@@ -514,9 +504,15 @@ static char *GetPythonTraceback(PyObject *exc_tb)
 	if (obResult==NULL) GPEM_ERROR("getvalue() failed.");
 
 	/* And it should be a string all ready to go - duplicate it. */
-	if (!PyString_Check(obResult))
+	if (PyString_Check(obResult))
+		result = strdup(PyString_AsString(obResult));
+#if (PY_VERSION_HEX >= 0x03000000)
+	else if (PyUnicode_Check(obResult))
+		result = strdup(_PyUnicode_AsString(obResult));
+#endif
+	else
 		GPEM_ERROR("getvalue() did not return a string");
-	result = strdup(PyString_AsString(obResult));
+
 done:
 	if (result==NULL && errorMsg != NULL)
 		result = strdup(errorMsg);
@@ -530,11 +526,11 @@ done:
 	return result;
 }
 
-BOOL DisplayPythonTraceback(PyObject *exc_type, PyObject *exc_val, PyObject *exc_tb, const char *extraTitleMsg = NULL)
+BOOL DisplayPythonTraceback(PyObject *exc_type, PyObject *exc_val, PyObject *exc_tb, const TCHAR *extraTitleMsg = NULL)
 {
 	class CTracebackDialog : public CDialog {
 	public:
-		CTracebackDialog(PyObject *exc_type, PyObject *exc_value, PyObject *exc_tb, const char *extraTitleMsg) : 
+		CTracebackDialog(PyObject *exc_type, PyObject *exc_value, PyObject *exc_tb, const TCHAR *extraTitleMsg) : 
 		  CDialog(IDD_LARGE_EDIT)
 		{
 			m_exc_type = exc_type;
@@ -560,7 +556,7 @@ BOOL DisplayPythonTraceback(PyObject *exc_type, PyObject *exc_val, PyObject *exc
 
 			SetWindowText(title);
 			GetDlgItem(IDCANCEL)->ShowWindow(SW_HIDE);
-			GetDlgItem(IDOK)->SetWindowText("Close");
+			GetDlgItem(IDOK)->SetWindowText(_T("Close"));
 			char *msg = GetPythonTraceback(m_exc_tb);
 			char *msg_free = msg;
 			// Translate '\n' to '\r\n' - do it the easy way!
@@ -571,14 +567,9 @@ BOOL DisplayPythonTraceback(PyObject *exc_type, PyObject *exc_val, PyObject *exc
 				else
 					useMsg += *msg;
 			free(msg_free);
-			PyObject *obStrType = PyObject_Str(m_exc_type);
-			char *szType = PyString_AsString(obStrType);
-			useMsg += szType;
+			useMsg += GetReprText(m_exc_type);
 			useMsg += ": ";
-
-			PyObject *obStrVal = PyObject_Str(m_exc_value);
-			char *szVal = PyString_AsString(obStrVal);
-			useMsg+=szVal;
+			useMsg += GetReprText(m_exc_value);
 #ifdef _DEBUG
 			{
 			// doesnt seem to like long strings.
@@ -595,45 +586,13 @@ BOOL DisplayPythonTraceback(PyObject *exc_type, PyObject *exc_val, PyObject *exc
 			return FALSE;
 		};
 		PyObject *m_exc_tb, *m_exc_type, *m_exc_value;
-		const char *m_extraTitleMsg;
+		const TCHAR *m_extraTitleMsg;
 	};
 	CTracebackDialog dlg(exc_type, exc_val, exc_tb, extraTitleMsg);
 	GUI_BGN_SAVE;
 	dlg.DoModal();
 	GUI_END_SAVE;
 	return TRUE;
-}
-
-int Python_run_command_with_log(const char *command, const char * logFileName = NULL)
-{
-	_ASSERTE(logFileName==NULL); // The logFileName param is no longer used!
-	PyObject *m, *d, *v;
-	m = PyImport_AddModule("__main__");
-	if (m == NULL)
-		return -1;
-	d = PyModule_GetDict(m);
-	v = PyRun_String((char *)command, file_input, d, d);
-	if (v == NULL) {
-		ExceptionHandler(EHA_DISPLAY_DIALOG);
-/*******
-		PyObject *fo = PyFile_FromString((char *)logFileName, "w" );
-		if (fo==NULL)
-			return -1;
-        PyObject *old = PySys_GetObject( "stderr" );
-		if (old==NULL)
-			return -1;
-		Py_INCREF(old);
-		PySys_SetObject( "stderr", fo );
-		PyErr_Print();
-		PySys_SetObject( "stderr", old );
-		Py_DECREF(old);
-		Py_XDECREF(fo);
-		return 1;	// indicate failure, with valid log.
-*******/
-		return 1;	// indicate failure, with traceback correctly shown.
-	}
-	DODECREF(v);
-	return 0;
 }
 
 // The "Official" way to destroy an associated (ie, MFC) object.
@@ -651,6 +610,22 @@ void Python_delete_assoc( void *ob )
 		CEnterLeavePython _celp; // KillAssoc requires it is held!
 		pObj->KillAssoc();
 	}
+}
+
+int Python_run_command_with_log(const char *command)
+{
+	PyObject *m, *d, *v;
+	m = PyImport_AddModule("__main__");
+	if (m == NULL)
+		return -1;
+	d = PyModule_GetDict(m);
+	v = PyRun_String(command, file_input, d, d);
+	if (v == NULL) {
+		ExceptionHandler(EHA_DISPLAY_DIALOG);
+		return 1;	// indicate failure, with traceback correctly shown.
+	}
+	DODECREF(v);
+	return 0;
 }
 
 void Python_set_error(const char *msg)
@@ -672,12 +647,12 @@ static DWORD FilterFunc (DWORD dwExceptionCode) {
 	DWORD dwRet = EXCEPTION_CONTINUE_SEARCH;
 	switch (dwExceptionCode) {
 		case STATUS_STACK_OVERFLOW:
-			OutputDebugString("win32ui has stack overflow!\n");
+			OutputDebugString(_T("win32ui has stack overflow!\n"));
 			PyErr_SetString(PyExc_SystemError,"Stack Overflow");
 			dwRet = EXCEPTION_EXECUTE_HANDLER;
 			break;
 		case EXCEPTION_ACCESS_VIOLATION:
-			OutputDebugString("win32ui has access vln!\n");
+			OutputDebugString(_T("win32ui has access vln!\n"));
 #ifdef _DEBUG
 			if (!bTrapAccessViolations)
 				return dwRet;
@@ -709,7 +684,7 @@ void gui_print_error(void)
 	bInError=FALSE;
 }
 
-void DefaultExceptionHandler(int action, const char *context, const char *extraTitleMsg)
+void DefaultExceptionHandler(int action, const TCHAR *context, const TCHAR *extraTitleMsg)
 {
 	PyObject *type, *value, *traceback;
 	PyErr_Fetch(&type, &value, &traceback);
@@ -745,7 +720,7 @@ void DefaultExceptionHandler(int action, const char *context, const char *extraT
 		TRACE("DefaultExceptionHandler: unknown action (%d)\n", action);
 }
 
-void ExceptionHandler(int action, const char *context, const char *extraTitleMsg)
+void ExceptionHandler(int action, const TCHAR *context, const TCHAR *extraTitleMsg)
 {
 	if (exceptionHandler)
 		exceptionHandler(action, extraTitleMsg, context);
@@ -825,30 +800,29 @@ int Python_callback(PyObject *method, int val)
 	PyObject *thearglst = Py_BuildValue("(i)",val);
 	return Python_do_int_callback(meth,thearglst);
 }
+
 int Python_callback(PyObject *method, int val1, int val2)
 {
-	PyObject *meth = method;
 	PyObject *arglst = Py_BuildValue("(ii)",val1,val2);
-	return Python_do_int_callback(meth,arglst);
+	return Python_do_int_callback(method, arglst);
 }
 
 int Python_callback(PyObject *method)
 {
-	PyObject *meth = method;
 	PyObject *arglst = Py_BuildValue("()");
-	return Python_do_int_callback(meth,arglst);
+	return Python_do_int_callback(method, arglst);
 }
+
 int Python_callback(PyObject *method, const MSG *msg)
 {
-	PyObject *meth = method;
-	PyObject *arglst = Py_BuildValue("((iiiii(ii)))",msg->hwnd,msg->message,msg->wParam,msg->lParam,msg->time,msg->pt.x,msg->pt.y);
-	return Python_do_int_callback(meth,arglst);
+	PyObject *arglst = Py_BuildValue("(N)", PyWinObject_FromMSG(msg));
+	return Python_do_int_callback(method, arglst);
 }
+
 int Python_callback(PyObject *method, PyObject *object)
 {
-	PyObject *meth = method;
 	PyObject *arglst = Py_BuildValue("(O)", object);
-	return Python_do_int_callback(meth,arglst);
+	return Python_do_int_callback(method, arglst);
 }
 
 
@@ -879,9 +853,12 @@ ui_python_print_traceback( PyObject *self, PyObject *args )
 static PyObject *
 ui_output_debug(PyObject *self, PyObject *args)
 {
-	char *msg;
+	TCHAR *msg;
+	PyObject *obmsg;
 	// @pyparm string|msg||The string to write.
-	if (!PyArg_ParseTuple(args, "s:OutputDebugString", &msg))
+	if (!PyArg_ParseTuple(args, "O:OutputDebugString", &obmsg))
+		return NULL;
+	if (!PyWinObject_AsTCHAR(obmsg, &msg, FALSE))
 		return NULL;
 	GUI_BGN_SAVE;
 #ifdef BULLSHIT_BUG
@@ -906,6 +883,7 @@ ui_output_debug(PyObject *self, PyObject *args)
 	OutputDebugString(msg);
 #endif
 	GUI_END_SAVE;
+	PyWinObject_FreeTCHAR(msg);
 	RETURN_NONE;
 }
 
@@ -989,10 +967,10 @@ ui_get_name(PyObject *self, PyObject *args)
 {
 	CHECK_NO_ARGS2(args,GetName);
 	// MFC AppName gives title, ExeName gives module name!
-	char fileName[MAX_PATH+1];
+	TCHAR fileName[MAX_PATH+1];
 
-	GetModuleFileName( GetModuleHandle(NULL), fileName, sizeof(fileName));
-	return Py_BuildValue("s", fileName );
+	GetModuleFileName( GetModuleHandle(NULL), fileName, sizeof(fileName)/sizeof(TCHAR));
+	return PyWinObject_FromTCHAR(fileName);
 }
 
 // @pymethod tuple|win32ui|GetRect|Returns the rectangle of the main application frame.  See <om PyCWnd.GetWindowRecr> for further details.
@@ -1017,89 +995,112 @@ ui_get_rect(PyObject *self, PyObject *args)
 static PyObject *
 ui_write_profile_val(PyObject *self, PyObject *args)
 {
-	char *sect, *entry, *strVal;
+	CWinApp *pApp = GetApp();
+	if (!pApp) return NULL;
+
+	TCHAR *sect=NULL, *entry=NULL, *strVal=NULL;
 	int intVal;
+	PyObject *obsect, *obentry, *obVal=Py_None, *ret=NULL;
 	// @pyparm string|section||The section in the INI file to write to.
 	// @pyparm string|entry||The entry within the section in the INI file to write to.
 	// @pyparm int/string|value||The value to write. The type of this parameter determines the method's return type.
 	BOOL bHaveInt = TRUE;
-	if (!PyArg_ParseTuple(args, "ssi:WriteProfileVal", &sect, &entry, &intVal)) {
+	if (!PyArg_ParseTuple(args, "OOO:WriteProfileVal", &obsect, &obentry, &obVal))
+		return NULL;
+	if (PyWinObject_AsTCHAR(obVal, &strVal, TRUE))
 		bHaveInt = FALSE;
+	else{
 		PyErr_Clear();
-		if (!PyArg_ParseTuple(args, "ssz", &sect, &entry, &strVal)) {
-			// set my own error
-			PyErr_Clear();
-			RETURN_TYPE_ERR("WriteProfileVal must have format (ssi) or (ssz)");
+		intVal=PyInt_AsLong(obVal);
+		if (intVal==-1 && PyErr_Occurred())
+			RETURN_TYPE_ERR("Value must be string or int");
 		}
-	}
-	BOOL rc;
-	CWinApp *pApp = GetApp();
-	if (!pApp) return NULL;
 
-	if (bHaveInt) {
-//		TRACE("Write profile value (int)[%s] - %s=%d\n",sect,entry,intVal);
+	if (PyWinObject_AsTCHAR(obsect, &sect, FALSE)
+		&&PyWinObject_AsTCHAR(obentry, &entry, FALSE)){
+		BOOL rc;
 		GUI_BGN_SAVE;
-		rc = pApp->WriteProfileInt( sect, entry, intVal );
+		if (bHaveInt)
+			rc = pApp->WriteProfileInt( sect, entry, intVal );
+		else
+			rc = pApp->WriteProfileString( sect, entry, strVal );
 		GUI_END_SAVE;
-	}
-	else {
-//		TRACE("Write profile value (str)[%s] - %s=%s\n",sect,entry,strVal?strVal:"<NULL>");
-		GUI_BGN_SAVE;
-		rc = pApp->WriteProfileString( sect, entry, strVal );
-		GUI_END_SAVE;
-	}
-	if (!rc)
-		RETURN_ERR("WriteProfileInt/String failed");
-	return Py_BuildValue("i",rc);
+		if (rc)
+			ret=PyInt_FromLong(rc);
+		else
+			PyErr_SetString(ui_module_error, "WriteProfileInt/String failed");
+		}
+	PyWinObject_FreeTCHAR(sect);
+	PyWinObject_FreeTCHAR(entry);
+	PyWinObject_FreeTCHAR(strVal);
+	return ret;
 }
+
 // @pymethod int/string|win32ui|GetProfileVal|Returns a value from the application's INI file.
 static PyObject *
 ui_get_profile_val(PyObject *self, PyObject *args)
 {
-	char *sect, *entry, *strDef;
+	CWinApp *pApp = GetApp();
+	if (!pApp) return NULL;
+
+	TCHAR *sect=NULL, *entry=NULL, *strDef=NULL;
+	PyObject *obsect, *obentry, *obDef=Py_None, *ret=NULL;
 	int intDef;
 	BOOL bHaveInt = TRUE;
 	// @pyparm string|section||The section in the INI file to read from.
 	// @pyparm string|entry||The entry within the section in the INI file to read.
 	// @pyparm int/string|defValue||The default value.  The type of this parameter determines the method's return type.
-	if (!PyArg_ParseTuple(args, "ssi", &sect, &entry, &intDef)) {
+	if (!PyArg_ParseTuple(args, "OOO", &obsect, &obentry, &obDef))
+		return NULL;
+
+	if (PyWinObject_AsTCHAR(obDef, &strDef, TRUE))
 		bHaveInt = FALSE;
+	else{
 		PyErr_Clear();
-		if (!PyArg_ParseTuple(args, "sss:GetProfileVal", &sect, &entry, &strDef)) {
-			// set my own error
-			PyErr_Clear();
-			RETURN_TYPE_ERR("GetProfileVal must have format (ssi) or (sss)");
+		intDef=PyInt_AsLong(obDef);
+		if (intDef==-1 && PyErr_Occurred())
+			RETURN_TYPE_ERR("Default value must be string or int");
 		}
-	}
-	CWinApp *pApp = GetApp();
-	if (!pApp) return NULL;
-	if (bHaveInt) {
-		GUI_BGN_SAVE;
-		PyObject *rc = Py_BuildValue("i",pApp->GetProfileInt(sect, entry, intDef ));
-		GUI_END_SAVE;
-		return rc;
-	}
-	else {
-		GUI_BGN_SAVE;
-		CString res = pApp->GetProfileString(sect, entry, strDef );
-		GUI_END_SAVE;
-		return Py_BuildValue("s",(const char *)res);
-	}
+	if (PyWinObject_AsTCHAR(obsect, &sect, FALSE)
+		&&PyWinObject_AsTCHAR(obentry, &entry, FALSE)){	
+		if (bHaveInt){
+			int rc;
+			GUI_BGN_SAVE;
+			rc=pApp->GetProfileInt(sect, entry, intDef);
+			GUI_END_SAVE;
+			ret = PyInt_FromLong(rc);
+			}
+		else{
+			CString rc;
+			GUI_BGN_SAVE;
+			rc=pApp->GetProfileString(sect, entry, strDef);
+			GUI_END_SAVE;
+			ret= PyWinObject_FromTCHAR(rc);
+			}
+		}
+	PyWinObject_FreeTCHAR(sect);
+	PyWinObject_FreeTCHAR(entry);
+	PyWinObject_FreeTCHAR(strDef);
+	return ret;
 }
-// @pymethod |win32ui|SetProfileFilename|Sets the name of the INI file used by the application.
+
+// @pymethod |win32ui|SetProfileFileName|Sets the name of the INI file used by the application.
 static PyObject *
 ui_set_profile_filename(PyObject *self, PyObject *args)
 {
-	char *filename;
+	TCHAR *filename;
+	PyObject *obfilename;
 	// @pyparm string|filename||The name of the ini file.
-	if (!PyArg_ParseTuple(args, "s:SetProfileFilename", &filename))
+	if (!PyArg_ParseTuple(args, "O:SetProfileFilename", &obfilename))
 		return NULL;
-	// this is a memory leak!
 	CWinApp *pApp = GetApp();
 	if (!pApp) return NULL;
-
-	char *newBuf = strdup(filename);
-	pApp->m_pszProfileName = newBuf;
+	if (!PyWinObject_AsTCHAR(obfilename, &filename, FALSE))
+		return NULL;
+	if (pApp->m_pszProfileName)
+		free((void *)pApp->m_pszProfileName);
+	pApp->m_pszProfileName = _tcsdup(filename);
+	PyWinObject_FreeTCHAR(filename);
 	RETURN_NONE;
 }
 // @pymethod string|win32ui|GetProfileFileName|Returns the name of the INI file used by the application.
@@ -1109,8 +1110,9 @@ ui_get_profile_filename(PyObject *self, PyObject *args)
 	CHECK_NO_ARGS2(args,GetProfileFileName);
 	CWinApp *pApp = GetApp();
 	if (!pApp) return NULL;
-	return Py_BuildValue("s", pApp->m_pszProfileName);
+	return PyWinObject_FromTCHAR(pApp->m_pszProfileName);
 }
+
 // @pymethod |win32ui|LoadStdProfileSettings|Loads MFC standard settings from the applications INI file.  This includes the Recent File List, etc.
 static PyObject *
 ui_load_std_profile_settings(PyObject *self, PyObject *args)
@@ -1134,18 +1136,23 @@ ui_load_std_profile_settings(PyObject *self, PyObject *args)
 static PyObject *
 ui_set_status_text(PyObject *self, PyObject *args)
 {
-	char *msg;
+	TCHAR *msg;
+	PyObject *obmsg;
 	BOOL bForce = FALSE;
 	// @pyparm string|msg||The message to write to the status bar.
 	// @pyparm int|bForce|0|A flag indicating if the message should be forced to the status bar, or written in idle time.
-	if (!PyArg_ParseTuple(args,"s|i:SetStatusText",&msg, &bForce))
+	if (!PyArg_ParseTuple(args,"O|i:SetStatusText",&obmsg, &bForce))
+		return NULL;
+	if (!PyWinObject_AsTCHAR(obmsg, &msg, FALSE))
 		return NULL;
 
 	// If the glue wants it, the glue can have it :-)
 	if (pHostGlue && pHostGlue->bWantStatusBarText) {
 		pHostGlue->SetStatusText(msg, bForce);
+		PyWinObject_FreeTCHAR(msg);
 		RETURN_NONE;
 	}
+
 	CProtectedWinApp *pApp = GetProtectedApp();
 	if (!pApp) return NULL;
 	CWnd *pWnd = pApp->GetMainFrame();
@@ -1160,6 +1167,7 @@ ui_set_status_text(PyObject *self, PyObject *args)
 	GUI_BGN_SAVE;
 	pStatusBar->SetWindowText(msg);
 	GUI_END_SAVE;
+	PyWinObject_FreeTCHAR(msg);
 	if (bForce) {
 		pStatusBar->InvalidateRect(NULL);
 		pStatusBar->UpdateWindow();
@@ -1182,9 +1190,7 @@ ui_get_recent_file_list(PyObject *self, PyObject *args)
 	}
 	for (int i=0;i<cnt;i++) {
 		CString csFile(pApp->GetRecentFileName(i));
-		// hack to non-const for Python
-		char *name = (char *)(const char *)csFile;
-		PyList_SetItem(list,i,PyString_FromString(name));
+		PyList_SetItem(list,i,PyWinObject_FromTCHAR(csFile));
 	}
 	return list;
 	// @rdesc A list of strings containing the fully qualified file names.
@@ -1194,12 +1200,16 @@ static PyObject *
 ui_add_to_recent_file_list(PyObject *self, PyObject *args)
 {
 	// @pyparm string|fileName||The file name to be added to the list.
-	char *msg;
-	if (!PyArg_ParseTuple(args,"s:AddToRecentFileList",&msg))
+	TCHAR *fname;
+	PyObject *obfname;
+	if (!PyArg_ParseTuple(args,"O:AddToRecentFileList",&obfname))
 		return NULL;
 	CWinApp *pApp = GetApp();
 	if (!pApp) return NULL;
-    pApp->AddToRecentFileList(msg); // @pyseemfc CWinApp|AddToRecentFileList
+	if (!PyWinObject_AsTCHAR(obfname, &fname, FALSE))
+		return NULL;
+    pApp->AddToRecentFileList(fname); // @pyseemfc CWinApp|AddToRecentFileList
+	PyWinObject_FreeTCHAR(fname);
 	RETURN_NONE;
 }
 
@@ -1316,40 +1326,47 @@ ui_destroy_debugger_thread(PyObject *self, PyObject *args)
 static PyObject *
 ui_message_box(PyObject * self, PyObject * args)
 {
-  char *message;
+  TCHAR *message, *title=NULL;
+  PyObject *obmessage, *obtitle=Py_None, *ret=NULL;
   long style = MB_OK;
-  const char *title = NULL;
   // @pyparm string|message||The message to be displayed in the message box.
   // @pyparm string/None|title|None|The title for the message box.  If None, the applications title will be used.
   // @pyparm int|style|win32con.MB_OK|The style of the message box.
-  if (!PyArg_ParseTuple(args, "s|zl:MessageBox", &message, &title, &style))
-    return NULL;
-  CWinApp *pApp = GetApp();
-  if (pApp==NULL) return NULL;
+	if (!PyArg_ParseTuple(args, "O|Ol:MessageBox", &obmessage, &obtitle, &style))
+		return NULL;
+	CWinApp *pApp = GetApp();
+	if (pApp==NULL) return NULL;
 
-  if (title==NULL)
-  	title = pApp->m_pszAppName;
-  int rc;
-  GUI_BGN_SAVE;
-  rc = ::MessageBox(pApp->m_pMainWnd->GetSafeHwnd(), message, title, style);
-  GUI_END_SAVE;
-  return Py_BuildValue("i",rc);
-  // @rdesc An integer identifying the button pressed to dismiss the dialog.
+	if (PyWinObject_AsTCHAR(obmessage, &message, FALSE)
+		&&PyWinObject_AsTCHAR(obtitle, &title, TRUE)){
+		int rc;
+		GUI_BGN_SAVE;
+		rc = ::MessageBox(pApp->m_pMainWnd->GetSafeHwnd(), message, title ? title : pApp->m_pszAppName, style);
+		GUI_END_SAVE;
+		ret = PyInt_FromLong(rc);
+		}
+	PyWinObject_FreeTCHAR(message);
+	PyWinObject_FreeTCHAR(title);
+	return ret;
+	// @rdesc An integer identifying the button pressed to dismiss the dialog.
 }
 
 // @pymethod string|win32ui|FullPath|Return the fully qualified path of a file name.
 static PyObject *
 ui_full_path(PyObject * self, PyObject * args)
 {
-	char *path;
-
+	TCHAR *path;
+	PyObject *obpath;
 	// @pyparm string|path||The path name.
-	if (!PyArg_ParseTuple(args, "s:FullPath", &path))
+	if (!PyArg_ParseTuple(args, "O:FullPath", &obpath))
 		return NULL;
-	char szOutPath[_MAX_PATH];
-	if (!GetFullPath(szOutPath, path))
+	if (!PyWinObject_AsTCHAR(obpath, &path, FALSE))
+		return NULL;
+	TCHAR szOutPath[_MAX_PATH];
+	if (!AfxFullPath(szOutPath, path))
 		RETURN_ERR("The file name is invalid");
-	return Py_BuildValue("s", szOutPath);
+	PyWinObject_FreeTCHAR(path);
+	return PyWinObject_FromTCHAR(szOutPath);
 }
 
 // @pymethod int|win32ui|ComparePath|Compares 2 paths.
@@ -1357,12 +1374,18 @@ static PyObject *
 ui_compare_path(PyObject * self, PyObject * args)
 {
 	BOOL AFXAPI AfxComparePath(LPCTSTR lpszPath1, LPCTSTR lpszPath2);
-	char *path1, *path2;
+	TCHAR *path1=NULL, *path2=NULL;
+	PyObject *obpath1, *obpath2, *ret=NULL;
 	// @pyparm string|path1||The path name.
 	// @pyparm string|path2||The path name.
-	if (!PyArg_ParseTuple(args, "ss:ComparePath", &path1, &path2))
+	if (!PyArg_ParseTuple(args, "OO:ComparePath", &obpath1, &obpath2))
 		return NULL;
-	return Py_BuildValue("i", AfxComparePath(path1, path2));
+	if (PyWinObject_AsTCHAR(obpath1, &path1, FALSE)
+		&&PyWinObject_AsTCHAR(obpath2, &path2, FALSE))
+		ret=PyInt_FromLong(AfxComparePath(path1, path2));
+	PyWinObject_FreeTCHAR(path1);
+	PyWinObject_FreeTCHAR(path2);
+	return ret;
 }
 
 // @pymethod string|win32ui|GetFileTitle|Given a file name, return its title
@@ -1370,14 +1393,20 @@ static PyObject *
 ui_get_file_title(PyObject * self, PyObject * args)
 {
 	UINT AFXAPI AfxGetFileTitle(LPCTSTR lpszPathName, LPTSTR lpszTitle, UINT nMax);
-	char *fname;
+	TCHAR *fname;
+	PyObject *obfname;
+	BOOL rc;
 	// @pyparm string|fileName||The file name.
-	if (!PyArg_ParseTuple(args, "s:GetFileTitle", &fname))
+	if (!PyArg_ParseTuple(args, "O:GetFileTitle", &obfname))
 		return NULL;
-	char buf[_MAX_FNAME+1];
-	if (AfxGetFileTitle(fname, buf, sizeof(buf))!=0)
+	if (!PyWinObject_AsTCHAR(obfname, &fname, FALSE))
+		return NULL;
+	TCHAR buf[_MAX_FNAME+1];
+	rc=AfxGetFileTitle(fname, buf, sizeof(buf)/sizeof(TCHAR))==0;
+	PyWinObject_FreeTCHAR(fname);
+	if (!rc)
 		RETURN_ERR("AfxGetFileTitle failed");
-	return PyString_FromString(buf);
+	return PyWinObject_FromTCHAR(buf);
 }
 
 
@@ -1494,23 +1523,29 @@ ui_win_help( PyObject *self, PyObject *args )
 	UINT cmd = HELP_CONTEXT;
 	PyObject *dataOb;
 	ULONG_PTR data;
+	TCHAR *str_data=NULL;
 	if (!PyArg_ParseTuple(args, "iO:WinHelp",
 			  &cmd,    // @pyparm int|cmd|win32con.HELP_CONTEXT|The type of help.  See the api for full details.
 			  &dataOb))   // @pyparm int/string|data||Additional data specific to the help call.
 		return NULL;
-	if (PyString_Check(dataOb))
-		data = (DWORD_PTR)PyString_AsString(dataOb);
-	else if (PyInt_Check(dataOb))
-		data = (DWORD_PTR)PyInt_AsLong(dataOb);
-	else {
-		RETURN_TYPE_ERR("First argument must be a string or an integer.");
-	}
+	if (PyWinObject_AsTCHAR(dataOb, &str_data, FALSE))
+		data=(ULONG_PTR)str_data;
+	else{
+		PyErr_Clear();
+		if (!PyWinLong_AsVoidPtr(dataOb, (void **)&data)){
+			// ??? Py3k produces strange results if you overwrite an already set exception ???
+			PyErr_Clear();
+			RETURN_TYPE_ERR("First argument must be a string or an integer.");
+			}
+		}
+
 	CWinApp *pApp = GetApp();
 	if (!pApp) return NULL;
 		
 	GUI_BGN_SAVE;
 	pApp->WinHelp(data, cmd);
 	GUI_END_SAVE;
+	PyWinObject_FreeTCHAR(str_data);
 	Py_INCREF(Py_None);
 	return Py_None;
 }
@@ -1519,29 +1554,35 @@ ui_win_help( PyObject *self, PyObject *args )
 static PyObject *
 ui_set_app_help_path(PyObject * self, PyObject * args)
 {
-  char *name;
-  long style = MB_OK;
-  if (!PyArg_ParseTuple(args, "s:SetAppHelpPath", &name))
-    return NULL;
-  CProtectedWinApp *pApp = GetProtectedApp();
-  if (pApp==NULL) return NULL;
-
-  GUI_BGN_SAVE;
-  free((void*)pApp->m_pszHelpFilePath);
-  pApp->m_pszHelpFilePath=_tcsdup(_T(name));
-  GUI_END_SAVE;
-  RETURN_NONE;
+	TCHAR *name;
+	PyObject *obname;
+	if (!PyArg_ParseTuple(args, "O:SetAppHelpPath", &obname))
+		return NULL;
+	CProtectedWinApp *pApp = GetProtectedApp();
+	if (pApp==NULL) return NULL;
+	if (!PyWinObject_AsTCHAR(obname, &name, FALSE))
+		return NULL;
+	GUI_BGN_SAVE;
+	free((void*)pApp->m_pszHelpFilePath);
+	pApp->m_pszHelpFilePath=_tcsdup(name);
+	GUI_END_SAVE;
+	PyWinObject_FreeTCHAR(name);
+	RETURN_NONE;
 }
 
 // @pymethod |win32ui|SetRegistryKey|Causes application settings to be stored in the registry instead of INI files.
 static PyObject *
 ui_set_registry_key(PyObject *self, PyObject *args)
 {
-	char *szKey;
-	if (!PyArg_ParseTuple(args,"s:SetRegistryKey",&szKey)) // @pyparm string|key||A string containing the name of the key.
+	TCHAR *szKey;
+	PyObject *obKey;
+	if (!PyArg_ParseTuple(args,"O:SetRegistryKey",&obKey)) // @pyparm string|key||A string containing the name of the key.
 		return NULL;
 	CProtectedWinApp *pApp = GetProtectedApp();
 	if (!pApp) return NULL;
+
+	if (!PyWinObject_AsTCHAR(obKey, &szKey, FALSE))
+		return NULL;
 	GUI_BGN_SAVE;
 	pApp->SetRegistryKey(szKey);
 	GUI_END_SAVE;
@@ -1550,6 +1591,7 @@ ui_set_registry_key(PyObject *self, PyObject *args)
 	// called, the list of most recently-used (MRU) files is also stored in the registry. The registry key is usually the name of a
 	// company. It is stored in a key of the following form:
 	// HKEY_CURRENT_USER\\Software\\\<company name\>\\\<application name\>\\\<section name\>\\\<value name\>.
+	PyWinObject_FreeTCHAR(szKey);
 	RETURN_NONE;
 }
 
@@ -1557,7 +1599,7 @@ ui_set_registry_key(PyObject *self, PyObject *args)
 static PyObject *
 ui_get_app_registry_key(PyObject *self, PyObject *args)
 {
-	if (!PyArg_ParseTuple(args,":SetRegistryKey"))
+	if (!PyArg_ParseTuple(args,":GetRegistryKey"))
 		return NULL;
 	CProtectedWinApp *pApp = GetProtectedApp();
 	if (!pApp) return NULL;
@@ -1611,26 +1653,28 @@ ui_get_app_name(PyObject *self, PyObject *args)
 {
 	if (!PyArg_ParseTuple(args,":GetAppName"))
 		return NULL;
-	return Py_BuildValue("s", AfxGetAppName());
+	return PyWinObject_FromTCHAR(AfxGetAppName());
 }
 
 // @pymethod int|win32ui|SetAppName|Sets the name of the application.
 static PyObject *
 ui_set_app_name(PyObject * self, PyObject * args)
 {
-	char *name;
-	long style = MB_OK;
-	const char *title = NULL;
+	TCHAR *name;
+	PyObject *obname;
 	// @pyparm string|appName||The new name for the application.  This is used for the default registry key, and the title bar of the application.
-	if (!PyArg_ParseTuple(args, "s:SetAppName", &name))
+	if (!PyArg_ParseTuple(args, "O:SetAppName", &obname))
 		return NULL;
 	CWinApp *pApp = GetApp();
 	if (pApp==NULL) return NULL;
+	if (!PyWinObject_AsTCHAR(obname, &name, FALSE))
+		return NULL;
 
 	GUI_BGN_SAVE;
 	free((void*)pApp->m_pszAppName);
-	pApp->m_pszAppName=_tcsdup(_T(name));
+	pApp->m_pszAppName=_tcsdup(name);
 	GUI_END_SAVE;
+	PyWinObject_FreeTCHAR(name);
 	RETURN_NONE;
 	// @pyseemfc CWinApp|m_pszAppName
 }
@@ -1673,7 +1717,7 @@ ui_register_wnd_class(PyObject *self, PyObject *args)
 	GUI_BGN_SAVE;
 	LPCTSTR ret = AfxRegisterWndClass( style, (HCURSOR)hCursor, (HBRUSH)hBrush, (HICON)hIcon); 
 	GUI_END_SAVE;
-	return PyString_FromString(ret);
+	return PyWinObject_FromTCHAR(ret);
 	// @comm The Microsoft Foundation Class Library automatically registers several standard window classes for you. Call this function if you want to register your own window classes.
 }
 
@@ -1990,13 +2034,12 @@ static int AddConstant(PyObject *dict, char *key, long value)
 	DODECREF(oval);
 	return rc;
 }
-#define ADD_CONSTANT(tok) if (rc=AddConstant(dict,#tok, tok)) return rc
-#define ADD_ENUM(parta, partb) if (rc=AddConstant(dict,#parta "_" #partb, parta::partb)) return rc
-#define ADD_ENUM3(parta, partb, partc) if (rc=AddConstant(dict,#parta "_" #partb "_" #partc, parta::partb::partc)) return rc
+#define ADD_CONSTANT(tok) if (PyModule_AddIntConstant(module, #tok, tok) == -1) return -1;
+#define ADD_ENUM(parta, partb) if (PyModule_AddIntConstant(module, #parta "_" #partb, parta::partb) == -1) return -1;
+#define ADD_ENUM3(parta, partb, partc) if (PyModule_AddIntConstant(module, #parta "_" #partb "_" #partc, parta::partb::partc) == -1) return -1;
 
-int AddConstants(PyObject *dict)
+int AddConstants(PyObject *module)
 {
-	int rc;
 #ifdef _DEBUG
 	int debug = 1;
 #else
@@ -2238,37 +2281,97 @@ int AddConstants(PyObject *dict)
 /**
 	ADD_CONSTANT();
 ***/
-	return rc;
+	return 0;
 }
 
+
+/* PyType_Ready assures that the type's tp_base is ready, but it does *not* call
+	itself for entries in tp_bases, leading to a crash or indecipherable errors
+	if one of multiple bases is not itself ready.
+	This should probably be reported as a bug.
+*/
+int PyWinType_Ready(PyTypeObject *pT)
+{
+	if (pT->tp_flags & Py_TPFLAGS_READY)
+		return 0;
+	if (pT->tp_bases == NULL)
+		return 0;
+	Py_ssize_t base_cnt=PyTuple_GET_SIZE(pT->tp_bases);
+	for (Py_ssize_t b=0; b<base_cnt; b++){
+		PyTypeObject *base_type = (PyTypeObject *)PyTuple_GET_ITEM(pT->tp_bases, b);
+		if (PyWinType_Ready(base_type) == -1)
+			return -1;
+		if (PyType_Ready(base_type) == -1)
+			return -1;
+		}
+	return 0;
+}
+			
 extern bool CheckGoodWinApp();
 extern HINSTANCE hWin32uiDll; // Handle to this DLL, from dllmain.cpp
 
 /* Initialize this module. */
-extern "C" __declspec(dllexport) void
-initwin32ui(void)
+extern "C" __declspec(dllexport)
+#if (PY_VERSION_HEX < 0x03000000)
+void initwin32ui(void)
+#else
+PyObject *PyInit_win32ui(void)
+#endif
 {
   // XXX - hack alert!
   // Win9x manages to wind up in here twice when used from a console - 
   // CheckGoodWinApp() winds up re-initializing - so when we return
   // we see if we already did init, and get out.
   // Would be nice to solve this properly, but Win9x is a bitch to debug :(
+#if (PY_VERSION_HEX < 0x03000000)
+#define RETURN_ERROR return;
+#define RETURN_MODULE return;
+#else
+#define RETURN_ERROR return NULL;
+#define RETURN_MODULE return module;
+#endif;
+
   static bool bInitialized = false;
+  static PyObject *dict, *module;
   if (!CheckGoodWinApp()) {
 	  PyErr_SetString(PyExc_RuntimeError, "The win32ui module could not initialize the application object.");
-	  return;
+	  RETURN_ERROR;
   }
   if (bInitialized)
-    return;
-  PyWinGlobals_Ensure();
-  PyObject *dict, *module;
-  module = Py_InitModule(uiModName, ui_functions);
-  if (!module) /* Eeek - some serious error! */
-    return;
-  dict = PyModule_GetDict(module);
-  if (!dict) return; /* Another serious error!*/
-  ui_module_error = PyErr_NewException("win32ui.error", NULL, NULL);
-  if (!ui_module_error) return; /* Another serious error!*/
+	  RETURN_MODULE;
+	
+	PyWinGlobals_Ensure();
+
+#if (PY_VERSION_HEX < 0x03000000)
+	module = Py_InitModule(uiModName, ui_functions);
+	if (!module)
+		return;
+	dict = PyModule_GetDict(module);
+	if (!dict)
+		return;
+	ui_module_error = PyErr_NewException("win32ui.error", NULL, NULL);
+	if (!ui_module_error)
+		return;
+#else
+
+	static PyModuleDef win32ui_def = {
+		PyModuleDef_HEAD_INIT,
+		uiModName,
+		"A module, encapsulating the Microsoft Foundation Classes.",
+		-1,
+		ui_functions
+		};
+	module = PyModule_Create(&win32ui_def);
+	if (!module)
+		return NULL;
+	dict = PyModule_GetDict(module);
+	if (!dict)
+		return NULL;
+	ui_module_error = PyErr_NewException("win32ui.error", NULL, NULL);
+	if (!ui_module_error)
+		return NULL;
+#endif
+
   PyDict_SetItemString(dict, "error", ui_module_error);
   // drop email addy - too many ppl use it for support requests for other
   // tools that simply embed Pythonwin...
@@ -2281,14 +2384,15 @@ initwin32ui(void)
   // Ensure we have a __file__ attribute (Python itself normally
   // adds one, but if this is called not as part of the standard
   // import process, we dont have one!
-  char pathName[MAX_PATH];
+  TCHAR pathName[MAX_PATH];
   GetModuleFileName(hWin32uiDll, pathName, sizeof(pathName)/sizeof(pathName[0]));
-  PyObject *obPathName = PyString_FromString(pathName);
+  PyObject *obPathName = PyWinObject_FromTCHAR(pathName);
   PyDict_SetItemString(dict, "__file__", obPathName);
   Py_XDECREF(obPathName);
 
   HookWindowsMessages();	// need to be notified of certain events...
-  AddConstants(dict);
+  if (AddConstants(module) == -1)
+      RETURN_ERROR;
 
   // Add all the types.
   PyObject *typeDict = PyDict_New();
@@ -2297,15 +2401,27 @@ initwin32ui(void)
 	  CRuntimeClass *pRT;
 	  ui_type_CObject *pT;
 	  ui_type_CObject::typemap->GetNextAssoc(pos, pRT, pT);
-	  PyObject *typeName = PyString_FromString(pT->tp_name);
-	  PyDict_SetItem(typeDict, typeName, (PyObject *)pT);
-	  Py_XDECREF(typeName);
+
+#if (PY_VERSION_HEX < 0x03000000)
+		PyObject *typeName = PyString_FromString(pT->tp_name);
+#else
+		PyObject *typeName = PyUnicodeObject_FromString(pT->tp_name);
+#endif
+		// PyType_Ready sets tp_mro for inheritance to work, so it *must* be called on the type objects now.
+		if ((typeName==NULL)
+			||(PyWinType_Ready(pT)==-1)
+			||(PyDict_SetItem(typeDict, typeName, (PyObject *)pT)==-1))
+			RETURN_ERROR;
+		Py_XDECREF(typeName);
   }
-  PyObject *mapName = PyString_FromString("types");
-  PyDict_SetItem(dict,mapName, typeDict);
-  Py_XDECREF(mapName);
+
+  PyDict_SetItemString(dict, "types", typeDict);
   Py_XDECREF(typeDict);
   bInitialized = true;
+
+#if (PY_VERSION_HEX >= 0x03000000)
+	return module;
+#endif
 }
 
 // Utilities for glue support.
@@ -2396,7 +2512,7 @@ BOOL Win32uiOnIdle( LONG lCount )
 	return ret;
 }
 
-extern "C" PYW_EXPORT BOOL Win32uiApplicationInit(Win32uiHostGlue *pGlue, char *cmd, const char *additionalPaths)
+extern "C" PYW_EXPORT BOOL Win32uiApplicationInit(Win32uiHostGlue *pGlue, TCHAR *cmd, const TCHAR *additionalPaths)
 {
 #ifdef _DEBUG
 	afxDump.SetDepth(1); // deep dump of objects at exit.
@@ -2408,22 +2524,26 @@ extern "C" PYW_EXPORT BOOL Win32uiApplicationInit(Win32uiHostGlue *pGlue, char *
 	// win32ui is attached to Python - otherwise there is
 	// a risk that when Python does "import win32ui", it
 	// will locate a different one, causing obvious grief!
+#if (PY_VERSION_HEX < 0x03000000)
 	initwin32ui();
+#else
+	PyInit_win32ui();
+#endif
 
 	// Set sys.argv if not already done!
 	PyObject *argv = PySys_GetObject("argv");
-	if (argv==NULL && __argv!=NULL && __argc > 0)
-		PySys_SetArgv(__argc-1, __argv+1);
+	if (argv==NULL && __targv!=NULL && __argc > 0)
+		PySys_SetArgv(__argc-1, __targv+1);
 	// If the versions of the .h file are not in synch, then we are in trouble!
 	if (pGlue->versionNo != WIN32UIHOSTGLUE_VERSION) {
-		MessageBox(0, "There is a mismatch between version of the application and win32ui.pyd.\n\nIt is likely the application needs to be rebuilt.", "Error", MB_OK);
+		MessageBox(0, _T("There is a mismatch between version of the application and win32ui.pyd.\n\nIt is likely the application needs to be rebuilt."), _T("Error"), MB_OK);
 		return FALSE;
 	}
 
 	// Debug/Release mismatch means we are gunna die very soon anyway...
 	// (although this is unlikely now Debug/Release have different names!)
 	if (pGlue->bDebugBuild != bDebug) {
-		MessageBox(0, "There is a mismatch between the Debug/Release versions of the application and win32ui.pyd", "Error", MB_OK);
+		MessageBox(0, _T("There is a mismatch between the Debug/Release versions of the application and win32ui.pyd"), _T("Error"), MB_OK);
 		return FALSE;
 	}
 
@@ -2442,8 +2562,13 @@ extern "C" PYW_EXPORT BOOL Win32uiApplicationInit(Win32uiHostGlue *pGlue, char *
 	pHostGlue = pGlue;
 	if (additionalPaths)
 		Python_addpath(additionalPaths);
+
+	// ??? Site fails to import on Py3k ???
+	if (Python_run_command_with_log("import site"))
+		return FALSE;
 	if (cmd!=NULL) {
-		if (Python_run_command_with_log(cmd, NULL))
+		USES_CONVERSION;
+		if (Python_run_command_with_log(T2A(cmd)))
 			return FALSE;
 	} // Processing cmd.
 

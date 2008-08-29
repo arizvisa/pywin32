@@ -24,7 +24,7 @@ extern CFrameWnd *GetFramePtr(PyObject *self);
 class CProtectedDocument : public CDocument
 {
 public:
-	void SetPathName( const char *pathName ) {m_strPathName = pathName;}
+	void SetPathName(TCHAR *pathName ) {m_strPathName = pathName;}
 };
 
 /////////////////////////////////////////////////////////////////////
@@ -51,7 +51,7 @@ void PyCDocTemplate::cleanup()
 	PyCCmdTarget::cleanup();
 	CPythonDocTemplate *pTempl = GetTemplate(this);
 	if (pTempl==NULL)
-		OutputDebugString("PyCDocTemplate::cleanup could not cleanup template!\n");
+		OutputDebugString(_T("PyCDocTemplate::cleanup could not cleanup template!\n"));
 	else {
 		RemoveDocTemplateFromApp( pTempl );
 		delete pTempl;
@@ -107,8 +107,11 @@ PyCDocTemplate::create(PyObject *self, PyObject *args)
 PyObject *
 PyCDocTemplate::DoCreateDocHelper(PyObject *self, PyObject *args, CRuntimeClass *pClass, ui_type_CObject &pydoc_type)
 {
-	char *fileName = NULL;	// default, untitled document
-	if (!PyArg_ParseTuple(args,"|z", &fileName))
+	TCHAR *fileName = NULL;	// default, untitled document
+	PyObject *obfileName=Py_None;
+	if (!PyArg_ParseTuple(args,"|O", &obfileName))
+		return NULL;
+	if (!PyWinObject_AsTCHAR(obfileName, &fileName, TRUE))
 		return NULL;
 	CDocument *pDoc = NULL;
 	if (fileName) {
@@ -143,6 +146,8 @@ PyCDocTemplate::DoCreateDocHelper(PyObject *self, PyObject *args, CRuntimeClass 
 //			pDoc->SetTitle(strDocName);
 //		}
 	}
+	// ??? Some of the error returns above need to free this also ???
+	PyWinObject_FreeTCHAR(fileName);
 	return ui_assoc_object::make(pydoc_type, pDoc);
 }
 
@@ -220,17 +225,23 @@ PyCDocTemplate::GetDocumentList(PyObject *self, PyObject *args)
 PyObject *
 PyCDocTemplate::FindOpenDocument(PyObject *self, PyObject *args)
 {
-	char *fileName;
+	TCHAR *fileName;
+	PyObject *obfileName;
 	// @pyparm string|fileName||The fully qualified filename to search for.
-	if (!PyArg_ParseTuple(args,"s:FindOpenDocument", &fileName))
+	if (!PyArg_ParseTuple(args,"O:FindOpenDocument", &obfileName))
+		return NULL;
+	if (!PyWinObject_AsTCHAR(obfileName, &fileName, FALSE))
 		return NULL;
 	CPythonDocTemplate *pTemplate = GetTemplate(self);
 	POSITION posDoc = pTemplate->GetFirstDocPosition();
 	while (posDoc) {
 		CDocument* pDoc = pTemplate->GetNextDoc(posDoc);
-		if (PyAfxComparePath(pDoc->GetPathName(), fileName))
+		if (PyAfxComparePath(pDoc->GetPathName(), fileName)){
+			PyWinObject_FreeTCHAR(fileName);
 			return ui_assoc_object::make(PyCDocument::type, pDoc)->GetGoodRet();
-	}
+			}
+		}
+	PyWinObject_FreeTCHAR(fileName);
 	RETURN_NONE;
 }
 // @pymethod string|PyCDocTemplate|GetDocString|Retrieves a specific substring describing the document type.
@@ -251,7 +262,7 @@ PyCDocTemplate::GetDocString(PyObject *self, PyObject *args)
 	if (!ok)
 		RETURN_ERR("PyCDocTemplate::GetDocString failed");
 	// @comm For more information on the doc strings, please see <om PyCDocTemplate::SetDocStrings>
-	return Py_BuildValue("s", (const char *)csRet);
+	return PyWinObject_FromTCHAR(csRet);
 }
 
 // @pymethod |PyCDocTemplate|GetResourceID|Returns the resource ID in use.
@@ -310,18 +321,22 @@ PyCDocTemplate::InitialUpdateFrame(PyObject *self, PyObject *args)
 PyObject *
 PyCDocTemplate::OpenDocumentFile(PyObject *self, PyObject *args)
 {
-	char *fileName = NULL;
+	TCHAR *fileName = NULL;
+	PyObject *obfileName=Py_None;
 	BOOL bMakeVisible = TRUE;
-	if (!PyArg_ParseTuple(args,"|zi:OpenDocumentFile",
-	                      &fileName,     // @pyparm string|filename||Name of file to open, or None
+	if (!PyArg_ParseTuple(args,"|Oi:OpenDocumentFile",
+	                      &obfileName,     // @pyparm string|filename||Name of file to open, or None
 	                      &bMakeVisible))// @pyparm int|bMakeVisible|1|Indicates if the document should be created visible.
 		return NULL;
 	CMultiDocTemplate *pTempl = GetTemplate(self);
 	if (pTempl==NULL)
 		return NULL;
+	if (!PyWinObject_AsTCHAR(obfileName, &fileName, TRUE))
+		return NULL;
 	GUI_BGN_SAVE;
 	CDocument *pDocument = pTempl->CMultiDocTemplate::OpenDocumentFile(fileName, bMakeVisible);
 	GUI_END_SAVE;
+	PyWinObject_FreeTCHAR(fileName);
 	if (PyErr_Occurred())
 		return NULL;
 	if (pDocument==NULL)
@@ -436,6 +451,7 @@ CFrameWnd* CPythonDocTemplate::CreateNewFrame( CDocument* pDoc, CFrameWnd* pOthe
 	CVirtualHelper helper("CreateNewFrame", this);
 	ok = helper.call(pDoc);
 	PyObject *retObject=NULL;
+	// ??? This needs to differentiate between callback error and wrong type ???
 	ok = ok && helper.retval( retObject );
 	ok = ok && ui_base_class::is_uiobject( retObject, &PyCFrameWnd::type );
 	if (!ok) {

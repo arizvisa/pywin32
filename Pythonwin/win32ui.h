@@ -57,7 +57,7 @@ inline BOOL IsGdiHandleValid(HANDLE hobject) \
 	{return hobject == NULL || IsWin32s() || ::GetObjectType(hobject) != 0;}
 
 
-CString GetAPIErrorString(char *fnName);
+CString GetAPIErrorString(const char *fnName);
 CString GetAPIErrorString(DWORD dwCode);
 
 // The do/while clauses wrapped around these macro bodies are a cpp
@@ -132,7 +132,7 @@ public:
 	ui_type( const char *name, ui_type *pBaseType, int typeSize, struct PyMethodDef* methodList, ui_base_class * (* thector)() );
 	~ui_type();
 public:
-	ui_type *base;
+	// ui_type *base;
 	struct PyMethodDef* methods;
 	ui_base_class * (* ctor)();
 };
@@ -197,11 +197,10 @@ public:
 
 	// virtuals for Python support
 	virtual CString repr();
-	virtual PyObject *getattr(char *name);
-	virtual int setattr(char *name, PyObject *v);
+	virtual PyObject *getattro(PyObject *obname);
+	virtual int setattro(PyObject *obname, PyObject *v);
 	virtual void cleanup();
 
-	static struct PyMethodDef ui_base_class::empty_methods[];
 	static ui_type type;							// my type.
 protected:
 	ui_base_class();
@@ -214,8 +213,8 @@ public:
 	BOOL is_uiobject(ui_type *which);
 	static void sui_dealloc(PyObject *ob);
 	static PyObject *sui_repr(PyObject *ob);
-	static PyObject *sui_getattr(PyObject *self, char *name);
-	static int sui_setattr(PyObject *op, char *name, PyObject *v);
+	static PyObject *sui_getattro(PyObject *self, PyObject *obname);
+	static int sui_setattro(PyObject *op, PyObject *obname, PyObject *v);
 #ifdef _DEBUG
 	DECLARE_DYNAMIC(ui_base_class)
 	virtual void Dump( CDumpContext &dc ) const;
@@ -250,9 +249,9 @@ enum EnumExceptionHandlerAction {
 	EHA_DISPLAY_DIALOG
 };
 
-typedef void (*ExceptionHandlerFunc)(int action, const char *context, const char *extraTitleMsg);
+typedef void (*ExceptionHandlerFunc)(int action, const TCHAR *context, const TCHAR *extraTitleMsg);
 
-PYW_EXPORT void ExceptionHandler(int action, const char *context=NULL, const char *extraTitleMsg=NULL);
+PYW_EXPORT void ExceptionHandler(int action, const TCHAR *context=NULL, const TCHAR *extraTitleMsg=NULL);
 PYW_EXPORT ExceptionHandlerFunc SetExceptionHandler(ExceptionHandlerFunc handler);
 
 // A helper class for calling "virtual methods" - ie, given a C++ object
@@ -281,7 +280,9 @@ public:
 	BOOL call(long);
 	BOOL call(UINT_PTR);
 	BOOL call(const char *);
+	BOOL call(const WCHAR *);
 	BOOL call(const char *, int);
+	BOOL call(const WCHAR *val, int ival);
 	BOOL call(CDC *, CPrintInfo *);
 	BOOL call(CPrintInfo *);
 	BOOL call(CDC *);
@@ -307,6 +308,7 @@ public:
 	BOOL retval( PyObject* &ret );
 	BOOL retval( CREATESTRUCT &cs );
 	BOOL retval( char * &ret );
+	BOOL retval( WCHAR *&ret );
 	BOOL retval( CString &ret );
 	BOOL retval( MSG *msg);
 	BOOL retval( HANDLE &ret );
@@ -332,7 +334,7 @@ PYW_EXPORT int Python_callback(PyObject *, LPARAM);
 PYW_EXPORT int Python_callback(PyObject *, int, int);
 PYW_EXPORT int Python_callback(PyObject *, const MSG *);
 PYW_EXPORT int Python_callback(PyObject *method, PyObject *object);
-int Python_run_command_with_log(const char *command, const char * logFileName);
+int Python_run_command_with_log(const char *command);
 PYW_EXPORT BOOL Python_check_message(const MSG *pMsg);	// TRUE if fully processed.
 PYW_EXPORT BOOL Python_check_key_message(const MSG *pMsg);	// TRUE if fully processed.
 PYW_EXPORT BOOL Python_OnCmdMsg(CCmdTarget *, UINT nID, int nCode, void* pExtra, AFX_CMDHANDLERINFO*pHandlerInfo );// TRUE if fully processed.
@@ -371,15 +373,9 @@ PYW_EXPORT void Python_do_exchange(CDialog *pDlg, CDataExchange *pDX);
 // call when an external object dies.
 PYW_EXPORT void Python_delete_assoc( void *ob );
 
-PYW_EXPORT void Python_addpath( const char *paths );
-
-// Use an internal MFC function.  Pretty easy to remove should the need arise.
-extern BOOL PASCAL AfxFullPath(LPSTR lpszPathOut, LPCSTR lpszFileIn);
-// but make it easier to!
-inline BOOL GetFullPath(LPSTR lpszPathOut, LPCSTR lpszFileIn)
-	{ return AfxFullPath(lpszPathOut, lpszFileIn);}
+PYW_EXPORT void Python_addpath( const TCHAR *paths );
 
 BOOL AFXAPI PyAfxComparePath(LPCTSTR lpszPath1, LPCTSTR lpszPath2);
-
+extern BOOL PASCAL AfxFullPath(LPTSTR lpszPathOut, LPCTSTR lpszFileIn);
 #endif // __filename_h__
 

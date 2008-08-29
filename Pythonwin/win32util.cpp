@@ -60,8 +60,8 @@ public:
 		_Py_NewReference(this);
 	}
 	~PyCRect() {if (m_owned) delete m_pRect;}
-	virtual PyObject *getattr(char *name);
-	virtual int setattr(char *name, PyObject *v);
+	virtual PyObject *getattro(PyObject *obname);
+	virtual int setattro(PyObject *obname, PyObject *v);
 	static PyObject *getitem(PyObject *self, Py_ssize_t index);
 	static Py_ssize_t getlength(PyObject *self);
 	CString repr();
@@ -90,8 +90,11 @@ static PySequenceMethods PyCRect_Sequence =
 	NULL, // sq_ass_slice;
 };
 
-PyObject *PyCRect::getattr(char *name)
+PyObject *PyCRect::getattro(PyObject *obname)
 {
+	char *name=PYWIN_ATTR_CONVERT(obname);
+	if (name==NULL)
+		return NULL;
 	if (strcmp(name, "left")==0)
 		return PyInt_FromLong(m_pRect->left);
 	if (strcmp(name, "right")==0)
@@ -100,13 +103,13 @@ PyObject *PyCRect::getattr(char *name)
 		return PyInt_FromLong(m_pRect->top);
 	if (strcmp(name, "bottom")==0)
 		return PyInt_FromLong(m_pRect->bottom);
-	return ui_base_class::getattr(name);
+	return PyObject_GenericGetAttr(this, obname);
 }
 
 CString PyCRect::repr()
 {
 	CString csRet;
-	csRet.Format("%s (%d, %d, %d, %d)", ui_base_class::repr(), m_pRect->left, m_pRect->top, m_pRect->right, m_pRect->bottom );
+	csRet.Format(_T("%s (%d, %d, %d, %d)"), ui_base_class::repr(), m_pRect->left, m_pRect->top, m_pRect->right, m_pRect->bottom );
 	return csRet;
 }
 
@@ -134,27 +137,31 @@ CString PyCRect::repr()
 	return NULL;
 }
 
-int PyCRect::setattr(char *name, PyObject *v)
+int PyCRect::setattro(PyObject *obname, PyObject *v)
 {
-	if (!PyInt_Check(v))
-		RETURN_TYPE_ERR("PyCRect objects only have integer properties");
+	char *name=PYWIN_ATTR_CONVERT(obname);
+	if (name==NULL)
+		return -1;
+	int intval=PyInt_AsLong(v);
+	if (intval==-1 && PyErr_Occurred())
+		return -1;
 	if (strcmp(name, "left")==0) {
-		m_pRect->left = PyInt_AsLong(v);
+		m_pRect->left = intval;
 		return 0;
 	}
 	if (strcmp(name, "right")==0) {
-		m_pRect->right = PyInt_AsLong(v);
+		m_pRect->right = intval;
 		return 0;
 	}
 	if (strcmp(name, "top")==0) {
-		m_pRect->top = PyInt_AsLong(v);
+		m_pRect->top = intval;
 		return 0;
 	}
 	if (strcmp(name, "bottom")==0) {
-		m_pRect->bottom = PyInt_AsLong(v);
+		m_pRect->bottom = intval;
 		return 0;
 	}
-	return ui_base_class::setattr(name, v);
+	return PyObject_GenericSetAttr(this, obname, v);
 }
 
 static struct PyMethodDef 
@@ -232,97 +239,74 @@ BOOL CreateStructFromPyObject(LPCREATESTRUCT lpcs, PyObject *ob, const char *fnN
 // Font conversion utilities
 //
 //
-static const char *szFontQuality = "quality";
-static const char *szFontName = "name";
-static const char *szFontWeight = "weight";
-static const char *szFontWidth = "width";
-static const char *szFontHeight = "height";
-static const char *szFontItalic = "italic";
-static const char *szFontUnderline = "underline";
-static const char *szFontPitch = "pitch and family";
-static const char *szFontCharSet = "charset";
+static char *szFontQuality = "quality";
+static char *szFontName = "name";
+static char *szFontWeight = "weight";
+static char *szFontWidth = "width";
+static char *szFontHeight = "height";
+static char *szFontItalic = "italic";
+static char *szFontUnderline = "underline";
+static char *szFontPitch = "pitch and family";
+static char *szFontCharSet = "charset";
 
 PyObject *LogFontToDict(const LOGFONT &lf)
 {
-	PyObject *ret = PyDict_New();
-	PyMapping_SetItemString( ret, (char *)szFontQuality, PyInt_FromLong(lf.lfQuality));
-	PyMapping_SetItemString( ret, (char *)szFontName, PyString_FromString((char *)lf.lfFaceName) );
-	PyMapping_SetItemString( ret, (char *)szFontHeight, PyInt_FromLong(-lf.lfHeight));
-	PyMapping_SetItemString( ret, (char *)szFontWidth, PyInt_FromLong(lf.lfWidth));
-	PyMapping_SetItemString( ret, (char *)szFontWeight, PyInt_FromLong(lf.lfWeight));
-	PyMapping_SetItemString( ret, (char *)szFontPitch, PyInt_FromLong(lf.lfPitchAndFamily));
-	PyMapping_SetItemString( ret, (char *)szFontCharSet, PyInt_FromLong(lf.lfCharSet));
-	PyMapping_SetItemString( ret, (char *)szFontUnderline, lf.lfUnderline?PyInt_FromLong(1):Py_None);
-	PyMapping_SetItemString( ret, (char *)szFontItalic, lf.lfItalic?PyInt_FromLong(1):Py_None);
-	return ret;
+	// ??? This is missing a lot of members ???
+	return Py_BuildValue("{s:N, s:N, s:N, s:N, s:N, s:N, s:N, s:N, s:N}",
+		szFontQuality, PyInt_FromLong(lf.lfQuality),
+		szFontName, PyWinObject_FromTCHAR(lf.lfFaceName),
+		szFontHeight, PyInt_FromLong(lf.lfHeight),
+		szFontWidth, PyInt_FromLong(lf.lfWidth),
+		szFontWeight, PyInt_FromLong(lf.lfWeight),
+		szFontPitch, PyInt_FromLong(lf.lfPitchAndFamily),
+		szFontCharSet, PyInt_FromLong(lf.lfCharSet),
+		szFontUnderline, PyBool_FromLong(lf.lfUnderline),
+		szFontItalic, PyBool_FromLong(lf.lfItalic));
 }
 
 BOOL DictToLogFont(PyObject *font_props, LOGFONT *pLF)
 {
-  ZeroMemory (pLF, sizeof(LOGFONT));
+	ZeroMemory (pLF, sizeof(LOGFONT));
+	static char *keywords[]={
+		szFontQuality, szFontName, szFontHeight, szFontWidth, szFontWeight, 
+		szFontPitch, szFontCharSet, szFontUnderline, szFontItalic, NULL
+		};
 
-  // font default values
-  pLF->lfCharSet = DEFAULT_CHARSET; // dont use ANSI_CHARSET to support Japanese charset.
-  pLF->lfQuality = PROOF_QUALITY;  // don't scale raster fonts and force anti aliasing
-  PyObject *v;
+	// font default values
+	pLF->lfCharSet = DEFAULT_CHARSET; // dont use ANSI_CHARSET to support Japanese charset.
+	pLF->lfQuality = PROOF_QUALITY;  // don't scale raster fonts and force anti aliasing
+	if (!PyDict_Check(font_props)){
+		PyErr_Format(PyExc_TypeError, "LOGFONT must be a dict, not %s", font_props->ob_type->tp_name);
+		return FALSE;
+		}
 
-  v = PyDict_GetItemString (font_props, (char *)szFontQuality);
-  if (v != NULL)
-        if (PyInt_Check (v))
-          pLF->lfQuality = (BYTE)PyInt_AsLong(v);
-        else
-              RETURN_ERR ("Expected integer value for font quality property");
+	PyObject *obFontName=Py_None;
+	TCHAR *FontName;
+	DWORD len;
+	PyObject *dummy_tuple=PyTuple_New(0);
+	if (!dummy_tuple)
+		return FALSE;
 
-  v = PyDict_GetItemString (font_props, (char *)szFontName);
-  if (v != NULL)
-	if (PyString_Check(v))
-	  strncpy (pLF->lfFaceName, PyString_AsString(v), LF_FACESIZE - 1);
-	else
-	  RETURN_ERR ("Expected string value for font name property");
-
-  v = PyDict_GetItemString (font_props, (char *)szFontHeight);
-  if (v != NULL)
-	if (PyInt_Check (v))
-	  pLF->lfHeight = -PyInt_AsLong(v);
-	else
-	  RETURN_ERR ("Expected integer value for font height property");
-
-  v = PyDict_GetItemString (font_props, (char *)szFontWidth);
-  if (v != NULL)
-	if (PyInt_Check (v))
-	  pLF->lfWidth = PyInt_AsLong(v);
-	else
-	  RETURN_ERR ("Expected integer value for font width property");
-
-  v = PyDict_GetItemString (font_props, (char *)szFontPitch);
-  if (v != NULL)
-	if (PyInt_Check (v))
-	  pLF->lfPitchAndFamily = (BYTE)PyInt_AsLong(v);
-	else
-	  RETURN_ERR ("Expected integer value for font 'pitch and family' property");
-
-  v = PyDict_GetItemString (font_props, (char *)szFontCharSet);
-  if (v != NULL)
-	if (PyInt_Check (v))
-	  pLF->lfCharSet = (BYTE)PyInt_AsLong(v);
-	else
-	  RETURN_ERR ("Expected integer value for font 'charset' property");
-
-  v = PyDict_GetItemString (font_props, (char *)szFontWeight);
-  if (v != NULL)
-	if (PyInt_Check (v))
-	  pLF->lfWeight = PyInt_AsLong(v);
-	else
-	  RETURN_ERR ("Expected integer value for font weight property");
-
-  v = PyDict_GetItemString (font_props, (char *)szFontItalic);
-  if (v != NULL && PyObject_IsTrue(v))
-	pLF->lfItalic = TRUE;
-
-  v = PyDict_GetItemString (font_props, (char *)szFontUnderline);
-  if (v != NULL && PyObject_IsTrue(v))
-	pLF->lfUnderline = TRUE;
-  return TRUE;
+	if (!PyArg_ParseTupleAndKeywords(dummy_tuple, font_props, "|bOlllbbbb:LOGFONT", keywords,
+		&pLF->lfQuality, &obFontName, &pLF->lfHeight, &pLF->lfWidth, &pLF->lfWeight,
+		&pLF->lfPitchAndFamily, &pLF->lfCharSet, &pLF->lfUnderline, &pLF->lfItalic)){
+		Py_DECREF(dummy_tuple);
+		return FALSE;
+		}
+	Py_DECREF(dummy_tuple);
+	if (!PyWinObject_AsTCHAR(obFontName, &FontName, TRUE, &len))
+		return FALSE;
+	if (FontName==NULL)
+		return TRUE;
+	
+	if (len > LF_FACESIZE-1){	// Must have room for terminating NULL
+		PyErr_Format(PyExc_ValueError, "Font name can be at most %d characters", LF_FACESIZE-1);
+		PyWinObject_FreeTCHAR(FontName);
+		return FALSE;
+		}
+	_tcsncpy(pLF->lfFaceName, FontName, len);
+	PyWinObject_FreeTCHAR(FontName);
+	return TRUE;
 }
 
 /////////////////////////////////////////////////////////////////////
@@ -347,7 +331,7 @@ PyObject *MakeLV_ITEMTuple(LV_ITEM *item)
 		PyTuple_SET_ITEM(ret, 3, Py_None);
 	}
 	if ((item->mask & LVIF_TEXT) && (item->pszText != NULL)) {
-		PyTuple_SET_ITEM(ret, 4, PyString_FromString(item->pszText));
+		PyTuple_SET_ITEM(ret, 4, PyWinObject_FromTCHAR(item->pszText));
 	} else {
 		Py_INCREF(Py_None);
 		PyTuple_SET_ITEM(ret, 4, Py_None);
@@ -388,7 +372,9 @@ BOOL ParseLV_ITEMTuple( PyObject *args, LV_ITEM *pItem)
 		PyErr_SetString(PyExc_TypeError, "LV_ITEM tuple has invalid size");
 		return FALSE;
 	}
-	PyErr_Clear(); // clear any errors, so I can detect my own.
+	// ??? This is questionable, shouldn't be any exceptions left hanging, and if this is called
+	//	from someplace where an exception legitimately exists, should fetch/restore the exception. ???
+	assert (!PyErr_Occurred());	//	PyErr_Clear(); // clear any errors, so I can detect my own.
 	// 0 - iItem.
 	if ((ob=PyTuple_GetItem(args, 0))==NULL)
 		return FALSE;
@@ -411,18 +397,15 @@ BOOL ParseLV_ITEMTuple( PyObject *args, LV_ITEM *pItem)
 		if (PyErr_Occurred()) return FALSE;
 		pItem->mask |= LVIF_STATE;
 	}
+
 	if (len<5) return TRUE;
-	if ((ob=PyTuple_GetItem(args, 4))==NULL)
+	ob=PyTuple_GET_ITEM(args, 4);
+	if (!PyWinObject_AsTCHAR(ob, &pItem->pszText, TRUE, (DWORD *)&pItem->cchTextMax))
 		return FALSE;
-	if (ob != Py_None) {
-		if (!PyString_Check(ob)) {
-			PyErr_Format(PyExc_TypeError, "The text item must be a string or None (got %s)", ob->ob_type->tp_name);
-			return FALSE;
-		}
+	// ??? Need to free this somewhere ???
+	if (pItem->pszText)
 		pItem->mask |= LVIF_TEXT;
-		pItem->pszText = PyString_AsString(ob);
-		pItem->cchTextMax = PyWin_SAFE_DOWNCAST(strlen(pItem->pszText)+1, size_t, int);
-	}
+
 	if (len<6) return TRUE;
 	if ((ob=PyTuple_GetItem(args, 5))==NULL)
 		return FALSE;
@@ -461,7 +444,7 @@ PyObject *MakeLV_COLUMNTuple(LV_COLUMN *item)
 		PyTuple_SET_ITEM(ret, 1, Py_None);
 	}
 	if ((item->mask & LVCF_TEXT) && (item->pszText != NULL)) {
-		PyTuple_SET_ITEM(ret, 2, PyString_FromString(item->pszText));
+		PyTuple_SET_ITEM(ret, 2, PyWinObject_FromTCHAR(item->pszText));
 	} else {
 		Py_INCREF(Py_None);
 		PyTuple_SET_ITEM(ret, 2, Py_None);
@@ -491,14 +474,14 @@ BOOL ParseLV_COLUMNTuple( PyObject *args, LV_COLUMN *pItem)
 		PyErr_SetString(PyExc_TypeError, "LV_COLUMN tuple has invalid size");
 		return FALSE;
 	}
-	PyErr_Clear(); // clear any errors, so I can detect my own.
+	assert (!PyErr_Occurred());	//	PyErr_Clear(); // clear any errors, so I can detect my own.
 	// 0 - fmt
 	if (len<1) return TRUE;
 	if ((ob=PyTuple_GetItem(args, 0))==NULL)
 		return FALSE;
 	if (ob != Py_None) {
 		pItem->fmt = (int)PyInt_AsLong(ob);
-		if (PyErr_Occurred()) return FALSE;
+		if (pItem->fmt==-1 && PyErr_Occurred()) return FALSE;
 		pItem->mask |= LVCF_FMT;
 	}
 	// 1 - cx
@@ -507,22 +490,19 @@ BOOL ParseLV_COLUMNTuple( PyObject *args, LV_COLUMN *pItem)
 		return FALSE;
 	if (ob != Py_None) {
 		pItem->cx = (int)PyInt_AsLong(ob);
-		if (PyErr_Occurred()) return FALSE;
+		if (pItem->cx==-1 && PyErr_Occurred()) return FALSE;
 		pItem->mask |= LVCF_WIDTH;
 	}
 	// 2 - text
 	if (len<3) return TRUE;
-	if ((ob=PyTuple_GetItem(args, 2))==NULL)
+
+	ob=PyTuple_GET_ITEM(args, 2);
+	if (!PyWinObject_AsTCHAR(ob, &pItem->pszText, TRUE, (DWORD *)&pItem->cchTextMax))
 		return FALSE;
-	if (ob != Py_None) {
-		if (!PyString_Check(ob)) {
-			PyErr_Format(PyExc_TypeError, "The text item must be a string or None (got %s)", ob->ob_type->tp_name);
-			return FALSE;
-		}
+	// ??? Need to free this somewhere ???
+	if (pItem->pszText)
 		pItem->mask |= LVCF_TEXT;
-		pItem->pszText = PyString_AsString(ob);
-		pItem->cchTextMax = PyWin_SAFE_DOWNCAST(strlen(pItem->pszText)+1, size_t, int);
-	}
+
 	// 3 - subitem
 	if (len<4) return TRUE;
 	if ((ob=PyTuple_GetItem(args, 3))==NULL)
@@ -530,7 +510,7 @@ BOOL ParseLV_COLUMNTuple( PyObject *args, LV_COLUMN *pItem)
 	if (ob != Py_None) {
 		pItem->mask |= LVCF_SUBITEM;
 		pItem->iSubItem = PyInt_AsLong(ob);
-		if (PyErr_Occurred())
+		if (pItem->iSubItem==-1 && PyErr_Occurred())
 			return FALSE;
 	}
 	return TRUE;
@@ -562,7 +542,7 @@ PyObject *MakeTV_ITEMTuple(TV_ITEM *item)
 		PyTuple_SET_ITEM(ret, 2, Py_None);
 	}
 	if ((item->mask & TVIF_TEXT) && (item->pszText != NULL)) {
-		PyTuple_SET_ITEM(ret, 3, PyString_FromString(item->pszText));
+		PyTuple_SET_ITEM(ret, 3, PyWinObject_FromTCHAR(item->pszText));
 	} else {
 		Py_INCREF(Py_None);
 		PyTuple_SET_ITEM(ret, 3, Py_None);
@@ -609,7 +589,7 @@ BOOL ParseTV_ITEMTuple( PyObject *args, TV_ITEM *pItem)
 		PyErr_SetString(PyExc_TypeError, "TV_ITEM tuple has invalid size");
 		return FALSE;
 	}
-	PyErr_Clear(); // clear any errors, so I can detect my own.
+	assert (!PyErr_Occurred());		//	PyErr_Clear(); // clear any errors, so I can detect my own.
 	// 0 - hItem
 	if (len<1) return TRUE;
 	if ((ob=PyTuple_GetItem(args, 0))==NULL)
@@ -643,20 +623,17 @@ BOOL ParseTV_ITEMTuple( PyObject *args, TV_ITEM *pItem)
 		if (PyErr_Occurred()) return FALSE;
 		pItem->mask |= TVIF_STATE;
 	}
+
 	// 3 - text
 	if (len<4) return TRUE;
-	if ((ob=PyTuple_GetItem(args, 3))==NULL)
+	ob=PyTuple_GET_ITEM(args, 3);
+	// @tupleitem 3|string|text|Item text
+	if (!PyWinObject_AsTCHAR(ob, &pItem->pszText, TRUE, (DWORD *)&pItem->cchTextMax))
 		return FALSE;
-	if (ob != Py_None) {
-		// @tupleitem 3|string|text|Item text
-		if (!PyString_Check(ob)) {
-			PyErr_Format(PyExc_TypeError, "The text item must be a string or None (got %s)", ob->ob_type->tp_name);
-			return FALSE;
-		}
+	// ??? This need to be freed after use ???
+	if (pItem->pszText)
 		pItem->mask |= TVIF_TEXT;
-		pItem->pszText = PyString_AsString(ob);
-		pItem->cchTextMax = PyWin_SAFE_DOWNCAST(strlen(pItem->pszText)+1, size_t, int);
-	}
+
 	// 4 - image
 	if (len<5) return TRUE;
 	if ((ob=PyTuple_GetItem(args, 4))==NULL)
@@ -682,7 +659,7 @@ BOOL ParseTV_ITEMTuple( PyObject *args, TV_ITEM *pItem)
 	if (ob != Py_None) {
 		// @tupleitem 6|int|cChildren|Number of child items.
 		pItem->mask |= TVIF_CHILDREN;
-		pItem->cChildren = (int)PyInt_AsLong(ob);
+		pItem->cChildren = PyInt_AsLong(ob);
 	}
 	// 7 - object
 	if (len<8) return TRUE;
@@ -722,7 +699,7 @@ PyObject *MakeHD_ITEMTuple(HD_ITEM *item)
 		PyTuple_SET_ITEM(ret, 1, Py_None);
 	}
 	if ((item->mask & HDI_TEXT) && (item->pszText != NULL) ) {
-		PyTuple_SET_ITEM(ret, 2, PyString_FromString(item->pszText));
+		PyTuple_SET_ITEM(ret, 2, PyWinObject_FromTCHAR(item->pszText));
 	} else {
 		Py_INCREF(Py_None);
 		PyTuple_SET_ITEM(ret, 2, Py_None);
@@ -764,7 +741,7 @@ BOOL ParseHD_ITEMTuple( PyObject *args, HD_ITEM *pItem)
 		PyErr_SetString(PyExc_TypeError, "HD_ITEM tuple has invalid size");
 		return FALSE;
 	}
-	PyErr_Clear(); // clear any errors, so I can detect my own.
+	assert (!PyErr_Occurred());		//	PyErr_Clear(); // clear any errors, so I can detect my own.
 	// 0 - mask
 	if (len<1) return TRUE;
 	if ((ob=PyTuple_GetItem(args, 0))==NULL)
@@ -790,19 +767,14 @@ BOOL ParseHD_ITEMTuple( PyObject *args, HD_ITEM *pItem)
 	
 	// 3 - pszText address of item string
 	if (len<3) return TRUE;
-	if ((ob=PyTuple_GetItem(args, 2))==NULL)
+	ob=PyTuple_GET_ITEM(args, 2);
+	// @pyparm string|pszText||Item text
+	if (!PyWinObject_AsTCHAR(ob, &pItem->pszText, TRUE, (DWORD *)&pItem->cchTextMax))
 		return FALSE;
-	if (ob !=Py_None) {
-		// @pyparm string|pszText||Item text
-		if (!PyString_Check(ob)) {
-			PyErr_Format(PyExc_TypeError, "The text item must be a string or None (got %s)", ob->ob_type->tp_name);
-			return FALSE;
-		}
-		pItem->pszText = PyString_AsString(ob);
-		if (PyErr_Occurred()) return FALSE;
-		pItem->cchTextMax = PyWin_SAFE_DOWNCAST(strlen(pItem->pszText)+1, size_t, int);
+	// ??? This needs to be freed ???
+	if (pItem->pszText)
 		pItem->mask |= HDI_TEXT;
-	}
+
 	// 3 - hbm handle of item bitmap
 	if (len<4) return TRUE;
 	if ((ob=PyTuple_GetItem(args, 3))==NULL)
@@ -843,26 +815,36 @@ BOOL ParseHD_ITEMTuple( PyObject *args, HD_ITEM *pItem)
 // @object CHARFORMAT|Describes a CHARFORMAT tuple
 BOOL ParseCharFormatTuple( PyObject *args, CHARFORMAT *pFmt)
 {
+	ZeroMemory(pFmt, sizeof(*pFmt));
+	pFmt->cbSize=sizeof(*pFmt);
 	if (!PyTuple_Check(args))
 		RETURN_TYPE_ERR("CHARFORMAT must be a tuple");
-	Py_ssize_t len = PyTuple_Size(args);
-	if (len>0) pFmt->dwMask = PyInt_AsLong(PyTuple_GET_ITEM(args, 0));
-	if (len>1) pFmt->dwEffects = PyInt_AsLong(PyTuple_GET_ITEM(args, 1));
-	if (len>2) pFmt->yHeight = PyInt_AsLong(PyTuple_GET_ITEM(args, 2));
-	if (len>3) pFmt->yOffset = PyInt_AsLong(PyTuple_GET_ITEM(args, 3));
-	if (len>4) pFmt->crTextColor = PyInt_AsLong(PyTuple_GET_ITEM(args, 4));
-	if (len>5) pFmt->bCharSet = (BYTE)PyInt_AsLong(PyTuple_GET_ITEM(args, 5));
-	if (len>6) pFmt->bPitchAndFamily = (BYTE)PyInt_AsLong(PyTuple_GET_ITEM(args, 6));
-	if (len>7) {
-		PyObject *obFont = PyTuple_GET_ITEM(args, 7);
-		if (obFont != Py_None) {
-			if (!PyString_Check(obFont)) {
-				PyErr_Format(PyExc_TypeError, "Font name must be None or a string (got %s)", obFont->ob_type->tp_name);
-				return FALSE;
-			}
-			strncpy(pFmt->szFaceName, PyString_AsString(obFont), sizeof(pFmt->szFaceName));
+	TCHAR *FaceName=NULL;
+	DWORD len;
+	PyObject *obFaceName=Py_None;
+	if (!PyArg_ParseTuple(args, "|kkllkbbO:CHARFORMAT",
+		&pFmt->dwMask,
+		&pFmt->dwEffects,
+		&pFmt->yHeight,
+		&pFmt->yOffset,
+		&pFmt->crTextColor,
+		&pFmt->bCharSet,
+		&pFmt->bPitchAndFamily,
+		&obFaceName))
+		return FALSE;
+	if (!PyWinObject_AsTCHAR(obFaceName, &FaceName, TRUE, &len))
+		return FALSE;
+	if (FaceName==NULL)
+		return TRUE;
+
+	if (len > (sizeof(pFmt->szFaceName)/sizeof(pFmt->szFaceName[0])) -1){
+		PyErr_SetString(PyExc_ValueError, "FaceName too long");
+		PyWinObject_FreeTCHAR(FaceName);
+		return FALSE;
 		}
-	}
+	_tcsncpy(pFmt->szFaceName, FaceName, len);
+	PyWinObject_FreeTCHAR(FaceName);
+	return TRUE;
    // @tupleitem 0|int|mask|The mask to use.  Bits in this mask indicate which of the following parameter are interpreted.  Must be a combination the win32con.CFM_* constants.
    // @tupleitem 1|int|effects|The effects to use.  Must be a combination the win32con.CFE_* constants.
    // @tupleitem 2|int|yHeight|The y height.
@@ -874,12 +856,11 @@ BOOL ParseCharFormatTuple( PyObject *args, CHARFORMAT *pFmt)
 
 	// @comm  Executing d=win32ui.CreateFontDialog(); d.DoModal(); print d.GetCharFormat()
 	// will print a valid CHARFORMAT tuple.
-	return !PyErr_Occurred();
 }
 
 PyObject *MakeCharFormatTuple(CHARFORMAT *pFmt)
 {
-	return Py_BuildValue("iillibbs",
+	return Py_BuildValue("iillibbN",
 		       pFmt->dwMask,
 			   pFmt->dwEffects,
 			   pFmt->yHeight,
@@ -887,7 +868,7 @@ PyObject *MakeCharFormatTuple(CHARFORMAT *pFmt)
 			   pFmt->crTextColor,
 			   pFmt->bCharSet,
 			   pFmt->bPitchAndFamily,
-			   pFmt->szFaceName);
+			   PyWinObject_FromTCHAR(pFmt->szFaceName));
 }
 
 // @object PARAFORMAT|Describes a PARAFORMAT tuple
@@ -895,6 +876,7 @@ BOOL ParseParaFormatTuple( PyObject *args, PARAFORMAT *pFmt)
 {
 	PyObject *obTabStops = Py_None;
 	pFmt->cTabCount = 0;
+	// ??? This format needs work, several of these are WORDs. ???
 	BOOL rc = PyArg_ParseTuple(args, "|iiiiiiiO:PARAFORMAT tuple", 
 		       &pFmt->dwMask, // @tupleitem 0|int|mask|The mask to use.  Bits in this mask indicate which of the following parameters are interpreted.  Must be a combination the win32con.PFM_* constants.
 			   &pFmt->wNumbering, // @tupleitem 1|int|numbering|The numbering style to use.
@@ -976,7 +958,7 @@ PyObject *PyWin_GetPythonObjectFromLong(LONG_PTR val)
 	return ret;
 }
 
-CString GetAPIErrorString(char *fnName)
+CString GetAPIErrorString(const char *fnName)
 {
 	CString csBuf = fnName + CString(" failed - ");
 	DWORD errorCode = GetLastError();
@@ -985,13 +967,13 @@ CString GetAPIErrorString(char *fnName)
 		if (message.GetLength()>0)
 			csBuf += message;
 		else {
-			char buf[80];
-			sprintf(buf,"error code was %d - no error message is available",errorCode);
+			CString buf;
+			buf.Format(_T("error code was %d - no error message is available"), errorCode);
 			csBuf += buf;
 		}
 	}
 	else
-		csBuf += "no error code is available";
+		csBuf += _T("no error code is available");
 	return csBuf;
 }
 
@@ -999,7 +981,7 @@ CString GetAPIErrorString(DWORD errCode)
 {
 	CString csBuf;
 	const int bufSize = 512;
-	char *buf = csBuf.GetBuffer( bufSize );
+	TCHAR *buf = csBuf.GetBuffer( bufSize );
 	::FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM, NULL, errCode, 0, buf, bufSize, NULL );
 	csBuf.ReleaseBuffer (-1);
 	return csBuf;
@@ -1047,32 +1029,32 @@ ui_type_CObject &UITypeFromHWnd( HWND hwnd )
 {
 	ui_type_CObject *ret;
 	// generic window - see if class name can help us.
-	char szClassName[64];
-	::GetClassName( hwnd, szClassName, sizeof(szClassName));
+	TCHAR szClassName[64];
+	::GetClassName( hwnd, szClassName, sizeof(szClassName)/sizeof(TCHAR));
 	// getting really lazy here.
-	if (strcmp(szClassName, "ListBox")==0)
+	if (_tcscmp(szClassName, _T("ListBox"))==0)
 		ret = &PyCListBox::type;
-	else if (strcmp(szClassName, "ComboBox")==0)
+	else if (_tcscmp(szClassName, _T("ComboBox"))==0)
 		ret = &PyCComboBox::type;
-	else if (strcmp(szClassName, "Button")==0)
+	else if (_tcscmp(szClassName, _T("Button"))==0)
 		ret = &PyCButton::type;
-	else if (strcmp(szClassName, "Edit")==0)
+	else if (_tcscmp(szClassName, _T("Edit"))==0)
 		ret = &PyCEdit::type;
-	else if (strcmp(szClassName, "RICHEDIT")==0)
+	else if (_tcscmp(szClassName, _T("RICHEDIT"))==0)
 		ret = &PyCRichEditCtrl::type;
-	else if (strcmp(szClassName, "SysListView32")==0)
+	else if (_tcscmp(szClassName, _T("SysListView32"))==0)
 		ret = &PyCListCtrl::type;
-	else if (strcmp(szClassName, "SysTreeView32")==0)
+	else if (_tcscmp(szClassName, _T("SysTreeView32"))==0)
 		ret = &PyCTreeCtrl::type;
-	else if (strcmp(szClassName, "msctls_progress32")==0)
+	else if (_tcscmp(szClassName, _T("msctls_progress32"))==0)
 		ret = &PyCProgressCtrl::type;
-	else if (strcmp(szClassName, "msctls_trackbar32")==0)
+	else if (_tcscmp(szClassName, _T("msctls_trackbar32"))==0)
 		ret = &PyCSliderCtrl::type;
-	else if (strcmp(szClassName, "msctls_updown32")==0)
+	else if (_tcscmp(szClassName, _T("msctls_updown32"))==0)
 		ret = &PyCSpinButtonCtrl::type;
 	// now handle some special cases to avoid warning below!
-	else if (strcmp(szClassName, "MDIClient")==0 ||
-		     strcmp(szClassName, "ConsoleWindowClass")==0)
+	else if (_tcscmp(szClassName, _T("MDIClient"))==0 ||
+		     _tcscmp(szClassName, _T("ConsoleWindowClass"))==0)
 		ret = &PyCWnd::type;
 	else {
 //		TRACE("Generic window returned for class name '%s'\n", szClassName);
@@ -1082,24 +1064,53 @@ ui_type_CObject &UITypeFromHWnd( HWND hwnd )
 }
 
 // utility to get a nice printable string from any object.
-// reference neutral.
+// reference neutral.   NOT !!!!!!!! - Also needs adjustment for Py3k unicode repr
 CString GetReprText( PyObject *objectUse )
 {
 	PyObject *s;
-	if (PyString_Check(objectUse))  // if it is a string, then no need to repr it
-		s = objectUse;              // and repr on a string may mangle it (eg
-	else {                          // turn '\t' into a literal "\t"
-		s = PyObject_Str(objectUse);
-		if (s==NULL) {
-			PyErr_Clear();
-			s = PyObject_Repr(objectUse);
+	CString csRet;
+#ifdef UNICODE
+	// PyObject_Unicode disappeared in Py3k, where PyObject_Str returns unicode object
+	#if (PY_VERSION_HEX < 0x03000000)
+		s=PyObject_Unicode(objectUse);
+	#else
+		s=PyObject_Str(objectUse);
+	#endif
+	if (s){
+		csRet = CString(PyUnicode_AsUnicode(s));
+		Py_DECREF(s);
+		return csRet;
 		}
-		if (s==NULL) {
-			PyErr_Clear();
-			return CString("No str() or repr()?!");
+#else
+	// Assumes that this will always be compiled with UNICODE defined for py3k
+	s=PyObject_Str(objectUse);
+	if (s){
+		csRet = CString(PyString_AsString(s));
+		Py_DECREF(s);
+		return csRet;
 		}
-	}
-	const char *szRepr = PyString_AsString(s);
+#endif
+
+	PyErr_Clear();
+	s = PyObject_Repr(objectUse);
+	if (s==NULL){
+		PyErr_Clear();
+		csRet.Format(_T("<type %s> (no string representation)"), objectUse->ob_type->tp_name);
+		return csRet;
+		}
+
+	// repr() should return either a string or unicode object, but not sure if this is enforced.
+	if (PyUnicode_Check(s))
+		csRet = CString(PyUnicode_AS_UNICODE(s));
+	else if (PyString_Check(s))
+		csRet = CString(PyString_AS_STRING(s));
+	else
+		csRet.Format(_T("??? repr() for type %s returned type %s ???"), objectUse->ob_type->tp_name, s->ob_type->tp_name);
+	Py_DECREF(s);
+	return csRet;
+
+	/* This was apparently trying to remove enclosing quotes, parens, and brackets but will only succeed for quotes
+		Forget about it for now
 	Py_ssize_t len=strlen(szRepr);
 	if (len > 2 && strchr("\"'[(", *szRepr)) {
 		if (szRepr[len-1]==*szRepr) {
@@ -1107,7 +1118,6 @@ CString GetReprText( PyObject *objectUse )
 			len-=2;	// drop first and last chars.
 		}
 	}
-	CString csRes = CString( szRepr, PyWin_SAFE_DOWNCAST(len, Py_ssize_t, int) );
-	return csRes;
+	csRet= CString( szRepr, PyWin_SAFE_DOWNCAST(len, Py_ssize_t, int) );
+	*/
 }
-

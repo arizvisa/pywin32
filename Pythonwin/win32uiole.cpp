@@ -153,7 +153,7 @@ static PyObject *win32uiole_AfxOleInit(PyObject *self, PyObject *args)
 }
 
 // @module win32uiole|A module, encapsulating the Microsoft Foundation Classes OLE functionality.
-static struct PyMethodDef uiole_functions[] = {
+static struct PyMethodDef win32uiole_functions[] = {
 	{"AfxOleInit",   win32uiole_AfxOleInit, 1}, // @pymeth AfxOleInit|
 	{"CreateInsertDialog",   PyCOleInsertDialog::create, 1}, // @pymeth CreateInsertDialog|Creates a InsertObject dialog.
 	{"CreateOleClientItem",  PyCOleClientItem_Create, 1}, // @pymeth CreateOleClientItem|Creates a <o PyCOleClientItem> object.
@@ -168,25 +168,10 @@ static struct PyMethodDef uiole_functions[] = {
 	{NULL,			NULL}
 };
 
-#define ADD_CONSTANT(tok) if (rc=AddConstant(dict,#tok, tok)) return rc
-#define ADD_ENUM(parta, partb) if (rc=AddConstant(dict,#parta "_" #partb, parta::partb)) return rc
+#define ADD_CONSTANT(tok) if (rc=PyModule_AddIntConstant(module, #tok, tok)) return rc
+#define ADD_ENUM(parta, partb) if (rc=PyModule_AddIntConstant(module, #parta "_" #partb, parta::partb)) return rc
 
-static int AddConstant(PyObject *dict, char *key, long value)
-{
-	PyObject *okey = PyString_FromString(key);
-	PyObject *oval = PyInt_FromLong(value);
-	if (!okey || !oval) {
-		XDODECREF(okey);
-		XDODECREF(oval);
-		return 1;
-	}
-	int rc = PyDict_SetItem(dict,okey, oval);
-	DODECREF(okey);
-	DODECREF(oval);
-	return rc;
-}
-
-int AddConstants(PyObject *dict)
+int AddConstants(PyObject *module)
 {
   int rc;
   ADD_ENUM(COleClientItem, emptyState);// @const win32uiole|COleClientItem_emptyState|
@@ -203,13 +188,49 @@ int AddConstants(PyObject *dict)
   return 0;
 }
 
-extern "C" __declspec(dllexport) void
-initwin32uiole(void)
+extern "C" __declspec(dllexport)
+#if (PY_VERSION_HEX < 0x03000000)
+void initwin32uiole(void)
+#else
+PyObject *PyInit_win32uiole(void)
+#endif
 {
-  PyObject *module = Py_InitModule("win32uiole", uiole_functions);
-  if (!module) /* Eeek - some serious error! */
-    return;
-  PyObject *dict = PyModule_GetDict(module);
-  if (!dict) return; /* Another serious error!*/
-  AddConstants(dict);
- }
+	PyObject *dict, *module;
+	PyWinGlobals_Ensure();
+
+#if (PY_VERSION_HEX < 0x03000000)
+#define RETURN_ERROR return;
+	module = Py_InitModule("win32uiole", win32uiole_functions);
+#else
+
+#define RETURN_ERROR return NULL;
+	static PyModuleDef win32uiole_def = {
+		PyModuleDef_HEAD_INIT,
+		"win32uiole",
+		"A module, encapsulating the Microsoft Foundation Classes OLE functionality.",
+		-1,
+		win32uiole_functions
+		};
+	module = PyModule_Create(&win32uiole_def);
+#endif;
+
+	if (!module)
+		RETURN_ERROR;
+	dict = PyModule_GetDict(module);
+	if (!dict)
+		RETURN_ERROR;
+
+	if (AddConstants(module))
+		RETURN_ERROR;
+
+	if (PyType_Ready(&PyCCommonDialog::type) == - 1 ||
+		PyType_Ready(&PyCOleDialog::type) == -1 ||
+		PyType_Ready(&PyCOleInsertDialog::type) == -1 ||
+		PyType_Ready(&PyCOleDocument::type) == -1 ||
+		PyType_Ready(&PyCOleClientItem::type) == -1)
+		RETURN_ERROR;
+
+#if (PY_VERSION_HEX >= 0x03000000)
+	return module;
+#endif
+}

@@ -271,25 +271,27 @@ PyObject *PyCListCtrl_InsertItem( PyObject *self, PyObject *args )
 	CListCtrl *pList;
 	int ret;
 	int item;
-	char *text;
+	TCHAR *text=NULL;
 	int image;
-	PyObject *obLVItem;
+	PyObject *obLVItem, *obtext;
 	if (!(pList=GetListCtrl(self)))
 		return NULL;
 
-	if (PyArg_ParseTuple(args, "isi:InsertItem", 
-		                 &item, // @pyparmalt1 int|item||The index of the item.
-						 &text, // @pyparmalt1 string|text||The text of the item.
-						 &image)) {// @pyparmalt1 int|image||The index of the image to use.
+	if (PyArg_ParseTuple(args, "iOi:InsertItem", 
+			&item,		// @pyparmalt1 int|item||The index of the item.
+			&obtext,	// @pyparmalt1 string|text||The text of the item.
+			&image)		// @pyparmalt1 int|image||The index of the image to use.
+		&& PyWinObject_AsTCHAR(obtext, &text, FALSE)){
 		GUI_BGN_SAVE;
 		ret = pList->InsertItem(item, text, image );
 		GUI_END_SAVE;
 
 	} else {
 		PyErr_Clear();
-		if (PyArg_ParseTuple(args, "is:InsertItem", 
-		                 &item, // @pyparmalt2 int|item||The index of the item.
-						 &text)) {// @pyparmalt2 string|text||The text of the item.
+		if (PyArg_ParseTuple(args, "iO:InsertItem", 
+				&item,		// @pyparmalt2 int|item||The index of the item.
+				&obtext)	// @pyparmalt2 string|text||The text of the item.
+			&& PyWinObject_AsTCHAR(obtext, &text, FALSE)){
 			GUI_BGN_SAVE;
 			ret = pList->InsertItem(item, text );
 			GUI_END_SAVE;
@@ -309,6 +311,7 @@ PyObject *PyCListCtrl_InsertItem( PyObject *self, PyObject *args )
 			}
 		}
 	}
+	PyWinObject_FreeTCHAR(text);
 	if (ret==-1)
 		RETURN_ERR("InsertItem failed");
 	return Py_BuildValue("i",ret);
@@ -366,10 +369,10 @@ PyObject *PyCListCtrl_GetColumn( PyObject *self, PyObject *args )
 		return NULL;
 	CListCtrl *pList = GetListCtrl(self);
 	if (!pList) return NULL;
-	char textBuf[256];
+	TCHAR textBuf[256];
 	LV_COLUMN lvItem;
 	lvItem.pszText = textBuf;
-	lvItem.cchTextMax = sizeof(textBuf);
+	lvItem.cchTextMax = sizeof(textBuf)/sizeof(TCHAR);
 	lvItem.mask = LVCF_FMT | LVCF_SUBITEM | LVCF_TEXT | LVCF_WIDTH;
 	GUI_BGN_SAVE;
 	BOOL ok = pList->GetColumn( col, &lvItem);
@@ -432,15 +435,19 @@ PyObject *PyCListCtrl_GetColumnWidth( PyObject *self, PyObject *args )
 // @pymethod int|PyCListCtrl|GetStringWidth|Gets the necessary column width to fully display this text in a column.
 PyObject *PyCListCtrl_GetStringWidth( PyObject *self, PyObject *args )
 {
-	char *text;
-	if (!PyArg_ParseTuple( args, "s:GetStringWidth", 
-	                   &text)) // @pyparm int|first||String that contains the text whose width is to be determined.
+	TCHAR *text;
+	PyObject *obtext;
+	if (!PyArg_ParseTuple( args, "O:GetStringWidth", 
+	                   &obtext)) // @pyparm int|first||String that contains the text whose width is to be determined.
 		return NULL;
 	CListCtrl *pList = GetListCtrl(self);
 	if (!pList) return NULL;
+	if (!PyWinObject_AsTCHAR(obtext, &text, FALSE))
+		return NULL;
 	GUI_BGN_SAVE;
 	int width = pList->GetStringWidth(text);
 	GUI_END_SAVE;
+	PyWinObject_FreeTCHAR(text);
 	return Py_BuildValue("i", width);
 	// @comm Doesn't take the size of an included Image in account, only the size of the text is determined.
 }
@@ -456,12 +463,12 @@ PyObject *PyCListCtrl_GetItem( PyObject *self, PyObject *args )
 
 	CListCtrl *pList = GetListCtrl(self);
 	if (!pList) return NULL;
-	char textBuf[256];
+	TCHAR textBuf[256];
 	LV_ITEM lvItem;
 	lvItem.iItem = item;
 	lvItem.iSubItem = sub;
 	lvItem.pszText = textBuf;
-	lvItem.cchTextMax = sizeof(textBuf);
+	lvItem.cchTextMax = sizeof(textBuf)/sizeof(TCHAR);
 	lvItem.mask = LVIF_TEXT | LVIF_IMAGE | LVIF_PARAM | LVIF_STATE;
 	GUI_BGN_SAVE;
 	BOOL ok = pList->GetItem( &lvItem);
@@ -475,7 +482,7 @@ PyObject *PyCListCtrl_GetItem( PyObject *self, PyObject *args )
 PyObject *PyCListCtrl_GetItemText( PyObject *self, PyObject *args )
 {
 	int item, sub;
-	char buf[256];
+	TCHAR buf[256];
 	if (!PyArg_ParseTuple( args, "ii:GetItemText", 
 	                   &item, // @pyparm int|item||The index of the item whose text is to be retrieved.
 					   &sub)) // @pyparm int|sub||Specifies the subitem whose text is to be retrieved.
@@ -483,11 +490,11 @@ PyObject *PyCListCtrl_GetItemText( PyObject *self, PyObject *args )
 	CListCtrl *pList = GetListCtrl(self);
 	if (!pList) return NULL;
 	GUI_BGN_SAVE;
-	int len = pList->GetItemText(item, sub, buf, sizeof(buf));
+	int len = pList->GetItemText(item, sub, buf, sizeof(buf)/sizeof(TCHAR));
 	GUI_END_SAVE;
 	if (len==0)
 		RETURN_ERR("GetItemText failed");
-	return PyString_FromStringAndSize(buf,len);
+	return PyWinObject_FromTCHAR(buf,len);
 }
 
 // @pymethod int|PyCListCtrl|SetItemText|Changes the text of a list view item or subitem.
@@ -496,16 +503,20 @@ PyObject *PyCListCtrl_SetItemText( PyObject *self, PyObject *args )
 	CListCtrl *pList = GetListCtrl(self);
 	if (!pList) return NULL;
 	int item, sub;
-	char *text;
-	if (!PyArg_ParseTuple( args, "iis:SetItemText", 
+	TCHAR *text;
+	PyObject *obtext;
+	if (!PyArg_ParseTuple( args, "iiO:SetItemText", 
 		                   &item, // @pyparm int|item||Index of the item whose text is to be set.
 						   &sub, // @pyparm int|sub||Index of the subitem, or zero to set the item label.
-						   &text)) // @pyparm string|text||String that contains the new item text.
+						   &obtext)) // @pyparm string|text||String that contains the new item text.
 
+		return NULL;
+	if (!PyWinObject_AsTCHAR(obtext, &text, FALSE))
 		return NULL;
 	GUI_BGN_SAVE;
 	BOOL ok = pList->SetItemText(item, sub, text);
 	GUI_END_SAVE;
+	PyWinObject_FreeTCHAR(text);
 	if (!ok)
 		RETURN_ERR("SetItemText failed");
 	RETURN_NONE;

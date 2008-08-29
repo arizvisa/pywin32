@@ -188,21 +188,24 @@ void PyNotifyParseExtraTuple( NMHDR *ptr, PyObject *args,  char *fmt)
 			pUse += bufSize;
 			break;
 			}
-		case 'S': // string buffer
+		case 'S': // Fixed size unicode buffer
 			{
-			int bufSize = 0;
+			DWORD bufSize = 0;
 			while (fmt[1] && isdigit(fmt[1])) {
 				bufSize = bufSize * 10 + (fmt[1]-'0');
 				fmt++;
 			}
 			ASSERT(bufSize);
 			if (!bIgnore) {
-				if (!PyString_Check(ob)) MY_RET_ERR("Expected string object")
-				char *szVal = PyString_AsString(ob);
-				SSIZE_T slen = strlen(szVal);
-				mbstowcs( (wchar_t *)pUse, szVal, bufSize );
+				WCHAR *wchar_buf=NULL;
+				DWORD wchar_cnt;
+				if (!PyWinObject_AsWCHAR(ob, &wchar_buf, FALSE, &wchar_cnt))
+					return;
+				ZeroMemory(pUse, bufSize * sizeof(wchar_t));
+				wcsncpy((WCHAR *)pUse, wchar_buf, min(wchar_cnt, bufSize-1));
+				PyWinObject_FreeWCHAR(wchar_buf);
 			}
-			pUse += bufSize + sizeof(wchar_t);
+			pUse += bufSize * sizeof(wchar_t);
 			break;
 			}
 		case 'O': // object with no reference count maintained
@@ -318,7 +321,7 @@ Python_OnNotify (CWnd *pFrom, WPARAM, LPARAM lParam, LRESULT *pResult)
 		fmt = "iiH";	//HD_NOTIFY
 	else if (code == LVN_KEYDOWN)
 		fmt = "ii";		// NMLVKEYDOWN ??? First element is a WORD ???
-	else if ((code >= LVN_LAST && code <= LVN_GETDISPINFOW) || code == LVN_ENDLABELEDITA || code == LVN_BEGINLABELEDITA)
+	else if ((code >= LVN_LAST && code <= LVN_GETDISPINFOW) || code == LVN_ENDLABELEDIT || code == LVN_BEGINLABELEDIT)
 		fmt = "L";		// NMLVDISPINFO
 	else if (code >= LVN_BEGINRDRAG && code <= LVN_FIRST)
 		fmt = "iiiiiPV";		// NMLISTVIEW - Last item is an LPARAM
@@ -360,7 +363,7 @@ Python_OnNotify (CWnd *pFrom, WPARAM, LPARAM lParam, LRESULT *pResult)
 			PyNotifyParseExtraTuple( pHdr, obOther, fmt);
 		if (PyErr_Occurred()){
 			gui_print_error();
-			PyErr_SetString(ui_module_error, "Error parsing OnNotify() extra return info");
+			PyErr_Format(ui_module_error, "Error parsing OnNotify() extra return info for code %d, fmt='%s'", code, fmt);
 			gui_print_error();
 			}
 		}

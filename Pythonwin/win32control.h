@@ -19,13 +19,18 @@ inline PyCCtrlView_Type::PyCCtrlView_Type( const char *name, ui_type *pBaseType,
 	ui_type_CObject(name, pBaseType, pRT, typeSize, methodList, thector )
 {
 	control = pControlType;
+	/* Some types also inherit from the control type (if different from itself).
+		tp_base will already have been set in ui_type_CObject constructor.
+	*/
+	if (pControlType != this)
+		tp_bases=Py_BuildValue("OO", pBaseType, pControlType);
 }
 
 class PYW_EXPORT PyCCtrlView : public PyCView {
 public:
 	MAKE_PY_CTOR(PyCCtrlView)
 	static PyCCtrlView_Type type;
-	PyObject * getattr(char *name);
+	// PyObject * getattr(char *name);
 	static PyObject *create(PyObject *self, PyObject *args);
 protected:
 	PyCCtrlView() {return;}
