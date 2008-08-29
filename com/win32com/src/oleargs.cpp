@@ -115,7 +115,9 @@ BOOL PyCom_VariantFromPyObject(PyObject *obj, VARIANT *var)
 		V_VT(var) = VT_I4;
 		V_I4(var) = PyInt_AsLong(obj);
 	}
-	else if (PyInstance_Check(obj) && PyObject_HasAttrString(obj, "_oleobj_"))
+	// PyInstance_Check had disappeared in py3k
+	// else if (PyInstance_Check(obj) && PyObject_HasAttrString(obj, "_oleobj_"))
+	else if (PyObject_HasAttrString(obj, "_oleobj_"))
 	{
 		if (PyCom_InterfaceFromPyInstanceOrObject(obj, IID_IDispatch, (void **)&V_DISPATCH(var), FALSE))
 				V_VT(var) = VT_DISPATCH;
@@ -164,7 +166,9 @@ BOOL PyCom_VariantFromPyObject(PyObject *obj, VARIANT *var)
 		V_VT(var) = VT_DATE;
 		PyWinObject_AsDATE(obj, &(V_DATE(var)));
 	}
-	else if (PyBuffer_Check(obj)) {
+	// PyBuffer_Check has gone away in py3k
+	// else if (PyBuffer_Check(obj)) {
+	else if (obj->ob_type->tp_as_buffer) {
 		// We have a buffer object - convert to safe array of VT_UI1
 		if (!PyCom_SAFEARRAYFromPyObject(obj, &V_ARRAY(var), VT_UI1))
 			return FALSE;
@@ -192,16 +196,12 @@ BOOL PyCom_VariantFromPyObject(PyObject *obj, VARIANT *var)
 			return FALSE;
 		V_VT(var) = VT_CY;
 	}
-	/*
-	else if (obj->ob_type == &AutomatedType)
-	{
-	}
-	*/
+
 	if (V_VT(var) == VT_EMPTY && !bGoodEmpty) {
 		// Must ensure we have a Python error set if we fail!
 		if (!PyErr_Occurred()) {
 			char *extraMessage = "";
-			if (obj->ob_type->tp_as_buffer && obj->ob_type->tp_as_buffer->bf_getreadbuffer)
+			if (obj->ob_type->tp_as_buffer)
 				extraMessage = " (but obtaining the buffer() of this object could)";
 			PyErr_Format(PyExc_TypeError, "Objects of type '%s' can not be converted to a COM VARIANT%s", obj->ob_type->tp_name, extraMessage);
 		}
@@ -273,7 +273,7 @@ PyObject *PyCom_PyObjectFromVariant(const VARIANT *var)
 			}
 			// The result may be too large for a simple "long".  If so,
 			// we must return a long.
-			if (V_UI4(&varValue) <= (unsigned)PyInt_GetMax())
+			if (V_UI4(&varValue) <= INT_MAX)
 				result = PyInt_FromLong(V_UI4(&varValue));
 			else
 				result = PyLong_FromUnsignedLong(V_UI4(&varValue));
@@ -398,30 +398,28 @@ static BOOL PyCom_SAFEARRAYFromPyObjectBuildDimension(PyObject *obj, SAFEARRAY *
 	// so, we can copy the entire dimension in one hit
 	// (only support single segment buffers for now)
 	if (dimNo==nDims && vt==VT_UI1 && obj->ob_type->tp_as_buffer) {
-		PyBufferProcs *pb = obj->ob_type->tp_as_buffer;
-		Py_ssize_t bufSize;
-		if (pb->bf_getreadbuffer && 
-			pb->bf_getsegcount &&
-			(*pb->bf_getsegcount)(obj, &bufSize)==1) 
-		{
-			if (PyWin_SAFE_DOWNCAST(bufSize, Py_ssize_t, LONG) != numElements) {
-				OleSetTypeError("Internal error - the buffer length is not the sequence length!");
-				return FALSE;
+		DWORD bufSize;
+		void *ob_buf, *sa_buf;
+		if (!PyWinObject_AsReadBuffer(obj, &ob_buf, &bufSize))
+			return FALSE;
+
+		if (bufSize != numElements) {
+			OleSetTypeError("Internal error - the buffer length is not the sequence length!");
+			return FALSE;
 			}
-			void *ob_buf, *sa_buf;
-			HRESULT hr = SafeArrayAccessData(pSA,&sa_buf);
-			if (FAILED(hr)) {
-				PyCom_BuildPyException(hr);
-				return FALSE;
+
+		HRESULT hr = SafeArrayAccessData(pSA,&sa_buf);
+		if (FAILED(hr)) {
+			PyCom_BuildPyException(hr);
+			return FALSE;
 			}
-			pb->bf_getreadbuffer(obj, 0, &ob_buf);
-			memcpy(sa_buf, ob_buf, bufSize);
-			SafeArrayUnaccessData(pSA);
-			// All done without a single loop :-)
-			return TRUE;
+		memcpy(sa_buf, ob_buf, bufSize);
+		SafeArrayUnaccessData(pSA);
+		// All done without a single loop :-)
+		return TRUE;
 		}
 		// Otherwise just fall through into the standard mechanisms
-	}
+
 	BOOL ok = TRUE;
 	for (int index=0;index<(int)numElements && ok;index++) {
 		pIndices[dimNo-1] = index;
@@ -498,7 +496,7 @@ static long PyCom_CalculatePyObjectDimension(PyObject *obItemCheck, long lDimens
 		long      lActualDimension  = -1;
 		Py_ssize_t lObjectSize;
 
-		if (PyBuffer_Check(obItemCheck))
+		if (obItemCheck->ob_type->tp_as_buffer)
 			// buffers are a special case - they define 1 new dimension.
 			return lReturnDimension+1;
 
@@ -840,16 +838,12 @@ PyObject *PyCom_PyObjectFromSAFEARRAYBuildDimension(SAFEARRAY *psa, VARENUM vt, 
 		PyObject *ret = PyBuffer_New(dataSize);
 		if (ret!=NULL) {
 			// Access the buffer object using the buffer interfaces.
-			PyBufferProcs *pb = ret->ob_type->tp_as_buffer;
-			if (!pb->bf_getwritebuffer ||
-			    !pb->bf_getsegcount ||
-			    (*pb->bf_getsegcount)(ret, NULL)!=1) {
-				PyErr_SetString(PyExc_RuntimeError, "New buffer has no buffer interfaces!!");
+			DWORD count;
+			if (!PyWinObject_AsWriteBuffer(ret, &ob_buf, &count)){
 				SafeArrayUnaccessData(psa);
 				Py_DECREF(ret);
 				return NULL;
 			}
-			long count = pb->bf_getwritebuffer(ret, 0, &ob_buf);
 			if (count != cElems) {
 				PyErr_SetString(PyExc_RuntimeError, "buffer size is not what we created!");
 				SafeArrayUnaccessData(psa);

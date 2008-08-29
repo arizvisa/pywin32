@@ -24,15 +24,41 @@ static const PyCom_InterfaceSupportInfo register_data[] =
 	PYCOM_INTERFACE_CLIENT_ONLY( ProvideTaskPage )
 };
 
-extern "C" __declspec(dllexport) void inittaskscheduler()
+
+extern "C" __declspec(dllexport)
+#if (PY_VERSION_HEX < 0x03000000)
+void inittaskscheduler(void)
+#else
+PyObject *PyInit_taskscheduler(void)
+#endif
 {
-	PyObject *module;
+	PyObject *dict, *module;
+	PyWinGlobals_Ensure();
+
+#if (PY_VERSION_HEX < 0x03000000)
+#define RETURN_ERROR return;
 	module = Py_InitModule("taskscheduler", taskscheduler_methods);
-	if (module==NULL)
+	if (!module)
 		return;
-	PyObject *dict = PyModule_GetDict(module);
-	if (dict==NULL)
+	dict = PyModule_GetDict(module);
+	if (!dict)
 		return;
+#else
+#define RETURN_ERROR return NULL;
+	static PyModuleDef taskscheduler_def = {
+		PyModuleDef_HEAD_INIT,
+		"taskscheduler",
+		"Supports the Scheduled Tasks COM interfaces",
+		-1,
+		taskscheduler_methods
+		};
+	module = PyModule_Create(&taskscheduler_def);
+	if (!module)
+		return NULL;
+	dict = PyModule_GetDict(module);
+	if (!dict)
+		return NULL;
+#endif
 
 	// Register all of our interfaces, gateways and IIDs.
 	PyCom_RegisterExtensionSupport(dict, register_data, sizeof(register_data)/sizeof(PyCom_InterfaceSupportInfo));
@@ -132,4 +158,7 @@ extern "C" __declspec(dllexport) void inittaskscheduler()
 	PyModule_AddIntConstant(module,"TASKPAGE_SCHEDULE", TASKPAGE_SCHEDULE);
 	PyModule_AddIntConstant(module,"TASKPAGE_SETTINGS", TASKPAGE_SETTINGS);
 
+#if (PY_VERSION_HEX >= 0x03000000)
+	return module;
+#endif
 }

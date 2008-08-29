@@ -388,13 +388,13 @@ PyObject *PyIScheduledWorkItem::SetComment(PyObject *self, PyObject *args)
 	LPWSTR pwszComment;
 	if ( !PyArg_ParseTuple(args, "O:SetComment", &obpwszComment) )
 		return NULL;
-	BOOL bPythonIsHappy = TRUE;
-	if (bPythonIsHappy && !PyWinObject_AsBstr(obpwszComment, &pwszComment)) bPythonIsHappy = FALSE;
-	if (!bPythonIsHappy) return NULL;
+
+	if (!PyWinObject_AsWCHAR(obpwszComment, &pwszComment))
+		return NULL;
 	HRESULT hr;
 	PY_INTERFACE_PRECALL;
 	hr = pISWI->SetComment( pwszComment );
-	SysFreeString(pwszComment);
+	PyWinObject_FreeWCHAR(pwszComment);
 
 	PY_INTERFACE_POSTCALL;
 
@@ -438,13 +438,12 @@ PyObject *PyIScheduledWorkItem::SetCreator(PyObject *self, PyObject *args)
 	LPWSTR pwszCreator;
 	if ( !PyArg_ParseTuple(args, "O:SetCreator", &obpwszCreator) )
 		return NULL;
-	BOOL bPythonIsHappy = TRUE;
-	if (bPythonIsHappy && !PyWinObject_AsBstr(obpwszCreator, &pwszCreator)) bPythonIsHappy = FALSE;
-	if (!bPythonIsHappy) return NULL;
+	if (!PyWinObject_AsWCHAR(obpwszCreator, &pwszCreator))
+		return NULL;
 	HRESULT hr;
 	PY_INTERFACE_PRECALL;
 	hr = pISWI->SetCreator( pwszCreator );
-	SysFreeString(pwszCreator);
+	PyWinObject_FreeWCHAR(pwszCreator);
 
 	PY_INTERFACE_POSTCALL;
 

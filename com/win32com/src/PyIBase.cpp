@@ -9,21 +9,11 @@ PyIBase::~PyIBase()
 {
 }
 
-/*static*/BOOL PyIBase::is_object(const PyObject *ob, PyComTypeObject *which)
+/*static*/BOOL PyIBase::is_object(PyObject *ob, PyComTypeObject *which)
 {
-	// First, is the object an instance of an interface type?
-	if ( !PyComTypeObject::is_interface_type((PyObject *)ob->ob_type) )
-		return FALSE;
-
-	// now check for inheritance.
-	PyComTypeObject *thisType = (PyComTypeObject *)ob->ob_type;
-	while (thisType) {
-		if (which==thisType)
-			return TRUE;
-		thisType = thisType->baseType;
-	}
-	return FALSE;
+	return PyObject_IsInstance(ob, (PyObject *)which);
 }
+
 BOOL PyIBase::is_object(PyComTypeObject *which)
 {
 	return is_object(this,which);
@@ -32,33 +22,34 @@ BOOL PyIBase::is_object(PyComTypeObject *which)
 /*static*/PyObject *
 PyIBase::getattro(PyObject *self, PyObject *name)
 {
+	/*
 	if (PyString_Check(name)) {
 		PyObject *rc = ((PyIBase *)self)->getattr(PyString_AsString(name));
 		if (rc)
 			return rc;
 		PyErr_Clear();
 	}
+	*/
 	// Using PyObject_GenericGetAttr allows some special type magic
 	// (ie, 
-#ifdef OLD_PYTHON_TYPES
-	PyErr_SetObject(PyExc_AttributeError, name);
-	return NULL;
-#else
 	return PyObject_GenericGetAttr(self, name);
-#endif
 }
 
 PyObject *
 PyIBase::getattr(char *name)
 {
-	return Py_FindMethodInChain(&((PyComTypeObject *)ob_type)->chain, this, name);
+	return PyObject_GetAttrString(this, name);
 }
 
-/*static*/int PyIBase::setattr(PyObject *op, char *name, PyObject *v)
+/*static*/int PyIBase::setattro(PyObject *op,PyObject *obname, PyObject *v)
 {
+	char *name=PYWIN_ATTR_CONVERT(obname);
+	if (name==NULL)
+		return -1;
 	PyIBase* bc = (PyIBase *)op;
 	return bc->setattr(name,v);
 }
+
 int PyIBase::setattr(char *name, PyObject *v)
 {
 	char buf[128];
@@ -76,7 +67,7 @@ PyObject * PyIBase::repr()
 {
 	TCHAR buf[80];
 	wsprintf(buf, _T("<%hs at %p>"),ob_type->tp_name, (PyObject *)this);
-	return PyString_FromTCHAR(buf);
+	return PyWinObject_FromTCHAR(buf);
 }
 
 /*static*/ void PyIBase::dealloc(PyObject *ob)

@@ -190,9 +190,9 @@ PyObject * dataconv_WriteFromOutTuple(PyObject *self, PyObject *args)
 	VARTYPE vtArgType;
 	BYTE *pbArgs;
 	BYTE *pbArg;
-	UINT cArgs;
+	Py_ssize_t cArgs;
 	UINT uiIndirectionLevel = 0;
-	UINT i;
+	Py_ssize_t i;
 	
 	if (!PyArg_ParseTuple(args, "OOO:WriteFromOutTuple", &obRetValues, &obArgTypes, &obPtr))
 		return NULL;
@@ -460,16 +460,18 @@ PyObject * dataconv_WriteFromOutTuple(PyObject *self, PyObject *args)
 		{
 			BYTE *pb = *(BYTE **)pbArg;
 			BYTE *pbOutBuffer = NULL;
-			UINT cb = 0;
-			if (PyBuffer_Check(obOutValue))
-			{
-				cb = obOutValue->ob_type->tp_as_buffer->bf_getreadbuffer(obOutValue, 0, (void **)&pbOutBuffer);
-				memcpy(pb, pbOutBuffer, cb);
-			}
-			else if (PyString_Check(obOutValue))
+			if (PyString_Check(obOutValue))
 			{
 				pbOutBuffer = (BYTE *)PyString_AS_STRING(obOutValue);
-				cb = PyString_GET_SIZE(obOutValue);
+				Py_ssize_t cb = PyString_GET_SIZE(obOutValue);
+				memcpy(pb, pbOutBuffer, cb);
+			}
+			// keep this after string check since string can act as buffers
+			else if (obOutValue->ob_type->tp_as_buffer)
+			{
+				DWORD cb;
+				if (!PyWinObject_AsReadBuffer(obOutValue, (void **)&pbOutBuffer, &cb))
+					goto Error;
 				memcpy(pb, pbOutBuffer, cb);
 			}
 			else
@@ -614,7 +616,7 @@ PyObject * dataconv_ReadFromInTuple(PyObject *self, PyObject *args)
 	PyObject *obPtr;
 	BYTE *pb;
 	BYTE *pbArg;
-	UINT cArgs, i;
+	Py_ssize_t cArgs, i;
 	PyObject *obArgs = NULL;
 	PyObject *obArg;
 	VARTYPE vtArgType;

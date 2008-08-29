@@ -260,16 +260,39 @@ static const PyCom_InterfaceSupportInfo g_interfaceSupportData[] =
 };
 
 /* Module initialisation */
-extern "C" __declspec(dllexport) void initdirectsound()
+extern "C" __declspec(dllexport)
+#if (PY_VERSION_HEX < 0x03000000)
+void initdirectsound(void)
+#else
+PyObject *PyInit_directsound(void)
+#endif
 {
-	char *modName = "directsound";
-	PyObject *oModule;
-	// Create the module and add the functions
-	oModule = Py_InitModule(modName, directsound_methods);
-	if (!oModule) /* Eeek - some serious error! */
+	PyObject *dict, *module;
+	PyWinGlobals_Ensure();
+
+#if (PY_VERSION_HEX < 0x03000000)
+	module = Py_InitModule("directsound", directsound_methods);
+	if (!module)
 		return;
-	PyObject *dict = PyModule_GetDict(oModule);
-	if (!dict) return; /* Another serious error!*/
+	dict = PyModule_GetDict(module);
+	if (!dict)
+		return;
+#else
+
+	static PyModuleDef directsound_def = {
+		PyModuleDef_HEAD_INIT,
+		"directsound",
+		"A module encapsulating the DirectSound interfaces.",
+		-1,
+		directsound_methods
+		};
+	module = PyModule_Create(&directsound_def);
+	if (!module)
+		return NULL;
+	dict = PyModule_GetDict(module);
+	if (!dict)
+		return NULL;
+#endif
 
 	// Register all of our interfaces, gateways and IIDs.
 	PyCom_RegisterExtensionSupport(dict, g_interfaceSupportData, sizeof(g_interfaceSupportData)/sizeof(g_interfaceSupportData[0]));
@@ -400,6 +423,10 @@ extern "C" __declspec(dllexport) void initdirectsound()
 	PyDict_SetItemString(dict, "DSCCAPSType", (PyObject *)&PyDSCCAPSType);
 	PyDict_SetItemString(dict, "DSCBCAPSType", (PyObject *)&PyDSCBCAPSType);
 	PyDict_SetItemString(dict, "DSCBUFFERDESCType", (PyObject *)&PyDSCBUFFERDESCType);
+
+#if (PY_VERSION_HEX >= 0x03000000)
+	return module;
+#endif
 }
 
 /* @topic DirectSound examples|

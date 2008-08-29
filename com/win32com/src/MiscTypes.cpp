@@ -9,8 +9,7 @@
 // ###         provide a nice way to see what interface is being exposed by
 // ###         an object).
 static PyTypeObject PyInterfaceType_Type = {
-	PyObject_HEAD_INIT(&PyType_Type)
-	0,			/* Number of items for varobject */
+	PYWIN_OBJECT_HEAD
 	"interface-type",			/* Name of this type */
 	sizeof(PyTypeObject),	/* Basic object size */
 	0,			/* Item size for varobject */
@@ -36,23 +35,18 @@ static PyTypeObject PyInterfaceType_Type = {
 PyComTypeObject::PyComTypeObject( const char *name, PyComTypeObject *pBase, int typeSize, struct PyMethodDef* methodList, PyIUnknown * (* thector)(IUnknown *))
 {
 // originally, this copied the typeobject of the parent, but as it is impossible
-// to gurantee order of static object construction, I went this way.  This is 
+// to guarantee order of static object construction, I went this way.  This is 
 // probably better, as is forces _all_ python objects have the same type sig.
 	static const PyTypeObject type_template = {
-#ifdef OLD_PYTHON_TYPES
-		PyObject_HEAD_INIT(&PyInterfaceType_Type)
-#else
-		PyObject_HEAD_INIT(&PyType_Type)
-#endif
-		0,													/*ob_size*/
+		PYWIN_OBJECT_HEAD
 		"PythonComTypeTemplate",							/*tp_name*/
 		sizeof(PyIBase), 									/*tp_basicsize*/
 		0,													/*tp_itemsize*/
 		/* methods */
 		(destructor) PyIBase::dealloc, 						/*tp_dealloc*/
 		0,													/*tp_print*/
-		0, 					/*tp_getattr*/
-		(setattrfunc) PyIBase::setattr,						/*tp_setattr*/
+		0, 													/*tp_getattr*/
+		0,													/*tp_setattr*/
 		PyIBase::cmp,										/*tp_compare*/
 		(reprfunc)PyIBase::repr,							/*tp_repr*/
     	0,													/*tp_as_number*/
@@ -61,10 +55,10 @@ PyComTypeObject::PyComTypeObject( const char *name, PyComTypeObject *pBase, int 
 		0,			/*tp_hash*/
 		0,			/*tp_call*/
 		0,			/*tp_str*/
-		PyIBase::getattro, /* tp_getattro */
-		0,			/*tp_setattro */
+		PyIBase::getattro,		/* tp_getattro */
+		PyIBase::setattro,			/*tp_setattro */
 		0,			/* tp_as_buffer */
-		0,			/* tp_flags */
+		Py_TPFLAGS_DEFAULT,			/* tp_flags */
 		0,          /* tp_doc */
 		0,    /* tp_traverse */
 		0,                              /* tp_clear */
@@ -75,37 +69,33 @@ PyComTypeObject::PyComTypeObject( const char *name, PyComTypeObject *pBase, int 
 		0,					/* tp_methods */	
 		0,					/* tp_members */
 		0,					/* tp_getset */
-#ifdef OLD_PYTHON_TYPES
-		0,					/* tp_base */
-#else
-		&PyInterfaceType_Type,
-#endif
+		0,	//	&PyInterfaceType_Type,	/* tp_base */
 	};
 
 	*((PyTypeObject *)this) = type_template;
-
-	chain.methods = methodList;
-	chain.link = pBase ? &pBase->chain : NULL;
-
-	baseType = pBase;
 	ctor = thector;
 
 	// cast away const, as Python doesnt use it.
 	tp_name = (char *)name;
 	tp_basicsize = typeSize;
+	((PyObject *)this)->ob_type=&PyType_Type;
+	tp_methods=methodList;
+
+	// All interfaces are based on PyInterfaceType, so this type will inherit from it thru pBase
+	// tp_bases=Py_BuildValue("OO", &PyInterfaceType_Type, pBase);
+	if (pBase)
+		tp_base=pBase;
+	else
+		tp_base=&PyInterfaceType_Type;
 }
+
 PyComTypeObject::~PyComTypeObject()
 {
 }
 
-/* static */ BOOL PyComTypeObject::is_interface_type(const PyObject *ob)
+/* static */ BOOL PyComTypeObject::is_interface_type(PyObject *ob)
 {
-#ifdef OLD_PYTHON_TYPES
-	return ob->ob_type == &PyInterfaceType_Type;
-#else
-	return ob->ob_type == &PyType_Type && 
-	       ((PyTypeObject *)ob)->tp_base == &PyInterfaceType_Type;
-#endif
+	return PyObject_IsSubclass(ob, (PyObject *)&PyInterfaceType_Type);
 }
 
 // Our type for IEnum* interfaces
@@ -114,7 +104,10 @@ PyComEnumTypeObject::PyComEnumTypeObject( const char *name, PyComTypeObject *pBa
 {
 	tp_iter = iter;
 	tp_iternext = iternext;
+	// Py3k does not have this flag, and depends just on presence of tp_iter
+#if (PY_VERSION_HEX < 0x03000000)
 	tp_flags |= Py_TPFLAGS_HAVE_ITER;
+#endif
 }
 
 // PyIEnum iter methods - generic for any "standard" COM IEnum interface, but
@@ -166,7 +159,9 @@ PyComEnumProviderTypeObject::PyComEnumProviderTypeObject(
 {
 	tp_iter = iter;
 	// tp_iternext remains NULL
+#if (PY_VERSION_HEX < 0x03000000)
 	tp_flags |= Py_TPFLAGS_HAVE_ITER;
+#endif
 }
 
 // PyIEnumProvider iter methods - generic for COM object that can provide an IEnum*
@@ -215,8 +210,7 @@ static void empty_dealloc(PyOleEmpty *o)
 
 PyTypeObject PyOleEmptyType =
 {
-	PyObject_HEAD_INIT(&PyType_Type)
-	0,
+	PYWIN_OBJECT_HEAD
 	"PyOleEmpty",
 	sizeof(PyOleEmpty),
 	0,
@@ -246,8 +240,7 @@ static void missing_dealloc(PyOleMissing *o)
 
 PYCOM_EXPORT PyTypeObject PyOleMissingType =
 {
-	PyObject_HEAD_INIT(&PyType_Type)
-	0,
+	PYWIN_OBJECT_HEAD
 	"PyOleMissing",
 	sizeof(PyOleMissing),
 	0,
@@ -276,8 +269,7 @@ static void notfound_dealloc(PyOleArgNotFound *o)
 
 PyTypeObject PyOleArgNotFoundType =
 {
-	PyObject_HEAD_INIT(&PyType_Type)
-	0,
+	PYWIN_OBJECT_HEAD
 	"ArgNotFound",
 	sizeof(PyOleArgNotFound),
 	0,

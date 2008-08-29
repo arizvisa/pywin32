@@ -14,10 +14,8 @@ generates Windows .hlp files.
 #include "PythonCOM.h"
 #include "PythonCOMServer.h"
 #include "PyFactory.h"
+#include "PyComTypeObjects.h"
 #include "OleAcc.h" // for ObjectFromLresult proto...
-
-// keep a reference to pythoncom'm __dict__ so the COM currency format can be looked up dynamically
-extern PyObject *pythoncom_dict=NULL;
 
 extern int PyCom_RegisterCoreIIDs(PyObject *dict);
 
@@ -1974,10 +1972,13 @@ static char *modName = "pythoncom";
 extern BOOL initunivgw(PyObject *parentDict);
 
 /* Module initialisation */
-extern "C" __declspec(dllexport) void initpythoncom()
+extern "C" __declspec(dllexport)
+#if (PY_VERSION_HEX < 0x03000000)
+void initpythoncom()
+#else
+PyObject *PyInit_pythoncom(void)
+#endif
 {
-	PyObject *oModule;
-
 	// The DLL Load inited the module.
 	// All we do here is init COM itself.  Done here
 	// so other clients get a chance to beat us to it!
@@ -1999,18 +2000,35 @@ extern "C" __declspec(dllexport) void initpythoncom()
 	// If HR fails, we really dont care - the import should work.  User can
 	// manually CoInit() to see!
 
+	PyObject *dict, *module;
+#if (PY_VERSION_HEX < 0x03000000)
+#define RETURN_ERROR return;
+	module = Py_InitModule("pythoncom", pythoncom_methods);
+	if (!module)
+		return;
+	dict = PyModule_GetDict(module);
+	if (!dict)
+		return;
+#else
+#define RETURN_ERROR return NULL;
+	static PyModuleDef pythoncom_def = {
+		PyModuleDef_HEAD_INIT,
+		"pythoncom",
+		"A module, encapsulating the OLE automation API",
+		-1,
+		pythoncom_methods
+		};
+	module = PyModule_Create(&pythoncom_def);
+	if (!module)
+		return NULL;
+	dict = PyModule_GetDict(module);
+	if (!dict)
+		return NULL;
+#endif
+
 	// ensure the framework has valid state to work with.
 	PyWinGlobals_Ensure();
 	PyCom_RegisterCoreSupport();
-
-	// Create the module and add the functions
-	oModule = Py_InitModule(modName, pythoncom_methods);
-	if (!oModule) /* Eeek - some serious error! */
-		return;
-
-	PyObject *dict = PyModule_GetDict(oModule);
-	if (!dict) return; /* Another serious error!*/
-	pythoncom_dict=dict;
 
 	PyDict_SetItemString(dict, "TypeIIDs", g_obPyCom_MapIIDToType);
 	PyDict_SetItemString(dict, "ServerInterfaces", g_obPyCom_MapGatewayIIDToName);
@@ -2027,44 +2045,40 @@ extern "C" __declspec(dllexport) void initpythoncom()
 
 	// Add some symbolic constants to the module   
 	// pycom_Error = PyString_FromString("pythoncom.error");
-	PyObject *pycom_Error = PyWinExc_COMError;
-	if (pycom_Error == NULL || PyDict_SetItemString(dict, "error", pycom_Error) != 0)
+	if (PyWinExc_COMError==NULL)
 	{
-		PyErr_SetString(PyExc_MemoryError, "can't define error");
-		return;
-	}
-	if (PyWinExc_COMError==NULL || PyDict_SetItemString(dict, "ole_error", PyWinExc_COMError) != 0)
-	{
+		// This is created by PyWin_Globals_Ensure
 		PyErr_SetString(PyExc_MemoryError, "can't define ole_error");
-		return;
+		RETURN_ERROR;
 	}
+	PyObject *pycom_Error = PyWinExc_COMError;
+	if (PyDict_SetItemString(dict, "ole_error", PyWinExc_COMError) != 0)
+		RETURN_ERROR;
+	if (PyDict_SetItemString(dict, "error", pycom_Error) != 0)
+		RETURN_ERROR;
+
 	// Add the same constant, but with a "new name"
 	if (PyDict_SetItemString(dict, "com_error", PyWinExc_COMError) != 0)
-	{
-		PyErr_SetString(PyExc_MemoryError, "can't define com_error");
-		return;
-	}
+		RETURN_ERROR;
+
 	PyCom_InternalError = PyErr_NewException("pythoncom.internal_error", NULL, NULL);
 	if (PyDict_SetItemString(dict, "internal_error", PyCom_InternalError) != 0)
-	{
-		PyErr_SetString(PyExc_MemoryError, "can't define internal_error");
-		return;
-	}
+		RETURN_ERROR;
 
 	// Add the IIDs
 	if (PyCom_RegisterCoreIIDs(dict) != 0)
-		return;
+		RETURN_ERROR;
+
+	// Initialize various non-interface types
+	if (PyType_Ready(&PyFUNCDESC::Type) == -1 ||
+		PyType_Ready(&PySTGMEDIUM::Type) == -1 ||
+		PyType_Ready(&PyTYPEATTR::Type) == -1 ||
+		PyType_Ready(&PyVARDESC::Type) == -1)
+		RETURN_ERROR;
 
 	// Setup our sub-modules
 	if (!initunivgw(dict))
-		return;
-
-	// Add a few types.
-	// NOTE - We do not autoduck these types, as they are for b/w compat only
-	// New code should use the functions in pywintypes.
-	PyDict_SetItemString(dict, "PyTimeType", (PyObject *)&PyTimeType);
-	PyDict_SetItemString(dict, "PyIIDType", (PyObject *)&PyIIDType);
-	PyDict_SetItemString(dict, "PyUnicodeType", (PyObject *)&PyUnicodeType);
+		RETURN_ERROR;
 
 	// Load function pointers.
 	HMODULE hModOle32 = GetModuleHandle("ole32.dll");
@@ -2415,5 +2429,9 @@ extern "C" __declspec(dllexport) void initpythoncom()
 	// ### ALL THE @PROPERTY TAGS MUST COME AFTER THE LAST @PROP TAG!!
 	// @property int|pythoncom|frozen|1 if the host is a frozen program, else 0
 	// @property int|pythoncom|dcom|1 if the system is DCOM aware, else 0.  Only Win95 without DCOM extensions should return 0
+
+#if (PY_VERSION_HEX >= 0x03000000)
+	return module;
+#endif;
 }
 

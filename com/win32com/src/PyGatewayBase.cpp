@@ -17,7 +17,10 @@ extern void PyCom_LogF(const char *fmt, ...);
 #define LogF PyCom_LogF
 
 #include <malloc.h>
-#if _MSC_VER < 1400
+// When building with the 2003 Platform SDK 64-bit compiloer, _MSC_VER is 1400,
+// but _malloca is not defined
+// #if _MSC_VER < 1400
+#ifndef _malloca
 // _malloca is the new 'safe' one
 #define _malloca _alloca
 #endif

@@ -10,7 +10,6 @@
 
 extern PyObject *g_obPyCom_MapIIDToType;
 extern PyObject *g_obPyCom_MapServerIIDToGateway;
-extern PyObject *pythoncom_dict;
 
 // String conversions
 
@@ -44,54 +43,25 @@ PyObject *MakeOLECHARToObj(const OLECHAR * str)
 // Currency conversions.
 PyObject *PyObject_FromCurrency(CURRENCY &cy)
 {
-	static BOOL decimal_imported=FALSE;
 	static PyObject *decimal_module=NULL;
-	static BOOL warned_future_currency=FALSE;
 	PyObject *result = NULL;
-
-	// Use decimal module if available and __future_currency__ evaluates to True, otherwise use old behaviour
-	PyObject *__future_currency__;
-	BOOL use_decimal;
-	__future_currency__=PyDict_GetItemString(pythoncom_dict,"__future_currency__");
-	if (__future_currency__==NULL){  // should not happen !
-		PyErr_Print();
-		use_decimal=FALSE;
-	}
-	else
-		use_decimal=PyObject_IsTrue(__future_currency__);
-	if (!use_decimal && !warned_future_currency) {
-#if (PY_VERSION_HEX >= 0x02030000)
-		PyErr_Warn(PyExc_FutureWarning,
-				   "Currency objects will soon be changed so a decimal.Decimal instance is used."
-				   "\n (set pythoncom.__future_currency__ to get these objects now.)");
-#endif
-		warned_future_currency = TRUE;
-	}
 	
-	if (use_decimal && !decimal_imported){
+	if (decimal_module==NULL){
 		decimal_module=PyImport_ImportModule("decimal");
 		if (!decimal_module) {
 			PyErr_Clear();
 			decimal_module=PyImport_ImportModule("win32com.decimal_23");
+			}
 		}
-		decimal_imported=TRUE;
-		if (decimal_module==NULL)
-			PyErr_Print();
-	}
-	if (use_decimal && (decimal_module==NULL)){
-		PyErr_Warn(NULL,"Can't find decimal module, reverting to using tuple for currency");
-		use_decimal=FALSE;
-	}
-	if (!use_decimal)
-		result = Py_BuildValue("ll", cy.Hi, cy.Lo);
-	else {
-		PyObject *unscaled_result;
-		unscaled_result=PyObject_CallMethod(decimal_module, "Decimal", "L", cy.int64);
-		if (unscaled_result!=NULL){
-			result=PyObject_CallMethod(unscaled_result, "__div__", "l", 10000);
-			Py_DECREF(unscaled_result);
+	if (decimal_module==NULL)
+		return NULL;
+
+	PyObject *unscaled_result;
+	unscaled_result=PyObject_CallMethod(decimal_module, "Decimal", "L", cy.int64);
+	if (unscaled_result!=NULL){
+		result=PyObject_CallMethod(unscaled_result, "__div__", "l", 10000);
+		Py_DECREF(unscaled_result);
 		}
-	}
 	return result;
 }
 
@@ -185,19 +155,25 @@ PyObject *PyCom_PyObjectFromIUnknown(IUnknown *punk, REFIID riid, BOOL bAddRef /
 
 BOOL PyCom_InterfaceFromPyInstanceOrObject(PyObject *ob, REFIID iid, LPVOID *ppv, BOOL bNoneOK /* = TRUE */)
 {
-	if (ob && PyInstance_Check(ob)) {
-		// Get the _oleobj_ attribute
-		ob = PyObject_GetAttrString(ob, "_oleobj_");
-		if (ob==NULL) {
-			PyErr_Clear();
-			PyErr_SetString(PyExc_TypeError, "The Python instance can not be converted to a COM object");
-			return FALSE;
+	if (ob == Py_None){
+		*ppv = NULL;
+		if (bNoneOK)
+			return TRUE;
+		PyErr_SetString(PyExc_TypeError, "None is not a valid interface object in this context");
+		return FALSE;
 		}
-	} else {
-		Py_XINCREF(ob);
-	}
+
+	if (PyObject_IsInstance(ob, (PyObject *)&PyIUnknown::type))
+		return PyCom_InterfaceFromPyObject(ob, iid, ppv, bNoneOK );
+
+	ob = PyObject_GetAttrString(ob, "_oleobj_");
+	if (ob==NULL) {
+		PyErr_Clear();
+		PyErr_SetString(PyExc_TypeError, "The Python instance can not be converted to a COM object");
+		return FALSE;
+		}
 	BOOL rc = PyCom_InterfaceFromPyObject(ob, iid, ppv, bNoneOK );
-	Py_XDECREF(ob);
+	Py_DECREF(ob);
 	return rc;
 }
 

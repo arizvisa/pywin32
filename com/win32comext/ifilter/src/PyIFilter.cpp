@@ -282,7 +282,7 @@ static int AddIID(PyObject *dict, const char *key, REFGUID guid)
 #define ADD_CONSTANT(tok) AddConstant(dict, #tok, tok)
 #define ADD_IID(tok) AddIID(dict, #tok, tok)
 
-// @object PyIFilter|Description of the interface
+// @object PyIFilter|Wraps the interfaces used with Indexing Service filtering
 static struct PyMethodDef PyIFilter_methods[] =
 {
 	{ "Init", PyIFilter::Init, 1 }, // @pymeth Init|Description of Init
@@ -299,7 +299,7 @@ PyComTypeObject PyIFilter::type("PyIFilter",
 		GET_PYCOM_CTOR(PyIFilter));
 
 
-static struct PyMethodDef g_methods[] =
+static struct PyMethodDef ifilter_functions[] =
 {
 	{ "LoadIFilter", pyLoadIFilter, 1 }, // @pymeth Init|Description of Init
 	{ "BindIFilterFromStorage", pyBindIFilterFromStorage, 1 }, // @pymeth BindIFilterFromStorage|
@@ -314,19 +314,39 @@ static const PyCom_InterfaceSupportInfo g_interfaceSupportData[] =
 };
 
 /* Module initialisation */
-extern "C" __declspec(dllexport) void initifilter()
+extern "C" __declspec(dllexport)
+#if (PY_VERSION_HEX < 0x03000000)
+void initifilter(void)
+#else
+PyObject *PyInit_ifilter(void)
+#endif
 {
-	char *modName = "ifilter";
-	PyObject *oModule;
-
+	PyObject *dict, *module;
 	PyWinGlobals_Ensure();
 
-	// Create the module and add the functions
-	oModule = Py_InitModule(modName, g_methods);
-	if (!oModule) /* Eeek - some serious error! */
+#if (PY_VERSION_HEX < 0x03000000)
+	module = Py_InitModule("ifilter", ifilter_functions);
+	if (!module)
 		return;
-	PyObject *dict = PyModule_GetDict(oModule);
-	if (!dict) return; /* Another serious error!*/
+	dict = PyModule_GetDict(module);
+	if (!dict)
+		return;
+#else
+
+	static PyModuleDef ifilter_def = {
+		PyModuleDef_HEAD_INIT,
+		"ifilter",
+		"Wraps the interfaces used with Indexing Service filtering",
+		-1,
+		ifilter_functions
+		};
+	module = PyModule_Create(&ifilter_def);
+	if (!module)
+		return NULL;
+	dict = PyModule_GetDict(module);
+	if (!dict)
+		return NULL;
+#endif
 
 	// Register all of our interfaces, gateways and IIDs.
 	PyCom_RegisterExtensionSupport(dict, g_interfaceSupportData, sizeof(g_interfaceSupportData)/sizeof(PyCom_InterfaceSupportInfo));
@@ -379,4 +399,8 @@ extern "C" __declspec(dllexport) void initifilter()
 	ADD_CONSTANT(FILTER_E_NO_MORE_TEXT);
 	ADD_CONSTANT(FILTER_S_LAST_TEXT); 
 	// NOTE: New constants should go in ifiltercon.py
+
+#if (PY_VERSION_HEX >= 0x03000000)
+	return module;
+#endif
 }

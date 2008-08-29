@@ -39,23 +39,50 @@ static const PyCom_InterfaceSupportInfo interface_info[] =
 	PYCOM_INTERFACE_SERVER_ONLY (SecurityInformation)
 };
 
-// @module win32com.authorization.authorization|
+// @module win32com.authorization.authorization|Module containing support for authorization COM interfaces
 static struct PyMethodDef authorization_methods[]=
 {
 	{ "EditSecurity", (PyCFunction)PyEditSecurity, METH_VARARGS|METH_KEYWORDS, "Creates a security descriptor editor dialog"}, // @pymeth EditSecurity|Creates a security descriptor editor dialog
 	{NULL}
 };
 
-extern "C" __declspec(dllexport) void initauthorization()
+
+extern "C" __declspec(dllexport)
+#if (PY_VERSION_HEX < 0x03000000)
+void initauthorization(void)
+#else
+PyObject *PyInit_authorization(void)
+#endif
 {
-	PyObject *module, *module_dict;
+	PyObject *dict, *module;
+	PyWinGlobals_Ensure();
+
+#if (PY_VERSION_HEX < 0x03000000)
 	module = Py_InitModule("authorization", authorization_methods);
-	if(module==NULL)
+	if (!module)
 		return;
-
-	module_dict = PyModule_GetDict(module);
-	if (module_dict==NULL)
+	dict = PyModule_GetDict(module);
+	if (!dict)
 		return;
-	PyCom_RegisterExtensionSupport(module_dict, interface_info, sizeof(interface_info)/sizeof(PyCom_InterfaceSupportInfo));
+#else
+	static PyModuleDef authorization_def = {
+		PyModuleDef_HEAD_INIT,
+		"authorization",
+		"Module containing support for authorization COM interfaces.",
+		-1,
+		authorization_methods
+		};
+	module = PyModule_Create(&authorization_def);
+	if (!module)
+		return NULL;
+	dict = PyModule_GetDict(module);
+	if (!dict)
+		return NULL;
+#endif
 
+PyCom_RegisterExtensionSupport(dict, interface_info, sizeof(interface_info)/sizeof(PyCom_InterfaceSupportInfo));
+
+#if (PY_VERSION_HEX >= 0x03000000)
+	return module;
+#endif
 }

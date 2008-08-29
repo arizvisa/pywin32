@@ -181,7 +181,7 @@ int PyIUnknown::compare(PyObject *other)
 PyObject *PyIUnknown::QueryInterface(PyObject *self, PyObject *args)
 {
 	PyObject *obiid;
-	PyObject *obUseIID = NULL;
+	PyObject *obUseIID = Py_None;
 	// @pyparm IID|iid||The IID requested.
 	// @pyparm IID|useIID|None|If provided and not None, will return an
 	// interface for the specified IID if (and only if) a native interface can not be supported.
@@ -209,20 +209,11 @@ PyObject *PyIUnknown::QueryInterface(PyObject *self, PyObject *args)
 
 	IID useIID;	/* used if obUseIID != NULL */
 
-	if ( obUseIID != NULL )
-	{
-		if ( obUseIID == Py_None )
-			obUseIID = NULL;
-		else if ( PyInt_Check(obUseIID) )
-		{
-			if ( PyInt_AS_LONG((PyIntObject *)obUseIID) )
-				useIID = IID_IUnknown;
-			else
-				obUseIID = NULL;
-		}
-		else if ( !PyWinObject_AsIID(obUseIID, &useIID) )
+	// This used to allow an int, with 1 indicating IUnknown
+	// Doesn't seem to be used anywhere, so it has been removed
+	if (obUseIID != Py_None)
+		if ( !PyWinObject_AsIID(obUseIID, &useIID) )
 			return NULL;
-	}
 
 	IUnknown *pMyUnknown = GetI(self);
 	if (pMyUnknown==NULL) return NULL;
@@ -243,7 +234,8 @@ PyObject *PyIUnknown::QueryInterface(PyObject *self, PyObject *args)
 	PyObject *rc = PyCom_PyObjectFromIUnknown(punk, iid, TRUE);
 
 	/* we may have been asked to use a different interface */
-	if ( rc == NULL && obUseIID != NULL )
+	/* ??? useIID will be ignored if interface successfully created ??? */
+	if ( rc == NULL && obUseIID != Py_None)
 	{
 		PyErr_Clear();
 		rc = PyCom_PyObjectFromIUnknown(punk, useIID, TRUE);

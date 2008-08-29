@@ -187,7 +187,7 @@ static PyObject *PyCoInternetSetFeatureEnabled(PyObject *self, PyObject *args)
 
 /* List of module functions */
 // @module internet|A module, encapsulating the ActiveX Internet interfaces
-static struct PyMethodDef internet_methods[]=
+static struct PyMethodDef internet_functions[]=
 {
 	{ "CoInternetIsFeatureEnabled", PyCoInternetIsFeatureEnabled}, // @pymeth CoInternetIsFeatureEnabled|
 	{ "CoInternetSetFeatureEnabled", PyCoInternetSetFeatureEnabled}, // @pymeth CoInternetSetFeatureEnabled|
@@ -219,16 +219,38 @@ static const PyCom_InterfaceSupportInfo g_interfaceSupportData[] =
 };
 
 /* Module initialisation */
-extern "C" __declspec(dllexport) void initinternet()
+extern "C" __declspec(dllexport)
+#if (PY_VERSION_HEX < 0x03000000)
+void initinternet(void)
+#else
+PyObject *PyInit_internet(void)
+#endif
 {
-	char *modName = "internet";
-	PyObject *oModule;
-	// Create the module and add the functions
-	oModule = Py_InitModule(modName, internet_methods);
-	if (!oModule) /* Eeek - some serious error! */
+	PyObject *dict, *module;
+	PyWinGlobals_Ensure();
+
+#if (PY_VERSION_HEX < 0x03000000)
+	module = Py_InitModule("internet", internet_functions);
+	if (!module)
 		return;
-	PyObject *dict = PyModule_GetDict(oModule);
-	if (!dict) return; /* Another serious error!*/
+	dict = PyModule_GetDict(module);
+	if (!dict)
+		return;
+#else
+	static PyModuleDef internet_def = {
+		PyModuleDef_HEAD_INIT,
+		"internet",
+		"A module, encapsulating the ActiveX Internet interfaces",
+		-1,
+		internet_functions
+		};
+	module = PyModule_Create(&internet_def);
+	if (!module)
+		return NULL;
+	dict = PyModule_GetDict(module);
+	if (!dict)
+		return NULL;
+#endif
 
 	// Register all of our interfaces, gateways and IIDs.
 	PyCom_RegisterExtensionSupport(dict, g_interfaceSupportData, sizeof(g_interfaceSupportData)/sizeof(PyCom_InterfaceSupportInfo));
@@ -278,4 +300,8 @@ extern "C" __declspec(dllexport) void initinternet()
 	ADD_CONSTANT(GET_FEATURE_FROM_THREAD_RESTRICTED ); // @const internet|GET_FEATURE_FROM_THREAD_RESTRICTED|
 
 //	ADD_CONSTANT(); // @const internet||
+
+#if (PY_VERSION_HEX >= 0x03000000)
+	return module;
+#endif
 }

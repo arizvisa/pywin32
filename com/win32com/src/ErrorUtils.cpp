@@ -59,7 +59,7 @@ void PyCom_ExcepInfoFromPyException(EXCEPINFO *pExcepInfo)
 		char *szBaseMessage = "Unexpected Python Error: ";
 		if (szException==NULL) szException = "<bad exception>";
 		if (szValue==NULL) szValue = "<bad exception value>";
-		int len = strlen(szBaseMessage) + strlen(szException) + 2 + strlen(szValue) + 1;
+		size_t len = strlen(szBaseMessage) + strlen(szException) + 2 + strlen(szValue) + 1;
 			// 2 for ": "
 		// message could be quite long - be safe.
 		char *tempBuf = new char[len];
@@ -198,8 +198,8 @@ BOOL PyCom_ExcepInfoFromPyObject(PyObject *v, EXCEPINFO *pExcepInfo, HRESULT *ph
 	// Any class sub-classed from the client is considered a server error,
 	// so we need to check the class explicitely.
 	if (v==PyWinExc_COMError || // String exceptions
-	      (PyInstance_Check(v) && // Class exceptions
-		  (PyObject *)(((PyInstanceObject *)v)->in_class)==PyWinExc_COMError) )  {
+			(PyObject_IsInstance(v, PyExc_Exception) && // Class exceptions
+			((PyObject *)v->ob_type==PyWinExc_COMError)))  {
 		// Client side error
 		// Clear the state of the excep info.
 		// use abstract API to get at details.
@@ -485,8 +485,8 @@ BOOL VLogF_Logger(PyObject *logger, const char *log_method,
 {
 	// Protected by Python lock
 	static TCHAR buff[8196];
-	int buf_len = sizeof(buff) / sizeof(buff[0]);
-	int prefix_len = strlen(prefix);
+	size_t buf_len = sizeof(buff) / sizeof(buff[0]);
+	size_t prefix_len = strlen(prefix);
 	assert(prefix_len<100);
 	strcpy(buff, prefix);
 	wvsprintf(buff+prefix_len, fmt, argptr);
@@ -631,8 +631,8 @@ BOOL IsNonServerErrorCurrent() {
 	if (exc_typ) {
 		PyErr_NormalizeException( &exc_typ, &exc_val, &exc_tb);
 		rc = (!PyErr_GivenExceptionMatches(exc_val, PyWinExc_COMError) ||
-		     ((PyInstance_Check(exc_val) && 
-		      (PyObject *)(((PyInstanceObject *)exc_val)->in_class)==PyWinExc_COMError)));
+		     (PyObject_IsInstance(exc_val, PyExc_Exception) &&
+		      PyObject_IsSubclass((PyObject *)exc_val->ob_type, PyWinExc_COMError)));
 	}
 	PyErr_Restore(exc_typ, exc_val, exc_tb);
 	return rc;

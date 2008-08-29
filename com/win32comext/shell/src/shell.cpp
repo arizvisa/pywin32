@@ -2088,7 +2088,12 @@ static PyObject *PyFILEGROUPDESCRIPTORAsString(PyObject *self, PyObject *args)
 		if (attr==NULL) PyErr_Clear();
 		if (attr && attr != Py_None) {
 			fd->dwFlags |= FD_FILESIZE;
-			ok = PyLong_AsTwoI32(attr, (int *)&fd->nFileSizeHigh, (unsigned *)&fd->nFileSizeLow);
+			ULARGE_INTEGER fsize;
+			ok=PyWinObject_AsULARGE_INTEGER(attr, &fsize);
+			if (ok){
+				fd->nFileSizeHigh=fsize.HighPart;
+				fd->nFileSizeLow=fsize.LowPart;
+			}
 		}
 		Py_XDECREF(attr);
 		if (!ok) goto loop_failed;
@@ -2238,7 +2243,10 @@ static PyObject *PyStringAsFILEGROUPDESCRIPTOR(PyObject *self, PyObject *args)
 		}
 
 		if (fd->dwFlags & FD_FILESIZE) {
-			val = PyLong_FromTwoInts(fd->nFileSizeHigh, fd->nFileSizeLow);
+			ULARGE_INTEGER fsize;
+			fsize.LowPart=fd->nFileSizeLow;
+			fsize.HighPart=fd->nFileSizeHigh;
+			val = PyWinObject_FromULARGE_INTEGER(fsize);
 			if (val) PyDict_SetItemString(sub, "nFileSize", val);
 			Py_XDECREF(val);
 		}
@@ -3189,7 +3197,7 @@ done:
 
 
 /* List of module functions */
-// @module shell|A module, encapsulating the ActiveX Control interfaces
+// @module shell|A module wrapping Windows Shell functions and interfaces
 static struct PyMethodDef shell_methods[]=
 {
     { "AssocCreate",    PyAssocCreate, 1 }, // @pymeth AssocCreate|Creates a <o PyIQueryAssociations> object
@@ -3327,17 +3335,42 @@ static int AddIID(PyObject *dict, const char *key, REFGUID guid)
 #define ADD_CONSTANT(tok) AddConstant(dict, #tok, tok)
 #define ADD_IID(tok) AddIID(dict, #tok, tok)
 
+
 /* Module initialisation */
-extern "C" __declspec(dllexport) void initshell()
+extern "C" __declspec(dllexport)
+#if (PY_VERSION_HEX < 0x03000000)
+void initshell(void)
+#else
+PyObject *PyInit_shell(void)
+#endif
 {
-	char *modName = "shell";
-	PyObject *oModule;
-	// Create the module and add the functions
-	oModule = Py_InitModule(modName, shell_methods);
-	if (!oModule) /* Eeek - some serious error! */
+	PyObject *dict, *module;
+	PyWinGlobals_Ensure();
+
+#if (PY_VERSION_HEX < 0x03000000)
+#define RETURN_ERROR return;
+	module = Py_InitModule("shell", shell_methods);
+	if (!module)
 		return;
-	PyObject *dict = PyModule_GetDict(oModule);
-	if (!dict) return; /* Another serious error!*/
+	dict = PyModule_GetDict(module);
+	if (!dict)
+		return;
+#else
+#define RETURN_ERROR return NULL;
+	static PyModuleDef shell_def = {
+		PyModuleDef_HEAD_INIT,
+		"shell",
+		"A module wrapping Windows Shell functions and interfaces",
+		-1,
+		shell_methods
+		};
+	module = PyModule_Create(&shell_def);
+	if (!module)
+		return NULL;
+	dict = PyModule_GetDict(module);
+	if (!dict)
+		return NULL;
+#endif
 
 	PyDict_SetItemString(dict, "error", PyWinExc_COMError);
 	// Register all of our interfaces, gateways and IIDs.
@@ -3499,5 +3532,9 @@ extern "C" __declspec(dllexport) void initshell()
 	ADD_IID(EP_AdvQueryPane);
 #else
 #	pragma message("Please update your SDK headers - IE5 features missing!")
+#endif
+
+#if (PY_VERSION_HEX >= 0x03000000)
+	return module;
 #endif
 }
