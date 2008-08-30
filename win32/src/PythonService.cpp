@@ -31,7 +31,7 @@ PYSERVICE_EXPORT void PythonService_Finalize();
 PYSERVICE_EXPORT BOOL PythonService_PrepareToHostSingle(PyObject *);
 PYSERVICE_EXPORT BOOL PythonService_PrepareToHostMultiple(const TCHAR *service_name, PyObject *klass);
 PYSERVICE_EXPORT BOOL PythonService_StartServiceCtrlDispatcher();
-PYSERVICE_EXPORT int PythonService_main(int argc, char **argv);
+PYSERVICE_EXPORT int PythonService_main(int argc, TCHAR **argv);
 
 TCHAR g_szEventSourceName[MAX_PATH] = _T("Python Service");
 TCHAR g_szEventSourceFileName[MAX_PATH] = _T("");
@@ -120,11 +120,11 @@ BOOL RegisterPythonServiceExe(void);
 
 static PY_SERVICE_TABLE_ENTRY *FindPythonServiceEntry(LPCTSTR svcName);
 
-static PyObject *LoadPythonServiceClass(char *svcInitString);
+static PyObject *LoadPythonServiceClass(TCHAR *svcInitString);
 static PyObject *LoadPythonServiceInstance(PyObject *,
 										DWORD dwArgc,
 										LPTSTR *lpszArgv );
-static BOOL LocatePythonServiceClassString( TCHAR *svcName, char *buf, int cchBuf);
+static BOOL LocatePythonServiceClassString( TCHAR *svcName, TCHAR *buf, int cchBuf);
 
 
 // Some handy service statuses we can use without filling at runtime.
@@ -541,7 +541,7 @@ static struct PyMethodDef servicemanager_functions[] = {
 };
 
 
-#define ADD_CONSTANT(tok) PyModule_AddIntConstant(dict, #tok, tok)
+#define ADD_CONSTANT(tok) if (PyModule_AddIntConstant(module, #tok, tok) == -1) RETURN_ERROR;
 
 extern "C" __declspec(dllexport)
 #if (PY_VERSION_HEX < 0x03000000)
@@ -636,11 +636,15 @@ static void PyService_InitPython()
 	// than "c:\path\to\ExeName.exe"
 	// This, however, shouldnt be a problem, as Python itself
 	// knows how to get the .EXE name when it needs.
+	int pyargc;
 #if (PY_VERSION_HEX < 0x03000000)
-	Py_SetProgramName(__argv[0]);
+	pyargc = __argc;
+	char **pyargv = __argv;
 #else
-	Py_SetProgramName(__wargv[0]);
-#endif;
+	WCHAR **pyargv;
+	pyargv = CommandLineToArgvW(GetCommandLineW(), &pyargc);
+#endif
+	Py_SetProgramName(pyargv[0]);
 
 #ifdef BUILD_FREEZE
 	PyInitFrozenExtensions();
@@ -651,13 +655,12 @@ static void PyService_InitPython()
 #endif
 	// Ensure we are set for threading.
 	PyEval_InitThreads();
-
+	PySys_SetArgv(pyargc, pyargv);
 #if (PY_VERSION_HEX < 0x03000000)
-	PySys_SetArgv(__argc, __argv);
 	initservicemanager();
 #else
-	PySys_SetArgv(__argc, __wargv);
 	PyInit_servicemanager();
+	LocalFree(pyargv);
 #endif
 }
 
@@ -864,8 +867,8 @@ void WINAPI service_main(DWORD dwArgc, LPTSTR *lpszArgv)
 	if (g_serviceProcessFlags == SERVICE_WIN32_OWN_PROCESS) {
 		pe = PythonServiceTable;
 		if (!pe->klass) {
-			char svcInitBuf[256];
-			LocatePythonServiceClassString(lpszArgv[0], svcInitBuf, sizeof(svcInitBuf));
+			TCHAR svcInitBuf[256];
+			LocatePythonServiceClassString(lpszArgv[0], svcInitBuf, sizeof(svcInitBuf)/sizeof(svcInitBuf[0]));
 			pe->klass = LoadPythonServiceClass(svcInitBuf);
 		}
 	} else
@@ -1071,7 +1074,7 @@ BOOL WINAPI DebugControlHandler ( DWORD dwCtrlType )
 //    main service thread.  When the this call returns,
 //    the service has stopped, so exit.
 //
-int PythonService_main(int argc, char **argv)
+int PythonService_main(int argc, TCHAR **argv)
 {
 	// Note that we don't know the service name we are hosting yet!
 	// If only one service is hosted, then it is no real problem - our dispatch
@@ -1110,14 +1113,14 @@ int PythonService_main(int argc, char **argv)
          ((*argv[1] == '-') || (*argv[1] == '/')) )
     {
 #ifndef BUILD_FREEZE
-        if ( _stricmp( "register", argv[1]+1 ) == 0 ||
-             _stricmp( "install", argv[1]+1 ) == 0 )
+        if ( _tcsicmp( _T("register"), argv[1]+1 ) == 0 ||
+             _tcsicmp( _T("install"), argv[1]+1 ) == 0 )
         {
 	        // Get out of here.
 			return RegisterPythonServiceExe() ? 0 : 1;
         }
 #endif
-        if ( _stricmp( "debug", argv[1]+1 ) == 0 ) {
+        if ( _tcsicmp( _T("debug"), argv[1]+1 ) == 0 ) {
 			/* Debugging the service.  If this EXE has a service name
 			   embedded in it, use it, otherwise insist one is passed on the
 			   command line
@@ -1178,15 +1181,15 @@ int PythonService_main(int argc, char **argv)
 
 // Given the string in form [path\]module.ClassName, return
 // an instance of the class
-PyObject *LoadPythonServiceClass(char *svcInitString)
+PyObject *LoadPythonServiceClass(TCHAR *svcInitString)
 {
-	char valueBuf[512];
+	TCHAR valueBuf[512];
 	// Initialize Python
 	PyService_InitPython();
-	strncpy(valueBuf, svcInitString, sizeof(valueBuf));
+	_tcsncpy(valueBuf, svcInitString, sizeof(valueBuf)/sizeof(valueBuf[0]));
 	// Find the last "\\"
-	char *sep = strrchr(valueBuf, '\\');
-	char *fname;
+	TCHAR *sep = _tcsrchr(valueBuf, _T('\\'));
+	TCHAR *fname;
 	if (sep) {
 		*sep = '\0';
 		fname = sep+1;
@@ -1196,7 +1199,7 @@ PyObject *LoadPythonServiceClass(char *svcInitString)
 				ReportPythonError(PYS_E_NO_SYS_PATH);
 				return NULL;
 		}
-		PyObject *obNew = PyString_FromString(valueBuf);
+		PyObject *obNew = PyWinObject_FromTCHAR(valueBuf);
 		if (obNew==NULL) {
 			ReportPythonError(PYS_E_NO_MEMORY_FOR_SYS_PATH);
 			return NULL;
@@ -1207,7 +1210,7 @@ PyObject *LoadPythonServiceClass(char *svcInitString)
 		fname = valueBuf;
 	}
 	// Find the last "." in the name, and assume it is a module name.
-	char *classNamePos = strrchr(fname, '.');
+	TCHAR *classNamePos = _tcsrchr(fname, _T('.'));
 	if (classNamePos==NULL) {
 		ReportError(PYS_E_CANT_LOCATE_MODULE_NAME);
 		return NULL;
@@ -1216,12 +1219,16 @@ PyObject *LoadPythonServiceClass(char *svcInitString)
 	// XXX - does this work for packages?  I fear that like Python,
 	// PyImport_ImportModule("foo.bar") will return 'foo', not bar.
 	*classNamePos++ = '\0';
-	module = PyImport_ImportModule(fname);
+	PyObject *obname=PyWinObject_FromTCHAR(fname);
+	module = PyImport_Import(obname);
+	Py_DECREF(obname);
 	if (module==NULL) {
 		ReportPythonError(E_PYS_NO_MODULE);
 		return NULL;
 	}
-	PyObject *pyclass = PyObject_GetAttrString(module, classNamePos);
+	PyObject *obclassName=PyWinObject_FromTCHAR(classNamePos);
+	PyObject *pyclass = PyObject_GetAttr(module, obclassName);
+	Py_DECREF(obclassName);
 	Py_DECREF(module);
 	if (pyclass==NULL) {
 		ReportPythonError(E_PYS_NO_CLASS);
@@ -1269,27 +1276,29 @@ PyObject *LoadPythonServiceInstance(	PyObject *pyclass,
 	return result;
 }
 
-BOOL LocatePythonServiceClassString( TCHAR *svcName, char *buf, int cchBuf)
+BOOL LocatePythonServiceClassString( TCHAR *svcName, TCHAR *buf, int cchBuf)
 {
-	char keyName[1024];
+	TCHAR keyName[1024];
 
 	// If not error loading, and not an empty string
 	// (NOTE: Embedding a resource to specify the service name is
 	// deprecated)
-	if (LoadStringA(GetModuleHandle(NULL), RESOURCE_SERVICE_NAME, buf, cchBuf)>1)
+	if (LoadString(GetModuleHandle(NULL), RESOURCE_SERVICE_NAME, buf, cchBuf)>1)
 		// Get out of here now!
 		return TRUE;
 
 	HKEY key = NULL;
 	BOOL ok = TRUE;
-	wsprintfA(keyName, "System\\CurrentControlSet\\Services\\%S\\PythonClass", svcName);
-	if (RegOpenKeyA(HKEY_LOCAL_MACHINE, keyName, &key) != ERROR_SUCCESS) {
+	_sntprintf(keyName, sizeof(keyName)/sizeof(keyName[0]),
+		_T("System\\CurrentControlSet\\Services\\%s\\PythonClass"),
+		svcName);
+	if (RegOpenKey(HKEY_LOCAL_MACHINE, keyName, &key) != ERROR_SUCCESS) {
 		ReportAPIError(PYS_E_API_CANT_LOCATE_PYTHON_CLASS);
 		return FALSE;
 	}
 	DWORD dataType;
-	DWORD valueBufSize = cchBuf;
-	if ((RegQueryValueExA(key, "", 0, &dataType, (LPBYTE)buf, &valueBufSize)!=ERROR_SUCCESS) ||
+	DWORD valueBufSize = cchBuf * sizeof(TCHAR);
+	if ((RegQueryValueEx(key, NULL, 0, &dataType, (LPBYTE)buf, &valueBufSize)!=ERROR_SUCCESS) ||
 		(dataType != REG_SZ)) {
 		ReportAPIError(PYS_E_API_CANT_LOCATE_PYTHON_CLASS);
 		ok = FALSE;
@@ -1383,8 +1392,10 @@ static void ReportAPIError(DWORD msgCode, DWORD errCode /*= 0*/)
 }
 
 #define GPEM_ERROR(what) {errorMsg = "<Error getting traceback - " ## what ## ">";goto done;}
-static char *GetPythonTraceback(PyObject *exc_tb)
+static char *GetPythonTraceback(PyObject *exc_type, PyObject *exc_value, PyObject *exc_tb)
 {
+	// Sleep (30000); // Time enough to attach the debugger (barely)
+	PyErr_Clear();
 	char *result = NULL;
 	char *errorMsg = NULL;
 	PyObject *modStringIO = NULL;
@@ -1396,7 +1407,13 @@ static char *GetPythonTraceback(PyObject *exc_tb)
 	PyObject *obResult = NULL;
 
 	/* Import the modules we need - cStringIO and traceback */
+#if (PY_VERSION_HEX < 0x03000000)
 	modStringIO = PyImport_ImportModule("cStringIO");
+#else
+	// In py3k, cStringIO is in "io"
+	modStringIO = PyImport_ImportModule("io");
+#endif
+
 	if (modStringIO==NULL) GPEM_ERROR("cant import cStringIO");
 	modTB = PyImport_ImportModule("traceback");
 	if (modTB==NULL) GPEM_ERROR("cant import traceback");
@@ -1408,17 +1425,36 @@ static char *GetPythonTraceback(PyObject *exc_tb)
 	if (obStringIO==NULL) GPEM_ERROR("cStringIO.StringIO() failed");
 
 	/* Get the traceback.print_exception function, and call it. */
-	obFuncTB = PyObject_GetAttrString(modTB, "print_tb");
-	if (obFuncTB==NULL) GPEM_ERROR("cant find traceback.print_tb");
-	argsTB = Py_BuildValue("OOO", 
-			exc_tb  ? exc_tb  : Py_None,
-			Py_None, 
-			obStringIO);
-	if (argsTB==NULL) GPEM_ERROR("cant make print_tb arguments");
+	obFuncTB = PyObject_GetAttrString(modTB, "print_exception");
+	if (obFuncTB==NULL) GPEM_ERROR("cant find traceback.print_exception");
+	argsTB = Py_BuildValue("OOOOO"
+#if (PY_VERSION_HEX >= 0x03000000)
+		"i"		
+		// Py3k has added an undocumented 'chain' argument which defaults to True
+		//	and causes all kinds of exceptions while trying to print a goddam exception
+#endif
+		,
+		exc_type ? exc_type : Py_None,
+		exc_value ? exc_value : Py_None,
+		exc_tb  ? exc_tb  : Py_None,
+		Py_None,	// limit
+		obStringIO
+#if (PY_VERSION_HEX >= 0x03000000)
+		,0	// Goddam undocumented 'chain' param, which defaults to True
+#endif
+		);
+	if (argsTB==NULL) GPEM_ERROR("cant make print_exception arguments");
 
 	obResult = PyObject_CallObject(obFuncTB, argsTB);
-	if (obResult==NULL) GPEM_ERROR("traceback.print_tb() failed");
-
+	if (obResult==NULL){
+		// Chain parameter when True causes traceback.print_exception to fail, leaving no
+		//	way to see what the original problem is, or even what error print_exc raises
+		// PyObject *t, *v, *tb;
+		// PyErr_Fetch(&t, &v, &tb);
+		// PyUnicodeObject *uo=(PyUnicodeObject *)v;
+		// DebugBreak();
+		GPEM_ERROR("traceback.print_exception() failed");
+		}
 	/* Now call the getvalue() method in the StringIO instance */
 	Py_DECREF(obFuncStringIO);
 	obFuncStringIO = PyObject_GetAttrString(obStringIO, "getvalue");
@@ -1428,9 +1464,15 @@ static char *GetPythonTraceback(PyObject *exc_tb)
 	if (obResult==NULL) GPEM_ERROR("getvalue() failed.");
 
 	/* And it should be a string all ready to go - duplicate it. */
-	if (!PyString_Check(obResult))
+	if (PyString_Check(obResult))
+		result = strdup(PyString_AsString(obResult));
+#if (PY_VERSION_HEX >= 0x03000000)
+	else if (PyUnicode_Check(obResult))
+		result = strdup(_PyUnicode_AsString(obResult));
+#endif
+	else
 		GPEM_ERROR("getvalue() did not return a string");
-	result = strdup(PyString_AsString(obResult));
+
 done:
 	if (result==NULL && errorMsg != NULL)
 		result = strdup(errorMsg);
@@ -1447,13 +1489,12 @@ done:
 static void ReportPythonError(DWORD code)
 {
 	if (PyErr_Occurred()) {
-		LPTSTR inserts[4];
-		inserts[3] = NULL; // terminate array
+		LPTSTR inserts[4] = {NULL, NULL, NULL, NULL};
 		PyObject *type, *value, *traceback;
 		PyErr_Fetch(&type, &value, &traceback);
-		WCHAR *szTracebackUse = L"<No memory!>"; // default.
-		WCHAR *szTraceback = NULL; // to be freed.
-		char *szmbTraceback = GetPythonTraceback(traceback);
+		TCHAR *szTracebackUse = L"<No memory!>"; // default.
+		TCHAR *szTraceback = NULL; // to be freed.
+		char *szmbTraceback = GetPythonTraceback(type, value, traceback);
 		if (szmbTraceback) {
 			int tb_len = strlen(szmbTraceback) + 1;
 			szTraceback = (TCHAR *)malloc(sizeof(WCHAR) * tb_len);
@@ -1466,16 +1507,9 @@ static void ReportPythonError(DWORD code)
 			free(szmbTraceback);
 		}
 		inserts[0] = szTracebackUse;
-		PyObject *obStr = PyObject_Str(type);
-		PyWinObject_AsWCHAR(obStr, inserts+1);
-		Py_XDECREF(obStr);
-		obStr = PyObject_Str(value);
-		PyWinObject_AsWCHAR(PyObject_Str(obStr), inserts+2);
-		Py_XDECREF(obStr);
 	    ReportError(code, (LPCTSTR *)inserts);
 		if (szTraceback) free(szTraceback);
-		PyWinObject_FreeWCHAR(inserts[1]);
-		PyWinObject_FreeWCHAR(inserts[2]);
+
 		if (bServiceDebug) { // If debugging, restore for traceback print,
 			PyErr_Restore(type, value, traceback);
 		} else {	// free em up.
@@ -1607,7 +1641,7 @@ BOOL WINAPI DllMain(HINSTANCE hInstance, DWORD dwReason, LPVOID lpReserved)
 #else // PYSERVICE_BUILD_DLL
 // Our EXE entry point.
 
-int main(int argc, char **argv)
+int _tmain(int argc, TCHAR **argv)
 {
 	PyObject *module, *f;
 	PyThreadState *threadState;
@@ -1615,17 +1649,23 @@ int main(int argc, char **argv)
 	FARPROC proc;
 	Py_Initialize();
 	PyEval_InitThreads();
+	module = PyImport_ImportModule("site"); // ??? remove when site bug is fixed ???
 	module = PyImport_ImportModule("servicemanager");
 	if (!module) goto failed;
 	f = PyObject_GetAttrString(module, "__file__");
 	Py_DECREF(module);
 	if (!f) goto failed;
-	if (!PyString_Check(f)) {
-		PyErr_SetString(PyExc_TypeError, "servicemanager.__file__ is not a string!");
+
+	// now get the handle to the DLL, and call the main function.
+	if (PyString_Check(f))
+		hmod = GetModuleHandleA(PyString_AsString(f));
+	else if (PyUnicode_Check(f))
+		hmod = GetModuleHandleW(PyUnicode_AsUnicode(f));
+	else{
+		PyErr_SetString(PyExc_TypeError, "servicemanager.__file__ is not a string or unicode !");
 		goto failed;
 	}
-	// now get the handle to the DLL, and call the main function.
-	hmod = GetModuleHandleA(PyString_AsString(f));
+
 	Py_DECREF(f);
 	if (!hmod) {
 		PyErr_Format(PyExc_RuntimeError, "servicemanager.__file__ could not be loaded - win32 error code is %d", GetLastError());
@@ -1641,8 +1681,8 @@ int main(int argc, char **argv)
 	PyThreadState_Swap(threadState);
 	PyEval_ReleaseThread(threadState);
 
-	typedef int (* FNPythonService_main)(int argc, char **argv);
-	return ((FNPythonService_main)proc)(argc, argv);
+	typedef int (* FNPythonService_main)(int argc, TCHAR **argv);
+	return (*(FNPythonService_main)proc)(argc, argv);
 failed:
 	fprintf(stderr, "PythonService was unable to locate the service manager. "
 	                "Please see the event log for details\n");
