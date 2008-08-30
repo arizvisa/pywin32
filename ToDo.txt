@@ -13,6 +13,8 @@ Swig doesn't handle com_interface_parent, adsi will not build
 
 Several types set Py_TPFLAGS_BASETYPE but do not have required infrastructure to actually subclass.
 
+servicemanager (PythonService.cpp) - Py_SetProgram and PySys_SetArgv don't work for 2.x, need char * args
+	but __argv is NULL
 
 
 Pythonwin -
@@ -45,4 +47,4 @@ Pythonwin -
 
 	Figure out a clean way to switch between commctrl.*A and commctrl.*W constants for hooking messages
 
-	
+	Add /ENTRY:wWinMainCRTStartup to linker args
