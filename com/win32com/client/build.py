@@ -18,7 +18,8 @@ dynamically, or possibly even generate .html documentation for objects.
 
 import sys
 import string
-import types
+import builtins
+
 from keyword import iskeyword
 from win32com.client import NeedUnicodeConversions
 
@@ -454,8 +455,7 @@ def _ResolveType(typerepr, itypeinfo):
 			try:
 				resultTypeInfo = itypeinfo.GetRefTypeInfo(subrepr)
 			except pythoncom.com_error as details:
-				if details[0] in [winerror.TYPE_E_CANTLOADLIBRARY,
-				                  winerror.TYPE_E_LIBNOTREGISTERED]:
+				if details.args[0] in [winerror.TYPE_E_CANTLOADLIBRARY, winerror.TYPE_E_LIBNOTREGISTERED]:
 					# an unregistered interface
 					return pythoncom.VT_UNKNOWN, None, None
 				raise
@@ -532,7 +532,7 @@ def MakePublicAttributeName(className, is_global = False):
 		# assign to None is evil (and SyntaxError in 2.4) - note
 		# that if it was a global it would get picked up below
 		className = 'NONE'
-	elif is_global and className in __builtins__:
+	elif is_global and hasattr(builtins, className):
 		# builtins may be mixed case.  If capitalizing it doesn't change it,
 		# force to all uppercase (eg, "None", "True" become "NONE", "TRUE"
 		ret = className.capitalize()

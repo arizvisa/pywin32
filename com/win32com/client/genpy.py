@@ -204,13 +204,8 @@ class EnumerationItem(build.OleItem, WritableItem):
       vdesc = entry.desc
       if vdesc[4] == pythoncom.VAR_CONST:
         val = vdesc[1]
-        if type(val) in (type(0), type(0)):
-          if val==0x80000000: # special case
-            use = "0x80000000L" # 'L' for future warning
-          elif val > 0x80000000 or val < 0: # avoid a FutureWarning
-            use = int(val)
-          else:
-            use = hex(val)
+        if isinstance(val, int):
+          use=val
         else:
           use = repr(str(val))
         print("\t%-30s=%-10s # from enum %s" % \
@@ -513,7 +508,7 @@ class DispatchItem(build.DispatchItem, WritableItem):
             print('\t\treturn win32com.client.util.WrapEnum(self._oleobj_.InvokeTypes(%d,LCID,%d,(13, 10),()),%s)' % (pythoncom.DISPID_NEWENUM, enumEntry.desc[4], resultCLSID), file=stream)
             print('\tdef __getitem__(self, index):', file=stream)
             print('\t\t"Allow this class to be accessed as a collection"', file=stream)
-            print("\t\tif not self.__dict__.has_key('_enum_'):", file=stream)
+            print("\t\tif '_enum_' not in self.__dict__:", file=stream)
             print("\t\t\tself.__dict__['_enum_'] = self._NewEnum()", file=stream)
             print("\t\treturn self._enum_.__getitem__(index)", file=stream)
         else: # Not an Enumerator, but may be an "Item/Count" based collection
