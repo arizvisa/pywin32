@@ -328,7 +328,7 @@ class dynamic_browser (dialog.Dialog):
         )
 
     dt = [
-        ["Python Object Browser", (0, 0, 200, 200), style, None, (8, "MS Sans Serif")],
+        ["Python Object Browser", (0, 0, 200, 200), style, 0, (8, "MS Sans Serif")],
         ["SysTreeView32", None, win32ui.IDC_LIST1, (0, 0, 200, 200), cs]
         ]
 
