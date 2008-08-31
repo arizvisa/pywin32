@@ -66,7 +66,7 @@ Examples:
 
 """
 
-import sys, os, types, pythoncom
+import sys, os, pythoncom
 from win32com.client import genpy
 
 from . import selecttlb
@@ -219,14 +219,14 @@ def GenerateFromTypeLibSpec(typelibInfo, file = None, verboseLevel = None, progr
 
 	if bForDemand and file is not None:
 		raise RuntimeError("You can only perform a demand-build when the output goes to the gen_py directory")
-	if type(typelibInfo)==type(()):
+	if isinstance(typelibInfo, tuple):
 		# Tuple
 		typelibCLSID, lcid, major, minor  = typelibInfo
 		tlb = pythoncom.LoadRegTypeLib(typelibCLSID, major, minor, lcid)
 		spec = selecttlb.TypelibSpec(typelibCLSID, lcid, major, minor)
 		spec.FromTypelib(tlb, str(typelibCLSID))
 		typelibs = [(tlb, spec)]
-	elif type(typelibInfo)==types.InstanceType:
+	elif isinstance(typelibInfo, selecttlb.TypelibSpec):
 		if typelibInfo.dll is None:
 			# Version numbers not always reliable if enumerated from registry.
 			tlb = pythoncom.LoadRegTypeLib(typelibInfo.clsid, typelibInfo.major, typelibInfo.minor, typelibInfo.lcid)
@@ -235,6 +235,8 @@ def GenerateFromTypeLibSpec(typelibInfo, file = None, verboseLevel = None, progr
 		typelibs = [(tlb, typelibInfo)]
 	elif hasattr(typelibInfo, "GetLibAttr"):
 		# A real typelib object!
+		# Could also use isinstance(typelibInfo, PyITypeLib) instead, but PyITypeLib is not directly exposed by pythoncom.
+		#	pythoncom.TypeIIDs[pythoncom.IID_ITypeLib] seems to work
 		tla = typelibInfo.GetLibAttr()
 		guid = tla[0]
 		lcid = tla[1]
