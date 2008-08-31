@@ -68,6 +68,7 @@ Examples:
 
 import sys, os, types, pythoncom
 from win32com.client import genpy
+
 from . import selecttlb
 from . import gencache
 from win32com.client import NeedUnicodeConversions, Dispatch
@@ -266,7 +267,14 @@ def GenerateFromTypeLibSpec(typelibInfo, file = None, verboseLevel = None, progr
 				outputName = os.path.join(full_name, "__init__.py")
 			else:
 				outputName = full_name + ".py"
-			fileUse = open(outputName, "wt")
+			# generate to a temp file (so errors don't leave a 1/2
+			# generated file) and one which can handle unicode!   
+			try:
+				os.unlink(outputName)
+			except os.error:
+				pass
+			encoding = 'mbcs' # could make this a param.
+			fileUse = open(outputName + ".temp", "wt", encoding=encoding) 
 			progress.LogBeginGenerate(outputName)
 		else:
 			fileUse = file
@@ -277,7 +285,7 @@ def GenerateFromTypeLibSpec(typelibInfo, file = None, verboseLevel = None, progr
 		
 		if file is None:
 			fileUse.close()
-		
+			os.rename(outputName + ".temp", outputName)
 		if bToGenDir:
 			progress.SetDescription("Importing module")
 			gencache.AddModuleToCache(info.clsid, info.lcid, info.major, info.minor)
