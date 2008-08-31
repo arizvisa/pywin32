@@ -111,6 +111,9 @@ extern PYWINTYPES_EXPORT PyObject *PyBuffer_FromReadWriteMemory(void *buf, Py_ss
 extern PYWINTYPES_EXPORT PyObject *PyBuffer_FromMemory(void *buf, Py_ssize_t size);
 #endif
 
+// Formats a python traceback into a character string - result must be free()ed
+PYWINTYPES_EXPORT char *GetPythonTraceback(PyObject *exc_type, PyObject *exc_value, PyObject *exc_tb);
+
 #include <tchar.h>
 /*
 ** Error/Exception handling

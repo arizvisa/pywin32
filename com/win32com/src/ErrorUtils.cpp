@@ -368,99 +368,6 @@ PYCOM_EXPORT HRESULT PyCom_SetAndLogCOMErrorFromPyExceptionEx(PyObject *provider
 	return PyCom_SetCOMErrorFromPyException(riid);
 }
 
-////////////////////////////////////////////////////////////////////////
-// Some logging functions
-////////////////////////////////////////////////////////////////////////
-/* Obtains a string from a Python traceback.
-   This is the exact same string as "traceback.print_exc" would return.
-
-   Pass in a Python traceback object (probably obtained from PyErr_Fetch())
-   Result is a string which must be free'd using PyMem_Free()
-*/
-#define TRACEBACK_FETCH_ERROR(what) {errMsg = what; goto done;}
-
-char *PyTraceback_AsString(PyObject *exc_tb)
-{
-	char *errMsg = NULL; /* holds a local error message */
-	char *result = NULL; /* a valid, allocated result. */
-	PyObject *modStringIO = NULL;
-	PyObject *modTB = NULL;
-	PyObject *obFuncStringIO = NULL;
-	PyObject *obStringIO = NULL;
-	PyObject *obFuncTB = NULL;
-	PyObject *argsTB = NULL;
-	PyObject *obResult = NULL;
-
-	/* Import the modules we need - cStringIO and traceback */
-	modStringIO = PyImport_ImportModule("cStringIO");
-	if (modStringIO==NULL)
-		TRACEBACK_FETCH_ERROR("cant import cStringIO\n");
-
-	modTB = PyImport_ImportModule("traceback");
-	if (modTB==NULL)
-		TRACEBACK_FETCH_ERROR("cant import traceback\n");
-	/* Construct a cStringIO object */
-	obFuncStringIO = PyObject_GetAttrString(modStringIO, "StringIO");
-	if (obFuncStringIO==NULL)
-		TRACEBACK_FETCH_ERROR("cant find cStringIO.StringIO\n");
-	obStringIO = PyObject_CallObject(obFuncStringIO, NULL);
-	if (obStringIO==NULL)
-		TRACEBACK_FETCH_ERROR("cStringIO.StringIO() failed\n");
-	/* Get the traceback.print_exception function, and call it. */
-	obFuncTB = PyObject_GetAttrString(modTB, "print_tb");
-	if (obFuncTB==NULL)
-		TRACEBACK_FETCH_ERROR("cant find traceback.print_tb\n");
-
-	argsTB = Py_BuildValue("OOO", 
-			exc_tb  ? exc_tb  : Py_None,
-			Py_None, 
-			obStringIO);
-	if (argsTB==NULL) 
-		TRACEBACK_FETCH_ERROR("cant make print_tb arguments\n");
-
-	obResult = PyObject_CallObject(obFuncTB, argsTB);
-	if (obResult==NULL) 
-		TRACEBACK_FETCH_ERROR("traceback.print_tb() failed\n");
-	/* Now call the getvalue() method in the StringIO instance */
-	Py_DECREF(obFuncStringIO);
-	obFuncStringIO = PyObject_GetAttrString(obStringIO, "getvalue");
-	if (obFuncStringIO==NULL)
-		TRACEBACK_FETCH_ERROR("cant find getvalue function\n");
-	Py_DECREF(obResult);
-	obResult = PyObject_CallObject(obFuncStringIO, NULL);
-	if (obResult==NULL) 
-		TRACEBACK_FETCH_ERROR("getvalue() failed.\n");
-
-	/* And it should be a string all ready to go - duplicate it. */
-	if (!PyString_Check(obResult))
-			TRACEBACK_FETCH_ERROR("getvalue() did not return a string\n");
-
-	{ // a temp scope so I can use temp locals.
-	char *tempResult = PyString_AsString(obResult);
-	result = (char *)PyMem_Malloc(strlen(tempResult)+1);
-	if (result==NULL)
-		TRACEBACK_FETCH_ERROR("memory error duplicating the traceback string\n");
-
-	strcpy(result, tempResult);
-	} // end of temp scope.
-done:
-	/* All finished - first see if we encountered an error */
-	if (result==NULL && errMsg != NULL) {
-		result = (char *)PyMem_Malloc(strlen(errMsg)+1);
-		if (result != NULL)
-			/* if it does, not much we can do! */
-			strcpy(result, errMsg);
-	}
-	Py_XDECREF(modStringIO);
-	Py_XDECREF(modTB);
-	Py_XDECREF(obFuncStringIO);
-	Py_XDECREF(obStringIO);
-	Py_XDECREF(obFuncTB);
-	Py_XDECREF(argsTB);
-	Py_XDECREF(obResult);
-	return result;
-}
-
 void PyCom_StreamMessage(const char *pszMessageText)
 {
 #ifndef MS_WINCE
@@ -480,6 +387,7 @@ void PyCom_StreamMessage(const char *pszMessageText)
 			fprintf(stdout, "%s", pszMessageText);
 	PyErr_Restore(typ, val, tb);
 }
+
 BOOL VLogF_Logger(PyObject *logger, const char *log_method,
 				  const TCHAR *prefix, const TCHAR *fmt, va_list argptr)
 {
@@ -544,32 +452,9 @@ PYCOM_EXPORT void PyCom_LogF(const TCHAR *fmt, ...)
 
 void _LogException(PyObject *exc_typ, PyObject *exc_val, PyObject *exc_tb)
 {
-	if (exc_tb) {
-		const char *szTraceback = PyTraceback_AsString(exc_tb);
-		if (szTraceback == NULL)
-			PyCom_StreamMessage("Can't get the traceback info!");
-		else {
-			PyCom_StreamMessage(traceback_prefix);
-			PyCom_StreamMessage(szTraceback);
-			PyMem_Free((void *)szTraceback);
-		}
-	}
-	PyObject *temp = PyObject_Str(exc_typ);
-	if (temp) {
-		PyCom_StreamMessage(PyString_AsString(temp));
-		Py_DECREF(temp);
-	} else
-		PyCom_StreamMessage("Can't convert exception to a string!");
-	PyCom_StreamMessage(": ");
-	if (exc_val != NULL) {
-		temp = PyObject_Str(exc_val);
-		if (temp) {
-			PyCom_StreamMessage(PyString_AsString(temp));
-			Py_DECREF(temp);
-		} else
-			PyCom_StreamMessage("Can't convert exception value to a string!");
-	}
-	PyCom_StreamMessage("\n");
+	char *szTraceback = GetPythonTraceback(exc_typ, exc_val, exc_tb);
+	PyCom_StreamMessage(szTraceback);
+	free(szTraceback);
 }
 
 // XXX - _DoLogError() was a really bad name in retrospect, given

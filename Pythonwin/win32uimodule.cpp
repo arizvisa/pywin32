@@ -452,79 +452,6 @@ void PYW_EXPORT Python_addpath(const TCHAR *paths )
 	}
 }
 
-#define GPEM_ERROR(what) {errorMsg = "<Error getting traceback - " ## what ## ">";goto done;}
-static char *GetPythonTraceback(PyObject *exc_tb)
-{
-	char *result = NULL;
-	char *errorMsg = NULL;
-	PyObject *modStringIO = NULL;
-	PyObject *modTB = NULL;
-	PyObject *obFuncStringIO = NULL;
-	PyObject *obStringIO = NULL;
-	PyObject *obFuncTB = NULL;
-	PyObject *argsTB = NULL;
-	PyObject *obResult = NULL;
-
-	/* Import the modules we need - cStringIO and traceback */
-#if (PY_VERSION_HEX < 0x03000000)
-	modStringIO = PyImport_ImportModule("cStringIO");
-#else
-	// In py3k, cStringIO is in "io"
-	modStringIO = PyImport_ImportModule("io");
-#endif
-
-	if (modStringIO==NULL) GPEM_ERROR("cant import cStringIO");
-	modTB = PyImport_ImportModule("traceback");
-	if (modTB==NULL) GPEM_ERROR("cant import traceback");
-
-	/* Construct a cStringIO object */
-	obFuncStringIO = PyObject_GetAttrString(modStringIO, "StringIO");
-	if (obFuncStringIO==NULL) GPEM_ERROR("cant find cStringIO.StringIO");
-	obStringIO = PyObject_CallObject(obFuncStringIO, NULL);
-	if (obStringIO==NULL) GPEM_ERROR("cStringIO.StringIO() failed");
-
-	/* Get the traceback.print_exception function, and call it. */
-	obFuncTB = PyObject_GetAttrString(modTB, "print_tb");
-	if (obFuncTB==NULL) GPEM_ERROR("cant find traceback.print_tb");
-	argsTB = Py_BuildValue("OOO", 
-			exc_tb  ? exc_tb  : Py_None,
-			Py_None, 
-			obStringIO);
-	if (argsTB==NULL) GPEM_ERROR("cant make print_tb arguments");
-
-	obResult = PyObject_CallObject(obFuncTB, argsTB);
-	if (obResult==NULL) GPEM_ERROR("traceback.print_tb() failed");
-
-	/* Now call the getvalue() method in the StringIO instance */
-	Py_DECREF(obFuncStringIO);
-	obFuncStringIO = PyObject_GetAttrString(obStringIO, "getvalue");
-	if (obFuncStringIO==NULL) GPEM_ERROR("cant find getvalue function");
-	Py_DECREF(obResult);
-	obResult = PyObject_CallObject(obFuncStringIO, NULL);
-	if (obResult==NULL) GPEM_ERROR("getvalue() failed.");
-
-	/* And it should be a string all ready to go - duplicate it. */
-	if (PyString_Check(obResult))
-		result = strdup(PyString_AsString(obResult));
-#if (PY_VERSION_HEX >= 0x03000000)
-	else if (PyUnicode_Check(obResult))
-		result = strdup(_PyUnicode_AsString(obResult));
-#endif
-	else
-		GPEM_ERROR("getvalue() did not return a string");
-
-done:
-	if (result==NULL && errorMsg != NULL)
-		result = strdup(errorMsg);
-	Py_XDECREF(modStringIO);
-	Py_XDECREF(modTB);
-	Py_XDECREF(obFuncStringIO);
-	Py_XDECREF(obStringIO);
-	Py_XDECREF(obFuncTB);
-	Py_XDECREF(argsTB);
-	Py_XDECREF(obResult);
-	return result;
-}
 
 BOOL DisplayPythonTraceback(PyObject *exc_type, PyObject *exc_val, PyObject *exc_tb, const TCHAR *extraTitleMsg = NULL)
 {
@@ -557,7 +484,7 @@ BOOL DisplayPythonTraceback(PyObject *exc_type, PyObject *exc_val, PyObject *exc
 			SetWindowText(title);
 			GetDlgItem(IDCANCEL)->ShowWindow(SW_HIDE);
 			GetDlgItem(IDOK)->SetWindowText(_T("Close"));
-			char *msg = GetPythonTraceback(m_exc_tb);
+			char *msg = GetPythonTraceback(m_exc_type, m_exc_value, m_exc_tb);
 			char *msg_free = msg;
 			// Translate '\n' to '\r\n' - do it the easy way!
 			CString useMsg;
@@ -567,9 +494,6 @@ BOOL DisplayPythonTraceback(PyObject *exc_type, PyObject *exc_val, PyObject *exc
 				else
 					useMsg += *msg;
 			free(msg_free);
-			useMsg += GetReprText(m_exc_type);
-			useMsg += ": ";
-			useMsg += GetReprText(m_exc_value);
 #ifdef _DEBUG
 			{
 			// doesnt seem to like long strings.
