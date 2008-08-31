@@ -301,7 +301,6 @@ class InteractivePythonApp(app.CApp):
 	# DDE Callback
 	#
 	def OnDDECommand(self, command):
-		print ("DDE Executing", repr(command))
 		try:
 			exec(command + "\n")
 		except:
