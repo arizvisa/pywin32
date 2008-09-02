@@ -138,7 +138,7 @@ public:
 
 #define PyRASDIALEXTENSIONS_Check(ob)	((ob)->ob_type == &PyRASDIALEXTENSIONS::type)
 
-// @object RASDIALEXTENSIONS|An object that describes a Win32 RASDIALPARAMS structure
+// @object RASDIALEXTENSIONS|An object that describes a Win32 RASDIALEXTENSIONS structure
 BOOL PyWinObject_AsRASDIALEXTENSIONS(PyObject *ob, RASDIALEXTENSIONS **ppRASDIALEXTENSIONS, BOOL bNoneOK /*= TRUE*/)
 {
 	if (bNoneOK && ob==Py_None) {
@@ -177,9 +177,28 @@ PyTypeObject PyRASDIALEXTENSIONS::type =
 	0,						/* tp_hahs */
 	0,						/* tp_call */
 	0,						/* tp_str */
-	PyRASDIALEXTENSIONS::getattro,				/* tp_getattr */
-	PyRASDIALEXTENSIONS::setattro,				/* tp_setattr */
-	0,	/*tp_as_buffer*/
+	PyRASDIALEXTENSIONS::getattro,				/* tp_getattro */
+	PyRASDIALEXTENSIONS::setattro,				/* tp_setattro */
+	0,						/*tp_as_buffer*/
+	Py_TPFLAGS_DEFAULT,		// tp_flags;
+	"An object that describes a Win32 RASDIALEXTENSIONS structure",		// tp_doc
+	0,						// tp_traverse;
+	0,						// tp_clear
+	0,						// tp_richcompare;
+	0,						// tp_weaklistoffset;
+	0,						// tp_iter
+	0,						// iternextfunc tp_iternext
+	0,						// tp_methods
+	0,						// tp_members
+	0,						// tp_getset;
+	0,						// tp_base;
+	0,						// tp_dict;
+	0,						// tp_descr_get;
+	0,						// tp_descr_set;
+	0,						// tp_dictoffset;
+	0,						// tp_init;
+	0,						// tp_alloc;
+	0,						// newfunc tp_new;
 };
 
 
@@ -806,28 +825,13 @@ static struct PyMethodDef win32ras_functions[] = {
 	{NULL,			NULL}
 };
 
+#define ADD_CONSTANT(tok) if (rc = PyModule_AddIntConstant(module, #tok, tok)) return rc
+#define ADD_ENUM(parta, partb) if (rc = PyModule_AddIntConstant(module, #parta "_" #partb, parta::partb)) return rc
+#define ADD_ENUM3(parta, partb, partc) if (rc = PyModule_AddIntConstant(module, #parta "_" #partb "_" #partc, parta::partb::partc)) return rc
 
-int AddConstant(PyObject *dict, char *key, long value)
+static int AddConstants(PyObject *module)
 {
-	PyObject *okey = PyString_FromString(key);
-	PyObject *oval = PyInt_FromLong(value);
-	if (!okey || !oval) {
-		Py_XDECREF(okey);
-		Py_XDECREF(oval);
-		return 1;
-	}
-	int rc = PyDict_SetItem(dict,okey, oval);
-	Py_XDECREF(okey);
-	Py_XDECREF(oval);
-	return rc;
-}
-#define ADD_CONSTANT(tok) if (rc=AddConstant(dict,#tok, tok)) return rc
-#define ADD_ENUM(parta, partb) if (rc=AddConstant(dict,#parta "_" #partb, parta::partb)) return rc
-#define ADD_ENUM3(parta, partb, partc) if (rc=AddConstant(dict,#parta "_" #partb "_" #partc, parta::partb::partc)) return rc
-
-static int AddConstants(PyObject *dict)
-{
-    int rc;
+	int rc;
     ADD_CONSTANT(RASCS_OpenPort); // @const win32ras|RASCS_OpenPort|Constant for RAS state.
     ADD_CONSTANT(RASCS_PortOpened); // @const win32ras|RASCS_PortOpened|Constant for RAS state.
     ADD_CONSTANT(RASCS_ConnectDevice); // @const win32ras|RASCS_ConnectDevice|Constant for RAS state.
@@ -894,11 +898,13 @@ PyObject *PyInit_win32ras(void)
 	if (!dict)
 		return NULL;
 #endif
-
 	module_error = PyWinExc_ApiError;
 	Py_INCREF(module_error);
 	PyDict_SetItemString(dict, "error", module_error);
-	AddConstants(dict);
+	if (PyType_Ready(&PyRASDIALEXTENSIONS::type) == -1)
+		RETURN_ERROR;
+	if (AddConstants(module) != 0)
+		RETURN_ERROR;
 
 #if (PY_VERSION_HEX >= 0x03000000)
 	return module;

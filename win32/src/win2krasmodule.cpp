@@ -92,8 +92,26 @@ PyTypeObject PyRASEAPUSERIDENTITY::type =
 	PyRASEAPUSERIDENTITY::getattro,		/*tp_getattro*/
 	0,						/*tp_setattro*/
 	0,						/*tp_as_buffer*/
+	Py_TPFLAGS_DEFAULT,		// tp_flags;
+	"An object that describes a Win32 RASDIALEXTENSIONS structure",		// tp_doc
+	0,						// tp_traverse;
+	0,						// tp_clear
+	0,						// tp_richcompare;
+	0,						// tp_weaklistoffset;
+	0,						// tp_iter
+	0,						// iternextfunc tp_iternext
+	0,						// tp_methods
+	0,						// tp_members
+	0,						// tp_getset;
+	0,						// tp_base;
+	0,						// tp_dict;
+	0,						// tp_descr_get;
+	0,						// tp_descr_set;
+	0,						// tp_dictoffset;
+	0,						// tp_init;
+	0,						// tp_alloc;
+	0,						// newfunc tp_new;
 };
-
 
 PyRASEAPUSERIDENTITY::PyRASEAPUSERIDENTITY(RASEAPUSERIDENTITY *identity)
 {
@@ -174,24 +192,10 @@ static struct PyMethodDef win2kras_functions[] = {
 	{NULL,			NULL}
 };
 
-int AddConstant(PyObject *dict, char *key, long value)
-{
-	PyObject *okey = PyString_FromString(key);
-	PyObject *oval = PyInt_FromLong(value);
-	if (!okey || !oval) {
-		Py_XDECREF(okey);
-		Py_XDECREF(oval);
-		return 1;
-	}
-	int rc = PyDict_SetItem(dict,okey, oval);
-	Py_XDECREF(okey);
-	Py_XDECREF(oval);
-	return rc;
-}
 
-#define ADD_CONSTANT(tok) if (rc=AddConstant(dict,#tok, tok)) return rc
+#define ADD_CONSTANT(tok) if (rc=PyModule_AddIntConstant(module, #tok, tok)) return rc
 
-static int AddConstants(PyObject *dict)
+static int AddConstants(PyObject *module)
 {
 	int rc;
 	ADD_CONSTANT(RASEAPF_NonInteractive); // @const win2kras|RASEAPF_NonInteractive|Specifies that the authentication protocol should not bring up a graphical user-interface. If this flag is not present, it is okay for the protocol to display a user interface.
@@ -236,7 +240,11 @@ PyObject *PyInit_win2kras(void)
 		return NULL;
 #endif
 
-	AddConstants(dict);
+	if (PyType_Ready(&PyRASEAPUSERIDENTITY::type) == -1)
+		RETURN_ERROR;
+	if (AddConstants(module) != 0)
+		RETURN_ERROR;
+
 #ifdef _DEBUG
 	const TCHAR *modName = _T("win32ras_d.pyd");
 #else
