@@ -1,7 +1,7 @@
 import win32ui
 from pywin.mfc import docview
 from pywin import is_platform_unicode, default_platform_encoding, default_scintilla_encoding
-from .scintillacon import *
+from . import scintillacon
 import win32con
 import string
 import array
@@ -58,14 +58,14 @@ class CScintillaDocument(ParentScintillaDocument):
 		view = self.GetFirstView()
 		if view.IsWindow():
 			# Turn off undo collection while loading 
-			view.SendScintilla(SCI_SETUNDOCOLLECTION, 0, 0)
+			view.SendScintilla(scintillacon.SCI_SETUNDOCOLLECTION, 0, 0)
 			# Make sure the control isnt read-only
 			view.SetReadOnly(0)
 
 			doc = self
-			view.SendScintilla(SCI_CLEARALL)
-			view.SendMessage(SCI_ADDTEXT, text)
-			view.SendScintilla(SCI_SETUNDOCOLLECTION, 1, 0)
+			view.SendScintilla(scintillacon.SCI_CLEARALL)
+			view.SendMessage(scintillacon.SCI_ADDTEXT, text)
+			view.SendScintilla(scintillacon.SCI_SETUNDOCOLLECTION, 1, 0)
 			view.SendScintilla(win32con.EM_EMPTYUNDOBUFFER, 0, 0)
 
 	def FinalizeViewCreation(self, view):
@@ -73,13 +73,13 @@ class CScintillaDocument(ParentScintillaDocument):
 
 	def HookViewNotifications(self, view):
 		parent = view.GetParentFrame()
-		parent.HookNotify(ViewNotifyDelegate(self, "OnBraceMatch"), SCN_CHECKBRACE)
-		parent.HookNotify(ViewNotifyDelegate(self, "OnMarginClick"), SCN_MARGINCLICK)
-		parent.HookNotify(ViewNotifyDelegate(self, "OnNeedShown"), SCN_NEEDSHOWN)
+		parent.HookNotify(ViewNotifyDelegate(self, "OnBraceMatch"), scintillacon.SCN_CHECKBRACE)
+		parent.HookNotify(ViewNotifyDelegate(self, "OnMarginClick"), scintillacon.SCN_MARGINCLICK)
+		parent.HookNotify(ViewNotifyDelegate(self, "OnNeedShown"), scintillacon.SCN_NEEDSHOWN)
 
-		parent.HookNotify(DocumentNotifyDelegate(self, "OnSavePointReached"), SCN_SAVEPOINTREACHED)
-		parent.HookNotify(DocumentNotifyDelegate(self, "OnSavePointLeft"), SCN_SAVEPOINTLEFT)
-		parent.HookNotify(DocumentNotifyDelegate(self, "OnModifyAttemptRO"), SCN_MODIFYATTEMPTRO)
+		parent.HookNotify(DocumentNotifyDelegate(self, "OnSavePointReached"), scintillacon.SCN_SAVEPOINTREACHED)
+		parent.HookNotify(DocumentNotifyDelegate(self, "OnSavePointLeft"), scintillacon.SCN_SAVEPOINTLEFT)
+		parent.HookNotify(DocumentNotifyDelegate(self, "OnModifyAttemptRO"), scintillacon.SCN_MODIFYATTEMPTRO)
 		# Tell scintilla what characters should abort auto-complete.
 		view.SCIAutoCStops(string.whitespace+"()[]:;+-/*=\\?'!#@$%^&,<>\"'|" )
 
