@@ -314,8 +314,8 @@ BOOL DictToLogFont(PyObject *font_props, LOGFONT *pLF)
 //  ListView conversion utilities
 //
 //
-// LV_ITEM 
-PyObject *MakeLV_ITEMTuple(LV_ITEM *item)
+// LV_ITEM
+PyObject *PyWinObject_FromLV_ITEM(LV_ITEM *item)
 {
 	PyObject *ret = PyTuple_New(7);
 	if (ret==NULL) return NULL;
@@ -352,6 +352,11 @@ PyObject *MakeLV_ITEMTuple(LV_ITEM *item)
 	return ret;
 }
 
+void PyWinObject_FreeLV_ITEM(LV_ITEM *pItem){
+	if (pItem->mask & LVIF_TEXT)
+		PyWinObject_FreeTCHAR(pItem->pszText);
+}
+
 // @object LV_ITEM|Describes an LV_ITEM tuple, used by the <o PyCListCtrl> object.
 // @tupleitem 0|int|item|The item number.
 // @tupleitem 1|int|subItem|The sub-item number.
@@ -363,65 +368,80 @@ PyObject *MakeLV_ITEMTuple(LV_ITEM *item)
 // @comm When passed to Python, will always be a tuple of size 7, and items may be None if not available.
 // <nl>When passed from Python, the tuple must be at least 2 items long, and any item may be None.
 // <nl>userob is any Python object at all, but no reference count is kept, so you must ensure the object remains referenced throught the lists life.
-BOOL ParseLV_ITEMTuple( PyObject *args, LV_ITEM *pItem)
+BOOL PyWinObject_AsLV_ITEM( PyObject *args, LV_ITEM *pItem)
 {
-	PyObject *ob;
-	pItem->mask = 0;
+	ZeroMemory(pItem, sizeof(*pItem));
+	PyObject *ob, *ob2;
 	Py_ssize_t len = PyTuple_Size(args);
 	if (len<2 || len > 7) {
 		PyErr_SetString(PyExc_TypeError, "LV_ITEM tuple has invalid size");
 		return FALSE;
 	}
-	// ??? This is questionable, shouldn't be any exceptions left hanging, and if this is called
-	//	from someplace where an exception legitimately exists, should fetch/restore the exception. ???
-	assert (!PyErr_Occurred());	//	PyErr_Clear(); // clear any errors, so I can detect my own.
+
 	// 0 - iItem.
-	if ((ob=PyTuple_GetItem(args, 0))==NULL)
+	ob=PyTuple_GET_ITEM(args, 0);
+	pItem->iItem = PyInt_AsLong(ob);
+	if (pItem->iImage == -1 && PyErr_Occurred())
 		return FALSE;
-	pItem->iItem = (UINT)PyInt_AsLong(ob);
-	if (PyErr_Occurred()) return FALSE;
+
 	// 1 - iSubItem
-	if ((ob=PyTuple_GetItem(args, 1))==NULL)
+	ob=PyTuple_GET_ITEM(args, 1);
+	pItem->iSubItem = PyInt_AsLong(ob);
+	if (pItem->iSubItem == -1 && PyErr_Occurred())
 		return FALSE;
-	pItem->iSubItem = (UINT)PyInt_AsLong(ob);
-	if (PyErr_Occurred()) return FALSE;
-	// 1/2 - state/stateMask
-	if (len<4) return TRUE;
-	if ((ob=PyTuple_GetItem(args, 2))==NULL)
+
+	// 2/3 - state/stateMask
+	if (len<3) return TRUE;
+	if (len<4){
+		PyErr_SetString(PyExc_TypeError, "LV_ITEM: Statemask must be provided if state if provided");
 		return FALSE;
-	if (ob != Py_None) {
-		pItem->state = (UINT)PyInt_AsLong(ob);
-		if (PyErr_Occurred() || (ob=PyTuple_GetItem(args, 3))==NULL)
+		}
+	ob=PyTuple_GET_ITEM(args, 2);
+	ob2=PyTuple_GET_ITEM(args, 3);
+	if (ob==Py_None && ob2==Py_None)
+		;
+	else if (ob==Py_None || ob2==Py_None) {
+		PyErr_SetString(PyExc_TypeError, "LV_ITEM - state and stateMask must both be None, or both not None");
+		return FALSE;
+	} else {
+		pItem->state = PyInt_AsLong(ob);
+		if (pItem->state == -1 && PyErr_Occurred())
 			return FALSE;
-		pItem->stateMask = (UINT)PyInt_AsLong(ob);
-		if (PyErr_Occurred()) return FALSE;
+		pItem->stateMask = PyInt_AsLong(ob2);
+		if (pItem->stateMask == -1 && PyErr_Occurred())
+			return FALSE;
 		pItem->mask |= LVIF_STATE;
 	}
 
+	// 4 - text
 	if (len<5) return TRUE;
 	ob=PyTuple_GET_ITEM(args, 4);
 	if (!PyWinObject_AsTCHAR(ob, &pItem->pszText, TRUE, (DWORD *)&pItem->cchTextMax))
 		return FALSE;
-	// ??? Need to free this somewhere ???
 	if (pItem->pszText)
 		pItem->mask |= LVIF_TEXT;
 
+	// 5 - image index
 	if (len<6) return TRUE;
-	if ((ob=PyTuple_GetItem(args, 5))==NULL)
-		return FALSE;
+	ob=PyTuple_GET_ITEM(args, 5);
 	if (ob != Py_None) {
-		pItem->mask |= LVIF_IMAGE;
 		pItem->iImage = PyInt_AsLong(ob);
-		if (PyErr_Occurred())
+		if (pItem->iImage == -1 && PyErr_Occurred()){
+			PyWinObject_FreeLV_ITEM(pItem);
 			return FALSE;
-	}
+			}
+		pItem->mask |= LVIF_IMAGE;
+		}
+
 	if (len<7) return TRUE;
-	if ((ob=PyTuple_GetItem(args, 6))==NULL)
+	ob=PyTuple_GET_ITEM(args, 6);
+	if (!PyWinObject_AsPARAM(ob, &pItem->lParam)){
+		PyWinObject_FreeLV_ITEM(pItem);
 		return FALSE;
-	if (ob != Py_None) {
+		}
+	if (pItem->lParam)
 		pItem->mask |= LVIF_PARAM;
-		pItem->lParam = PyInt_AsLong(ob);
-	}
+
 	return TRUE;
 }
 
@@ -522,7 +542,7 @@ BOOL ParseLV_COLUMNTuple( PyObject *args, LV_COLUMN *pItem)
 //
 //
 // TV_ITEM 
-PyObject *MakeTV_ITEMTuple(TV_ITEM *item)
+PyObject *PyWinObject_FromTV_ITEM(TV_ITEM *item)
 {
 	PyObject *ret = PyTuple_New(8);
 	if (ret==NULL) return NULL;
@@ -575,41 +595,43 @@ PyObject *MakeTV_ITEMTuple(TV_ITEM *item)
 	return ret;
 }
 
+void PyWinObject_FreeTV_ITEM(TV_ITEM *pItem){
+	if (pItem->mask & TVIF_TEXT)
+		PyWinObject_FreeTCHAR(pItem->pszText);
+}
+
 // @object TV_ITEM|Describes a TV_ITEM tuple, used by the <o PyCListCtrl> object.
 // A tuple of 8 items:
 // <nl>When returned from a win32ui function, will always be a tuple of size 8, and items may be None if not available.
 // <nl>When passed to a win32ui function, the tuple may be any length up to 8, and any item may be None.
-BOOL ParseTV_ITEMTuple( PyObject *args, TV_ITEM *pItem)
+BOOL PyWinObject_AsTV_ITEM( PyObject *args, TV_ITEM *pItem)
 {
+	ZeroMemory(pItem, sizeof(*pItem));
 	PyObject *ob;
 	PyObject *ob2;
-	pItem->mask = 0;
 	Py_ssize_t len = PyTuple_Size(args);
 	if (len > 8) {
 		PyErr_SetString(PyExc_TypeError, "TV_ITEM tuple has invalid size");
 		return FALSE;
 	}
-	assert (!PyErr_Occurred());		//	PyErr_Clear(); // clear any errors, so I can detect my own.
 	// 0 - hItem
 	if (len<1) return TRUE;
-	if ((ob=PyTuple_GetItem(args, 0))==NULL)
-		return FALSE;
+	ob=PyTuple_GET_ITEM(args, 0);
 	if (ob != Py_None) {
 		// @tupleitem 0|int|hItem|Item handle
 		if (!PyWinObject_AsHANDLE(ob, (HANDLE *)pItem->hItem))
 			return FALSE;
 		pItem->mask |= TVIF_HANDLE;
 	}
+
 	// 1,2 - state/stateMask
 	if (len<2) return TRUE;
 	if (len<3) {
 		PyErr_SetString(PyExc_TypeError, "TV_ITEM - state and stateMask must be provided");
 		return FALSE;
 	}
-	if ((ob=PyTuple_GetItem(args, 1))==NULL)
-		return FALSE;
-	if ((ob2=PyTuple_GetItem(args, 2))==NULL)
-		return FALSE;
+	ob=PyTuple_GET_ITEM(args, 1);
+	ob2=PyTuple_GET_ITEM(args, 2);
 	if (ob==Py_None && ob2==Py_None)
 		;
 	else if (ob==Py_None || ob2==Py_None) {
@@ -618,9 +640,12 @@ BOOL ParseTV_ITEMTuple( PyObject *args, TV_ITEM *pItem)
 	} else {
 		// @tupleitem 1|int|state|Item state.  If specified, the stateMask must also be specified.
 		// @tupleitem 2|int|stateMask|Item state mask
-		pItem->state = (int)PyInt_AsLong(ob);
-		pItem->stateMask = (int)PyInt_AsLong(ob2);
-		if (PyErr_Occurred()) return FALSE;
+		pItem->state = PyInt_AsLong(ob);
+		if (pItem->state == -1 && PyErr_Occurred())
+			return FALSE;
+		pItem->stateMask = PyInt_AsLong(ob2);
+		if (pItem->stateMask == -1 && PyErr_Occurred())
+			return FALSE;
 		pItem->mask |= TVIF_STATE;
 	}
 
@@ -629,49 +654,62 @@ BOOL ParseTV_ITEMTuple( PyObject *args, TV_ITEM *pItem)
 	ob=PyTuple_GET_ITEM(args, 3);
 	// @tupleitem 3|string|text|Item text
 	if (!PyWinObject_AsTCHAR(ob, &pItem->pszText, TRUE, (DWORD *)&pItem->cchTextMax))
-		return FALSE;
-	// ??? This need to be freed after use ???
+		return FALSE;	// last exit without cleanup
 	if (pItem->pszText)
 		pItem->mask |= TVIF_TEXT;
 
 	// 4 - image
 	if (len<5) return TRUE;
-	if ((ob=PyTuple_GetItem(args, 4))==NULL)
-		return FALSE;
+	ob=PyTuple_GET_ITEM(args, 4);
 	if (ob != Py_None) {
+		// @tupleitem 4|int|iImage|Image list index of icon for non-seleted state.
+		pItem->iImage = PyInt_AsLong(ob);
+		if (pItem->iImage == -1 && PyErr_Occurred()){
+			PyWinObject_FreeTV_ITEM(pItem);
+			return FALSE;
+			}
 		pItem->mask |= TVIF_IMAGE;
-		// @tupleitem 4|int|iImage|Offset of items image.
-		pItem->iImage = (int)PyInt_AsLong(ob);
-	}
+		}
+
 	// 5 - imageSelected
 	if (len<6) return TRUE;
-	if ((ob=PyTuple_GetItem(args, 5))==NULL)
-		return FALSE;
+	ob=PyTuple_GET_ITEM(args, 5);
 	if (ob != Py_None) {
 		// @tupleitem 5|int|iSelectedImage|Offset of items selected image.
+		pItem->iSelectedImage = PyInt_AsLong(ob);
+		if (pItem->iSelectedImage == -1 && PyErr_Occurred()){
+			PyWinObject_FreeTV_ITEM(pItem);
+			return FALSE;
+			}
 		pItem->mask |= TVIF_SELECTEDIMAGE;
-		pItem->iSelectedImage = (int)PyInt_AsLong(ob);
-	}
+		}
+
 	// 6 - cChildren
 	if (len<7) return TRUE;
-	if ((ob=PyTuple_GetItem(args, 6))==NULL)
-		return FALSE;
+	ob=PyTuple_GET_ITEM(args, 6);
 	if (ob != Py_None) {
 		// @tupleitem 6|int|cChildren|Number of child items.
-		pItem->mask |= TVIF_CHILDREN;
 		pItem->cChildren = PyInt_AsLong(ob);
-	}
+		if (pItem->cChildren == -1 && PyErr_Occurred()){
+			PyWinObject_FreeTV_ITEM(pItem);
+			return FALSE;
+			}
+		pItem->mask |= TVIF_CHILDREN;
+		}
+
 	// 7 - object
 	if (len<8) return TRUE;
-	if ((ob=PyTuple_GetItem(args, 7))==NULL)
-		return FALSE;
+	ob=PyTuple_GET_ITEM(args, 7);
 	if (ob != Py_None) {
 		// @tupleitem 7|int|lParam|User defined integer param.
-		pItem->mask |= LVIF_PARAM;
-		if (!PyWinObject_AsPARAM(ob, &pItem->lParam))
+		if (!PyWinObject_AsPARAM(ob, &pItem->lParam)){
+			PyWinObject_FreeTV_ITEM(pItem);
 			return FALSE;
-	}
-	return !PyErr_Occurred();
+			}
+		pItem->mask |= LVIF_PARAM;
+		}
+
+	return TRUE;
 }
 
 /////////////////////////////////////////////////////////////////////
@@ -1063,8 +1101,7 @@ ui_type_CObject &UITypeFromHWnd( HWND hwnd )
 	return *ret;
 }
 
-// utility to get a nice printable string from any object.
-// reference neutral.   NOT !!!!!!!! - Also needs adjustment for Py3k unicode repr
+// utility to get a nice printable string from any object. (reference neutral)
 CString GetReprText( PyObject *objectUse )
 {
 	PyObject *s;

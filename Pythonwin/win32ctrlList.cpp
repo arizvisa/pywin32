@@ -300,11 +300,12 @@ PyObject *PyCListCtrl_InsertItem( PyObject *self, PyObject *args )
 			if (PyArg_ParseTuple(args, "O:InsertItem",
 							 &obLVItem)) { // @pyparm <om PyCListCtrl.LV_ITEM tuple>|item||A tuple describing the new item.
 				LV_ITEM lvItem;
-				if (!ParseLV_ITEMTuple(obLVItem, &lvItem))
+				if (!PyWinObject_AsLV_ITEM(obLVItem, &lvItem))
 					return NULL;
 				GUI_BGN_SAVE;
 				ret = pList->InsertItem(&lvItem);
 				GUI_END_SAVE;
+				PyWinObject_FreeLV_ITEM(&lvItem);
 			} else {
 				PyErr_Clear();
 				RETURN_ERR("InsertItem requires (item, text, image), (item, text), or (itemObject)");
@@ -328,11 +329,12 @@ PyObject *PyCListCtrl_SetItem( PyObject *self, PyObject *args )
 		                 &obLVItem)) // @pyparm <om PyCListCtrl.LV_ITEM tuple>|item||A tuple describing the new item.
 		return NULL;
 	LV_ITEM lvItem;
-	if (!ParseLV_ITEMTuple(obLVItem, &lvItem))
+	if (!PyWinObject_AsLV_ITEM(obLVItem, &lvItem))
 		return NULL;
 	GUI_BGN_SAVE;
 	BOOL ok = pList->SetItem(&lvItem);
 	GUI_END_SAVE;
+	PyWinObject_FreeLV_ITEM(&lvItem);
 	if (!ok)
 		RETURN_ERR("SetItem failed");
 	RETURN_NONE;
@@ -475,7 +477,7 @@ PyObject *PyCListCtrl_GetItem( PyObject *self, PyObject *args )
 	GUI_END_SAVE;
 	if (!ok)
 		RETURN_ERR("GetItem failed");
-	return MakeLV_ITEMTuple(&lvItem);
+	return PyWinObject_FromLV_ITEM(&lvItem);
 }
 
 // @pymethod int|PyCListCtrl|GetItemText|Retrieves the text of a list view item or subitem.

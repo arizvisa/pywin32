@@ -482,11 +482,12 @@ PyObject *PyCTreeCtrl_InsertItem( PyObject *self, PyObject *args )
 			PyWinObject_AsHANDLE, &tvItem.hParent, // @pyparm HTREEITEM|hParent||The parent item.  If commctrl.TVI_ROOT or 0, it is added to the root.
 			PyWinObject_AsHANDLE, &tvItem.hInsertAfter, // @pyparm HTREEITEM|hInsertAfter||The item to insert after.  Can be an item or TVI_FIRST, TVI_LAST or TVI_SORT
 			&obTVItem)) { // @pyparm <om PyCTreeCtrl.TV_ITEM tuple>|item||A tuple describing the new item.
-		if (!ParseTV_ITEMTuple(obTVItem, &tvItem.item))
+		if (!PyWinObject_AsTV_ITEM(obTVItem, &tvItem.item))
 			return NULL;
 		GUI_BGN_SAVE;
 		ret = pList->InsertItem(&tvItem);
 		GUI_END_SAVE;
+		PyWinObject_FreeTV_ITEM(&tvItem.item);
 		goto done;
 		}
 
@@ -512,11 +513,12 @@ PyObject *PyCTreeCtrl_SetItem( PyObject *self, PyObject *args )
 		                 &obTVItem)) // @pyparm <om PyCTreeCtrl.TV_ITEM tuple>|item||A tuple describing the new item.
 		return NULL;
 	TV_ITEM tvItem;
-	if (!ParseTV_ITEMTuple(obTVItem, &tvItem))
+	if (!PyWinObject_AsTV_ITEM(obTVItem, &tvItem))
 		return NULL;
  	GUI_BGN_SAVE;
 	BOOL ok = pList->SetItem(&tvItem);
  	GUI_END_SAVE;
+	PyWinObject_FreeTV_ITEM(&tvItem);
 	if (!ok)
 		RETURN_ERR("SetItem failed");
 	RETURN_NONE;
@@ -568,7 +570,7 @@ PyObject *PyCTreeCtrl_GetItem( PyObject *self, PyObject *args )
  	GUI_END_SAVE;
 	if (!ok)
 		RETURN_ERR("GetItem failed");
-	return MakeTV_ITEMTuple(&tvItem);
+	return PyWinObject_FromTV_ITEM(&tvItem);
 }
 
 // @pymethod int|PyCTreeCtrl|GetItemText|Retrieves the text of a list view item or subitem.

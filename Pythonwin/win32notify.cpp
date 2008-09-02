@@ -86,13 +86,13 @@ PyObject *PyNotifyMakeExtraTuple( NMHDR *ptr, char *fmt)
 			break;
 		case 'T': {// TV_ITEM structure
 			TV_ITEM *ptv = (TV_ITEM *)pUse;
-			ob = bIgnore ? NULL : MakeTV_ITEMTuple(ptv);
+			ob = bIgnore ? NULL : PyWinObject_FromTV_ITEM(ptv);
 			pUse += (sizeof(TV_ITEM));
 			break;
 			}
 		case 'L': {// LV_ITEM structure
 			LV_ITEM *plv = (LV_ITEM *)pUse;
-			ob = bIgnore ? NULL : MakeLV_ITEMTuple(plv);
+			ob = bIgnore ? NULL : PyWinObject_FromLV_ITEM(plv);
 			pUse += (sizeof(LV_ITEM));
 			break;
 			}
@@ -311,8 +311,8 @@ Python_OnNotify (CWnd *pFrom, WPARAM, LPARAM lParam, LRESULT *pResult)
 		NMTREEVIEW *nmtv=(NMTREEVIEW *)pHdr;
 		ob2=Py_BuildValue("iNN(ll)",
 			nmtv->action,
-			MakeTV_ITEMTuple(&nmtv->itemOld),
-			MakeTV_ITEMTuple(&nmtv->itemNew),
+			PyWinObject_FromTV_ITEM(&nmtv->itemOld),
+			PyWinObject_FromTV_ITEM(&nmtv->itemNew),
 			nmtv->ptDrag.x, nmtv->ptDrag.y);
 		}
 	else if (code == HDN_ITEMDBLCLICKW || code == HDN_ITEMDBLCLICKA)

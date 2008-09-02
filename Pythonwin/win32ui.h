@@ -352,14 +352,16 @@ PYW_EXPORT PyObject *MakeCharFormatTuple(CHARFORMAT *pFmt);
 PYW_EXPORT BOOL ParseParaFormatTuple( PyObject *args, PARAFORMAT *pFmt);
 PYW_EXPORT PyObject *MakeParaFormatTuple(PARAFORMAT *pFmt);
 
-PYW_EXPORT PyObject *MakeLV_ITEMTuple(LV_ITEM *item);
-PYW_EXPORT BOOL ParseLV_ITEMTuple( PyObject *args, LV_ITEM *pItem);
+PYW_EXPORT PyObject *PyWinObject_FromLV_ITEM(LV_ITEM *pItem);
+PYW_EXPORT BOOL PyWinObject_AsLV_ITEM( PyObject *args, LV_ITEM *pItem);
+PYW_EXPORT void PyWinObject_FreeLV_ITEM(LV_ITEM *pItem);
 
 PYW_EXPORT PyObject *MakeLV_COLUMNTuple(LV_COLUMN *item);
 PYW_EXPORT BOOL ParseLV_COLUMNTuple( PyObject *args, LV_COLUMN *pItem);
 
-PYW_EXPORT BOOL ParseTV_ITEMTuple( PyObject *args, TV_ITEM *pItem);
-PYW_EXPORT PyObject *MakeTV_ITEMTuple(TV_ITEM *item);
+PYW_EXPORT BOOL PyWinObject_AsTV_ITEM( PyObject *args, TV_ITEM *pItem);
+PYW_EXPORT PyObject *PyWinObject_FromTV_ITEM(TV_ITEM *pItem);
+PYW_EXPORT void PyWinObject_FreeTV_ITEM(TV_ITEM *pItem);
 
 PyObject *PyWin_GetPythonObjectFromLong(LONG_PTR val);
 
