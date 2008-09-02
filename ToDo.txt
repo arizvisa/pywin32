@@ -1,12 +1,10 @@
 Some things that still need work for Python 3.0
 
-win32ras - Add constants with unicode names
 
 Places where need to call PyType_Ready for all types defined in module
 	perfmon
 	directsound
 	dbi, odbc
-	win32ras, win2kras
 	win32help
 
 Swig doesn't handle com_interface_parent, adsi will not build
@@ -16,9 +14,11 @@ Several types set Py_TPFLAGS_BASETYPE but do not have required infrastructure to
 servicemanager (PythonService.cpp) - Py_SetProgram and PySys_SetArgv don't work for 2.x, need char * args
 	but __argv is NULL
 
+pythoncom - Get*String routines for looking up error codes return bytes instead of unicode
 
 Pythonwin -
-	LVITEM and TVITEM conversions use PyWinobject_AsTCHAR, result needs to be freed
+	xxx LVITEM and TVITEM conversions use PyWinobject_AsTCHAR, result needs to be freed
+	LV_COLUMN conversion - same as above
 
 	xxx win32uimodule - Python_callback has 64-bit issues with HWND, WPARAM, LPARAM
 
@@ -48,3 +48,7 @@ Pythonwin -
 	Figure out a clean way to switch between commctrl.*A and commctrl.*W constants for hooking messages
 
 	Add /ENTRY:wWinMainCRTStartup to linker args
+
+	Need to override GetWindowText for scintilla controls - for WM_GETTEXT, text is returned as utf-8 bytes instead of wide-char
+
+
