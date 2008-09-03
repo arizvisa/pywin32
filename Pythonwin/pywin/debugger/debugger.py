@@ -55,7 +55,7 @@ class HierFrameItem(HierListItem):
 		if not name or name == '?' :
 			# See if locals has a '__name__' (ie, a module)
 			if '__name__' in self.myobject.f_locals:
-				name = self.myobject.f_locals['__name__'] + " module"
+				name = str(self.myobject.f_locals['__name__']) + " module"
 			else:
 				name = '<Debugger Context>'
 
@@ -577,7 +577,6 @@ class Debugger(debugger_parent):
 		self.interaction(frame, None)
 
 	def user_exception(self, frame, exc_info):
-		print ('user exception callled !!!!!!!')
 		# This function is called if an exception occurs,
 		# but only if we are to stop at or just below this level
 		(exc_type, exc_value, exc_traceback) = exc_info
