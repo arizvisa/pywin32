@@ -27,10 +27,8 @@ class CScintillaDocument(ParentScintillaDocument):
 				text = f.read()
 			finally:
 				f.close()
-			text = text.encode('utf-8')
-			if is_platform_unicode:
-				# Translate from locale-specific (MCBS) encoding to UTF-8 for Scintilla
-				text = text.encode(default_scintilla_encoding)
+			# Translate from locale-specific (MCBS) encoding to UTF-8 for Scintilla
+			text = text.encode(default_scintilla_encoding)
 		except IOError:
 			win32ui.MessageBox("Could not load the file from %s" % filename)
 			return 0

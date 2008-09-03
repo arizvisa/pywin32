@@ -386,8 +386,8 @@ class CScintillaView(docview.CtrlView, control.CScintillaColorEditInterface):
 	def SaveTextFile(self, filename):
 		doc = self.GetDocument()
 		s = self.GetTextRange()
-		if is_platform_unicode:
-			s = str(s,"utf-8").encode("mbcs")
+		## if is_platform_unicode:
+		##	s = str(s,"utf-8").encode("mbcs")
 		f  = open(filename, 'w')
 		f.write(s)
 		f.close()

@@ -223,8 +223,8 @@ class ScintillaControlInterface:
 		buff = (keywords+"\0").encode(default_scintilla_encoding)
 		self.SendScintilla(scintillacon.SCI_SETKEYWORDS, kw_list_no, buff)
 	def SCISetProperty(self, name, value):
-		name_buff = array.array('b',  (name + '\0').encode('utf-8'))
-		val_buff = array.array("b", (str(value)+'\0').encode('utf-8'))
+		name_buff = array.array('b',  (name + '\0').encode(default_scintilla_encoding))
+		val_buff = array.array("b", (str(value)+'\0').encode(default_scintilla_encoding))
 		address_name_buffer = name_buff.buffer_info()[0]
 		address_val_buffer = val_buff.buffer_info()[0]
 		self.SendScintilla(scintillacon.SCI_SETPROPERTY, address_name_buffer, address_val_buffer)
@@ -281,7 +281,7 @@ class CScintillaEditInterface(ScintillaControlInterface):
 		"""
 		findtextex_fmt='llPll'
 		## Scintilla does not handle unicode in EM_FINDTEXT msg (FINDTEXTEX struct)
-		txt_buff = (findText+'\0').encode('utf-8')
+		txt_buff = (findText+'\0').encode(default_scintilla_encoding)
 		txt_array = array.array('b', txt_buff)
 		ft_buff = struct.pack(findtextex_fmt, range[0], range[1], txt_array.buffer_info()[0], 0, 0)
 		ft_array = array.array('b', ft_buff)
