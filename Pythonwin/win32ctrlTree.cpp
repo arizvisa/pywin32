@@ -481,7 +481,7 @@ PyObject *PyCTreeCtrl_InsertItem( PyObject *self, PyObject *args )
 	if (PyArg_ParseTuple(args, "O&O&O:InsertItem",
 			PyWinObject_AsHANDLE, &tvItem.hParent, // @pyparm HTREEITEM|hParent||The parent item.  If commctrl.TVI_ROOT or 0, it is added to the root.
 			PyWinObject_AsHANDLE, &tvItem.hInsertAfter, // @pyparm HTREEITEM|hInsertAfter||The item to insert after.  Can be an item or TVI_FIRST, TVI_LAST or TVI_SORT
-			&obTVItem)) { // @pyparm <om PyCTreeCtrl.TV_ITEM tuple>|item||A tuple describing the new item.
+			&obTVItem)) { // @pyparm <o TV_ITEM>|item||A tuple describing the new item.
 		if (!PyWinObject_AsTV_ITEM(obTVItem, &tvItem.item))
 			return NULL;
 		GUI_BGN_SAVE;
@@ -510,7 +510,7 @@ PyObject *PyCTreeCtrl_SetItem( PyObject *self, PyObject *args )
 	if (!(pList=GetTreeCtrl(self)))
 		return NULL;
 	if (!PyArg_ParseTuple(args, "O:SetItem",
-		                 &obTVItem)) // @pyparm <om PyCTreeCtrl.TV_ITEM tuple>|item||A tuple describing the new item.
+		                 &obTVItem)) // @pyparm <o TV_ITEM>|item||A tuple describing the new item.
 		return NULL;
 	TV_ITEM tvItem;
 	if (!PyWinObject_AsTV_ITEM(obTVItem, &tvItem))
@@ -546,7 +546,7 @@ PyObject *PyCTreeCtrl_SetImageList( PyObject *self, PyObject *args )
 	return ui_assoc_object::make( PyCImageList::type, pOldList )->GetGoodRet();
 }
 
-// @pymethod <om PyCTreeCtrl.TV_ITEM tuple>|PyCTreeCtrl|GetItem|Retrieves the details of an items attributes.
+// @pymethod <o TV_ITEM>|PyCTreeCtrl|GetItem|Retrieves the details of an items attributes.
 PyObject *PyCTreeCtrl_GetItem( PyObject *self, PyObject *args )
 {
 	HTREEITEM item;

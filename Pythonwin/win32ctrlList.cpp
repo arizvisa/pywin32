@@ -227,14 +227,15 @@ PyObject *PyCListCtrl_InsertColumn( PyObject *self, PyObject *args )
 
 	if (!PyArg_ParseTuple(args, "iO:InsertColumn",
 			             &iColNo,   // @pyparm int|colNo||The new column number
-		                 &obLVCol)) // @pyparm <om PyCListCtrl.LV_COLUMN tuple>|item||A tuple describing the new column.
+		                 &obLVCol)) // @pyparm <o LV_COLUMN>|item||A tuple describing the new column.
 		return NULL;
 	LV_COLUMN lvCol;
-	if (!ParseLV_COLUMNTuple(obLVCol, &lvCol))
+	if (!PyWinObject_AsLV_COLUMN(obLVCol, &lvCol))
 		return NULL;
 	GUI_BGN_SAVE;
 	int ret = pList->InsertColumn(iColNo, &lvCol);
 	GUI_END_SAVE;
+	PyWinObject_FreeLV_COLUMN(&lvCol);
 	if (ret==-1)
 		RETURN_ERR("InsertColumn failed");
 	return Py_BuildValue("i",ret);
@@ -252,17 +253,18 @@ PyObject *PyCListCtrl_SetColumn( PyObject *self, PyObject *args )
 
 	if (!PyArg_ParseTuple(args, "iO:InsertColumn",
 			             &iColNo,   // @pyparm int|colNo||The to be modified column number
-		                 &obLVCol)) // @pyparm <om PyCListCtrl.LV_COLUMN tuple>|item||A tuple describing the modified column.
+		                 &obLVCol)) // @pyparm <o LV_COLUMN>|item||A tuple describing the modified column.
 		return NULL;
 	LV_COLUMN lvCol;
-	if (!ParseLV_COLUMNTuple(obLVCol, &lvCol))
+	if (!PyWinObject_AsLV_COLUMN(obLVCol, &lvCol))
 		return NULL;
 	GUI_BGN_SAVE;
 	int ret = pList->SetColumn(iColNo, &lvCol);
 	GUI_END_SAVE;
+	PyWinObject_FreeLV_COLUMN(&lvCol);
 	if (ret==-1)
 		RETURN_ERR("SetColumn failed");
-	return Py_BuildValue("i",ret);
+	return PyInt_FromLong(ret);
 }
 
 // @pymethod int|PyCListCtrl|InsertItem|Inserts an item into the list.
@@ -298,7 +300,7 @@ PyObject *PyCListCtrl_InsertItem( PyObject *self, PyObject *args )
 		} else {
 			PyErr_Clear();
 			if (PyArg_ParseTuple(args, "O:InsertItem",
-							 &obLVItem)) { // @pyparm <om PyCListCtrl.LV_ITEM tuple>|item||A tuple describing the new item.
+							 &obLVItem)) { // @pyparm <o LV_ITEM>|item||A tuple describing the new item.
 				LV_ITEM lvItem;
 				if (!PyWinObject_AsLV_ITEM(obLVItem, &lvItem))
 					return NULL;
@@ -315,7 +317,7 @@ PyObject *PyCListCtrl_InsertItem( PyObject *self, PyObject *args )
 	PyWinObject_FreeTCHAR(text);
 	if (ret==-1)
 		RETURN_ERR("InsertItem failed");
-	return Py_BuildValue("i",ret);
+	return PyInt_FromLong(ret);
 }
 
 // @pymethod int|PyCListCtrl|SetItem|Sets some of all of an items attributes.
@@ -326,7 +328,7 @@ PyObject *PyCListCtrl_SetItem( PyObject *self, PyObject *args )
 	if (!(pList=GetListCtrl(self)))
 		return NULL;
 	if (!PyArg_ParseTuple(args, "O:SetItem",
-		                 &obLVItem)) // @pyparm <om PyCListCtrl.LV_ITEM tuple>|item||A tuple describing the new item.
+		                 &obLVItem)) // @pyparm <o LV_ITEM>|item||A tuple describing the new item.
 		return NULL;
 	LV_ITEM lvItem;
 	if (!PyWinObject_AsLV_ITEM(obLVItem, &lvItem))
@@ -362,7 +364,7 @@ PyObject *PyCListCtrl_SetImageList( PyObject *self, PyObject *args )
 	return ui_assoc_object::make( PyCImageList::type, pOldList )->GetGoodRet();
 }
 
-// @pymethod <om PyCListCtrl.LV_COLUMN tuple>|PyCListCtrl|GetColumn|Retrieves the details of a column in the control.
+// @pymethod <o LV_COLUMN>|PyCListCtrl|GetColumn|Retrieves the details of a column in the control.
 PyObject *PyCListCtrl_GetColumn( PyObject *self, PyObject *args )
 {
 	int col;
@@ -381,7 +383,7 @@ PyObject *PyCListCtrl_GetColumn( PyObject *self, PyObject *args )
 	GUI_END_SAVE;
 	if (!ok)
 		RETURN_ERR("GetColumn failed");
-	return MakeLV_COLUMNTuple(&lvItem);
+	return PyWinObject_FromLV_COLUMN(&lvItem);
 }
 
 // @pymethod int|PyCListCtrl|DeleteColumn|Deletes the specified column from the list control.
@@ -454,7 +456,7 @@ PyObject *PyCListCtrl_GetStringWidth( PyObject *self, PyObject *args )
 	// @comm Doesn't take the size of an included Image in account, only the size of the text is determined.
 }
 
-// @pymethod <om PyCListCtrl.LV_ITEM tuple>|PyCListCtrl|GetItem|Retrieves the details of an items attributes.
+// @pymethod <o LV_ITEM>|PyCListCtrl|GetItem|Retrieves the details of an items attributes.
 PyObject *PyCListCtrl_GetItem( PyObject *self, PyObject *args )
 {
 	int item, sub = 0;

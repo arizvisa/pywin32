@@ -356,8 +356,9 @@ PYW_EXPORT PyObject *PyWinObject_FromLV_ITEM(LV_ITEM *pItem);
 PYW_EXPORT BOOL PyWinObject_AsLV_ITEM( PyObject *args, LV_ITEM *pItem);
 PYW_EXPORT void PyWinObject_FreeLV_ITEM(LV_ITEM *pItem);
 
-PYW_EXPORT PyObject *MakeLV_COLUMNTuple(LV_COLUMN *item);
-PYW_EXPORT BOOL ParseLV_COLUMNTuple( PyObject *args, LV_COLUMN *pItem);
+PYW_EXPORT PyObject *PyWinObject_FromLV_COLUMN(LV_COLUMN *pCol);
+PYW_EXPORT BOOL PyWinObject_AsLV_COLUMN( PyObject *args, LV_COLUMN *pCol);
+PYW_EXPORT void PyWinObject_FreeLV_COLUMN(LV_COLUMN *pCol);
 
 PYW_EXPORT BOOL PyWinObject_AsTV_ITEM( PyObject *args, TV_ITEM *pItem);
 PYW_EXPORT PyObject *PyWinObject_FromTV_ITEM(TV_ITEM *pItem);

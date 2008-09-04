@@ -447,36 +447,42 @@ BOOL PyWinObject_AsLV_ITEM( PyObject *args, LV_ITEM *pItem)
 
 //
 // LV_COLUMN
-PyObject *MakeLV_COLUMNTuple(LV_COLUMN *item)
+PyObject *PyWinObject_FromLV_COLUMN(LV_COLUMN *pCol)
 {
 	PyObject *ret = PyTuple_New(4);
 	if (ret==NULL) return NULL;
-	if (item->mask & LVCF_FMT) {
-		PyTuple_SET_ITEM(ret, 0, PyInt_FromLong(item->fmt));
+	if (pCol->mask & LVCF_FMT) {
+		PyTuple_SET_ITEM(ret, 0, PyInt_FromLong(pCol->fmt));
 	} else {
 		Py_INCREF(Py_None);
 		PyTuple_SET_ITEM(ret, 0, Py_None);
 	}
-	if (item->mask & LVCF_WIDTH) {
-		PyTuple_SET_ITEM(ret, 1, PyInt_FromLong(item->cx));
+	if (pCol->mask & LVCF_WIDTH) {
+		PyTuple_SET_ITEM(ret, 1, PyInt_FromLong(pCol->cx));
 	} else {
 		Py_INCREF(Py_None);
 		PyTuple_SET_ITEM(ret, 1, Py_None);
 	}
-	if ((item->mask & LVCF_TEXT) && (item->pszText != NULL)) {
-		PyTuple_SET_ITEM(ret, 2, PyWinObject_FromTCHAR(item->pszText));
+	if ((pCol->mask & LVCF_TEXT) && (pCol->pszText != NULL)) {
+		PyTuple_SET_ITEM(ret, 2, PyWinObject_FromTCHAR(pCol->pszText));
 	} else {
 		Py_INCREF(Py_None);
 		PyTuple_SET_ITEM(ret, 2, Py_None);
 	}
-	if (item->mask & LVCF_SUBITEM) {
-		PyTuple_SET_ITEM(ret, 3, PyInt_FromLong(item->iSubItem));
+	if (pCol->mask & LVCF_SUBITEM) {
+		PyTuple_SET_ITEM(ret, 3, PyInt_FromLong(pCol->iSubItem));
 	} else {
 		Py_INCREF(Py_None);
 		PyTuple_SET_ITEM(ret, 3, Py_None);
 	}
 	return ret;
 }
+
+void PyWinObject_FreeLV_COLUMN(LV_COLUMN *pCol){
+	if (pCol->mask & LVCF_TEXT)
+		PyWinObject_FreeTCHAR(pCol->pszText);
+}
+
 // @object LV_COLUMN|A tuple that describes a Win32 LV_COLUMN tuple. Used by the <o PyCListCtrl> object.
 // A tuple of 4 items, being fmt, cx, pszText, iSubItem
 // @tupleitem 0|int|fmt|Alignment of the column header and the subitem text in the column.
@@ -485,54 +491,57 @@ PyObject *MakeLV_COLUMNTuple(LV_COLUMN *item)
 // @tupleitem 3|int|subItem|Index of subitem associated with the column. 
 // <nl>When passed to Python, will always be a tuple of size 4, and items may be None if not available.
 // <nl>When passed from Python, the tuple may be any length up to 4, and any item may be None.
-BOOL ParseLV_COLUMNTuple( PyObject *args, LV_COLUMN *pItem)
+BOOL PyWinObject_AsLV_COLUMN( PyObject *args, LV_COLUMN *pCol)
 {
-	PyObject *ob;
-	pItem->mask = 0;
-	Py_ssize_t len = PyTuple_Size(args);
-	if (len > 4) {
-		PyErr_SetString(PyExc_TypeError, "LV_COLUMN tuple has invalid size");
+	ZeroMemory(pCol, sizeof(*pCol));
+	if (!PyTuple_Check(args)){
+		PyErr_SetString(PyExc_TypeError, "LV_COLUMN must be a tuple");
 		return FALSE;
-	}
-	assert (!PyErr_Occurred());	//	PyErr_Clear(); // clear any errors, so I can detect my own.
+		}
+	PyObject *ob;
+	Py_ssize_t len = PyTuple_GET_SIZE(args);
+	if (len > 4) {
+		PyErr_SetString(PyExc_TypeError, "LV_COLUMN can contain at most 4 items");
+		return FALSE;
+		}
+
 	// 0 - fmt
 	if (len<1) return TRUE;
-	if ((ob=PyTuple_GetItem(args, 0))==NULL)
-		return FALSE;
+	ob=PyTuple_GET_ITEM(args, 0);
 	if (ob != Py_None) {
-		pItem->fmt = (int)PyInt_AsLong(ob);
-		if (pItem->fmt==-1 && PyErr_Occurred()) return FALSE;
-		pItem->mask |= LVCF_FMT;
+		pCol->fmt = PyInt_AsLong(ob);
+		if (pCol->fmt==-1 && PyErr_Occurred()) return FALSE;
+		pCol->mask |= LVCF_FMT;
 	}
+
 	// 1 - cx
 	if (len<2) return TRUE;
-	if ((ob=PyTuple_GetItem(args, 1))==NULL)
-		return FALSE;
+	ob=PyTuple_GET_ITEM(args, 1);
 	if (ob != Py_None) {
-		pItem->cx = (int)PyInt_AsLong(ob);
-		if (pItem->cx==-1 && PyErr_Occurred()) return FALSE;
-		pItem->mask |= LVCF_WIDTH;
+		pCol->cx = PyInt_AsLong(ob);
+		if (pCol->cx==-1 && PyErr_Occurred()) return FALSE;
+		pCol->mask |= LVCF_WIDTH;
 	}
+
 	// 2 - text
 	if (len<3) return TRUE;
-
 	ob=PyTuple_GET_ITEM(args, 2);
-	if (!PyWinObject_AsTCHAR(ob, &pItem->pszText, TRUE, (DWORD *)&pItem->cchTextMax))
+	if (!PyWinObject_AsTCHAR(ob, &pCol->pszText, TRUE, (DWORD *)&pCol->cchTextMax))
 		return FALSE;
-	// ??? Need to free this somewhere ???
-	if (pItem->pszText)
-		pItem->mask |= LVCF_TEXT;
+	if (pCol->pszText)
+		pCol->mask |= LVCF_TEXT;
 
 	// 3 - subitem
 	if (len<4) return TRUE;
-	if ((ob=PyTuple_GetItem(args, 3))==NULL)
-		return FALSE;
+	ob=PyTuple_GET_ITEM(args, 3);
 	if (ob != Py_None) {
-		pItem->mask |= LVCF_SUBITEM;
-		pItem->iSubItem = PyInt_AsLong(ob);
-		if (pItem->iSubItem==-1 && PyErr_Occurred())
+		pCol->iSubItem = PyInt_AsLong(ob);
+		if (pCol->iSubItem==-1 && PyErr_Occurred()){
+			PyWinObject_FreeLV_COLUMN(pCol);
 			return FALSE;
-	}
+			}
+		pCol->mask |= LVCF_SUBITEM;
+		}
 	return TRUE;
 }
 

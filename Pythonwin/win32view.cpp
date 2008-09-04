@@ -1019,7 +1019,7 @@ static struct PyMethodDef ui_list_view_methods[] = {
 
 PyCCtrlView_Type PyCListView::type("PyCListView", 
 								   &PyCCtrlView::type, // @base PyCListView|PyCCtrlView
-								   &PyCListCtrl::type,		// ??? need to add this to tp_bases so PyCListView inherits PyCListCtrl methods ???
+								   &PyCListCtrl::type,
 								   RUNTIME_CLASS(CListView), 
 								   sizeof(PyCListView), 
 								   ui_list_view_methods, 
