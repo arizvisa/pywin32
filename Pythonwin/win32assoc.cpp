@@ -297,13 +297,7 @@ CString ui_assoc_object::repr()
 
 	if (virtualInst == NULL)
 		py_repr=no_repr;
-	else
-		py_repr=_T("??? some object ???");
-	// else{
-		/* PyObject_Repr or PyObject_Str will cause an infinite loop here, since subclasses will inherit
-		*this* repr if they don't define __repr__,
-		*/
-		/*
+	else{
 		PyObject *vi_repr=PyObject_Str(virtualInst);
 		if (vi_repr==NULL || !PyWinObject_AsTCHAR(vi_repr, &py_repr, FALSE)){
 			PyErr_Clear();
@@ -313,7 +307,6 @@ CString ui_assoc_object::repr()
 			bfree_repr=TRUE;
 		Py_XDECREF(vi_repr);
 		}
-		*/
 	csRet.Format(_T(" - assoc is %p, vi=%s"), assoc, py_repr);
 	if (bfree_repr)
 		PyWinObject_FreeTCHAR(py_repr);
