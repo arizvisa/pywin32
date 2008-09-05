@@ -105,6 +105,13 @@ void initperfmon(void)
 	module = Py_InitModule("perfmon", perfmon_functions);
 	if (!module) return;
 	dict = PyModule_GetDict(module);
+	if (!dict)
+		return;
+
+	if (PyType_Ready(&PyPerfMonManager::type) == -1
+		|| PyType_Ready(&PyPERF_COUNTER_DEFINITION::type) == -1
+		|| PyType_Ready(&PyPERF_OBJECT_TYPE::type) == -1)
+		return;
 }
 
 #else
@@ -123,6 +130,10 @@ PyObject *PyInit_perfmon(void)
 		return NULL;
 	dict = PyModule_GetDict(module);
 	if (!dict)
+		return NULL;
+	if (PyType_Ready(&PyPerfMonManager::type) == -1
+		|| PyType_Ready(&PyPERF_COUNTER_DEFINITION::type) == -1
+		|| PyType_Ready(&PyPERF_OBJECT_TYPE::type) == -1)
 		return NULL;
 	return module;
 }
