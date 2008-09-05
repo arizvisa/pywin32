@@ -18,7 +18,7 @@ pythoncom - Get*String routines for looking up error codes return bytes instead 
 
 Pythonwin -
 	xxx LVITEM and TVITEM conversions use PyWinobject_AsTCHAR, result needs to be freed
-	LV_COLUMN conversion - same as above
+	xxx LV_COLUMN conversion - same as above
 
 	xxx win32uimodule - Python_callback has 64-bit issues with HWND, WPARAM, LPARAM
 
@@ -29,7 +29,7 @@ Pythonwin -
 	'stop at exceptions' option doesn't do anything  (even in 2.x)
 
 	repr for MFC objects needs work, currently doesn't print associated python class due to recursion -
-		maybe special case it in __getattr__ ?
+		fixed now, but requires using new-style class in 2.x (pywin.mfc.object.Object)
 
 	Work on direct subclassing of MFC types
 		tp_flags must include Py_TPFLAGS_BASETYPE
@@ -42,8 +42,6 @@ Pythonwin -
 	Pasted text ends up with empty lines
 
 	Autoindent gets spaces/tabs wrong
-
-	Several places where 'utf-8' is hardcoded, change to default_scintilla_encoding
 
 	Figure out a clean way to switch between commctrl.*A and commctrl.*W constants for hooking messages
 
