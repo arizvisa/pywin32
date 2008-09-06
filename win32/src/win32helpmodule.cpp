@@ -2632,26 +2632,9 @@ data tuple items must be integers");
 
 
 // Module constants:
+#define ADD_CONSTANT(tok) if (rc=PyModule_AddIntConstant(module, #tok, tok)) return rc
 
-
-static int AddConstant(PyObject *dict, char *key, long value)
-{
-  PyObject *okey = PyString_FromString(key);
-  PyObject *oval = PyInt_FromLong(value);
-  if (!okey || !oval) {
-    Py_XDECREF(okey);
-    Py_XDECREF(oval);
-    return 1;
-  }
-  int rc = PyDict_SetItem(dict, okey, oval);
-  Py_DECREF(okey);
-  Py_DECREF(oval);
-  return rc;
-}
-
-#define ADD_CONSTANT(tok) if (rc=AddConstant(dict,#tok, tok)) return rc
-
-int AddConstants(PyObject *dict)
+int AddConstants(PyObject *module)
 {
   int rc;
 
@@ -3249,13 +3232,10 @@ PyObject *PyInit_win32help(void)
 	PyWinGlobals_Ensure();
 
 #if (PY_VERSION_HEX < 0x03000000)
+#define RETURN_ERROR return;
 	module = Py_InitModule("win32help", win32help_functions);
-	if (!module)
-		return;
-	dict = PyModule_GetDict(module);
-	if (!dict)
-		return;
 #else
+#define RETURN_ERROR return NULL;
 	static PyModuleDef win32help_def = {
 		PyModuleDef_HEAD_INIT,
 		"win32help",
@@ -3264,16 +3244,25 @@ PyObject *PyInit_win32help(void)
 		win32help_functions
 		};
 	module = PyModule_Create(&win32help_def);
+#endif
 	if (!module)
-		return NULL;
+		RETURN_ERROR;
 	dict = PyModule_GetDict(module);
 	if (!dict)
-		return NULL;
-#endif
-
-	AddConstants(dict);
-	PyDict_SetItemString(dict, "__version__", 
+		RETURN_ERROR;
+	if (AddConstants(module) != 0)
+		RETURN_ERROR;
+	PyDict_SetItemString(dict, "__version__",
                        PyString_FromString("$Revision$"));
+
+	if (PyType_Ready(&PyHH_AKLINKType) == -1
+		||PyType_Ready(&PyHH_FTS_QUERYType) == -1
+		||PyType_Ready(&PyHH_POPUPType) == -1
+		||PyType_Ready(&PyHH_WINTYPEType) == -1
+		||PyType_Ready(&PyNMHDRType) == -1
+		||PyType_Ready(&PyHHN_NOTIFYType) == -1
+		||PyType_Ready(&PyHHNTRACKType) == -1)
+		RETURN_ERROR;
 
 #if (PY_VERSION_HEX >= 0x03000000)
 	return module;
