@@ -754,9 +754,10 @@ static int ibindInt(cursorObject *cur, int column, PyObject *item)
 
 static int ibindLong(cursorObject*cur,int column, PyObject *item) 
 {
-	int len = sizeof(double);
-	double val = PyLong_AsDouble(item);
-
+	int len = sizeof(long long);
+	long long  val = PyLong_AsLongLong(item);
+	if (val == -1 && PyErr_Occurred())
+		return 0;
 	InputBinding *ib = initInputBinding(cur, len);
 	if (!ib)
 		return 0;
@@ -767,8 +768,8 @@ static int ibindLong(cursorObject*cur,int column, PyObject *item)
 		cur->hstmt,
 		column,
 		SQL_PARAM_INPUT,
-		SQL_C_DOUBLE,
-		SQL_FLOAT,
+		SQL_C_SBIGINT,
+		SQL_BIGINT,
 		len,
 		0, 
 		ib->bind_area,
@@ -1072,8 +1073,17 @@ static int bindInput
 		else
 		{
 			PyObject *sitem = PyObject_Str(item);
-			rv = ibindString(cur, iCol, sitem);
-			Py_DECREF(sitem);
+			if (sitem==NULL)
+				rv = 0;
+			else if PyString_Check(sitem)
+				rv = ibindString(cur, iCol, sitem);
+			else if PyUnicode_Check(sitem)
+				rv = ibindUnicode(cur, iCol, sitem);
+			else{	// Just in case some object doesn't follow the rules
+				PyErr_Format(PyExc_SystemError, "??? Repr for type '%s' returned type '%s' ???", item->ob_type, sitem->ob_type);
+				rv=0;
+				}
+			Py_XDECREF(sitem);
 		}
 		Py_DECREF(item);
 		if (rv == 0)
@@ -1874,8 +1884,8 @@ static PyObject *odbcSQLDataSources(PyObject *self, PyObject *args)
 		ret = NULL;
 	} else
 		ret = Py_BuildValue("NN",
-			PyString_FromStringAndSize((char *)svr, svr_size),
-			PyString_FromStringAndSize((char *)desc, desc_size));
+			PyWinObject_FromTCHAR((TCHAR *)svr, svr_size),
+			PyWinObject_FromTCHAR((TCHAR *)desc, desc_size));
 	return ret;
 }
 
@@ -1886,22 +1896,8 @@ static PyMethodDef globalMethods[] = {
   {0,     0}
 };
 
-int AddConstant(PyObject *dict, char *key, long value)
-{
-	PyObject *okey = PyString_FromString(key);
-	PyObject *oval = PyInt_FromLong(value);
-	if (!okey || !oval) {
-		Py_XDECREF(okey);
-		Py_XDECREF(oval);
-		return 1;
-	}
-	int rc = PyDict_SetItem(dict,okey, oval);
-	Py_XDECREF(okey);
-	Py_XDECREF(oval);
-	return rc;
-}
-#define ADD_CONSTANT(tok) AddConstant(dict,#tok, tok)
 
+#define ADD_CONSTANT(tok) if (PyModule_AddIntConstant(module, #tok, tok) == -1) RETURN_ERROR;
 
 extern "C" __declspec(dllexport)
 #if (PY_VERSION_HEX < 0x03000000)
@@ -1914,16 +1910,11 @@ PyObject *PyInit_odbc(void)
 	PyWinGlobals_Ensure();
 
 #if (PY_VERSION_HEX < 0x03000000)
+#define RETURN_ERROR return;
 	module = Py_InitModule("odbc", globalMethods);
-	if (!module)
-		return;
-	dict = PyModule_GetDict(module);
-	if (!dict)
-		return;
-	if (!PyImport_ImportModule("dbi"))
-		return;
 
 #else
+#define RETURN_ERROR return NULL;
 	static PyModuleDef odbc_def = {
 		PyModuleDef_HEAD_INIT,
 		"odbc",
@@ -1932,22 +1923,25 @@ PyObject *PyInit_odbc(void)
 		globalMethods
 		};
 	module = PyModule_Create(&odbc_def);
+#endif
+
 	if (!module)
-		return NULL;
+		RETURN_ERROR;
 	dict = PyModule_GetDict(module);
 	if (!dict)
-		return NULL;
+		RETURN_ERROR;
 	if (!PyImport_ImportModule("dbi"))
-		return NULL;
-#endif
+		RETURN_ERROR;
 
     if (unsuccessful(SQLAllocEnv(&Env)))
 	{
 		odbcPrintError(SQL_NULL_HENV, 0, SQL_NULL_HSTMT, _T("INIT"));
+		RETURN_ERROR;
     }
 
-	odbcError = PyString_FromString("OdbcError");
-	PyDict_SetItemString(dict, "error", odbcError);
+	odbcError = PyErr_NewException("odbc.odbcError", NULL, NULL);
+	if (odbcError == NULL || PyDict_SetItemString(dict, "error", odbcError) == -1)
+		RETURN_ERROR;
 
 	/* The indices go to indices in the ODBC error table */
 	dbiErrors[0] = DbiNoError;

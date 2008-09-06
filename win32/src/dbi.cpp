@@ -360,13 +360,11 @@ PyObject *PyInit_dbi(void)
 	PyWinGlobals_Ensure();
 
 #if (PY_VERSION_HEX < 0x03000000)
+#define RETURN_ERROR return;
 	module = Py_InitModule("dbi", globalMethods);
-	if (!module)
-		return;
-	dict = PyModule_GetDict(module);
-	if (!dict)
-		return;
+
 #else
+#define RETURN_ERROR return NULL;
 	static PyModuleDef dbi_def = {
 		PyModuleDef_HEAD_INIT,
 		"dbi",
@@ -375,51 +373,80 @@ PyObject *PyInit_dbi(void)
 		globalMethods
 		};
 	module = PyModule_Create(&dbi_def);
-	if (!module)
-		return NULL;
-	dict = PyModule_GetDict(module);
-	if (!dict)
-		return NULL;
 #endif
 
-	PyDict_SetItemString(dict, "STRING",
-						 DbiString = PyString_FromString("STRING"));
-	PyDict_SetItemString(dict, "RAW",
-						 DbiRaw = PyString_FromString("RAW"));
-	PyDict_SetItemString(dict, "NUMBER",
-						 DbiNumber = PyString_FromString("NUMBER"));
-	PyDict_SetItemString(dict, "DATE",
-						 DbiDate = PyString_FromString("DATE"));
-	PyDict_SetItemString(dict, "ROWID",
-						 DbiRowId = PyString_FromString("ROWID"));
-	PyDict_SetItemString(
-		dict, "TYPES",
-		Py_BuildValue("(OOOOO)",
-					  DbiString,
-					  DbiRaw,
-					  DbiNumber,
-					  DbiDate,
-					  DbiRowId));
+	if (!module)
+		RETURN_ERROR;
+	dict = PyModule_GetDict(module);
+	if (!dict)
+		RETURN_ERROR;
 
-	/* Establish errors */
-	PyDict_SetItemString(
-		dict, "noError",
-		DbiNoError = PyString_FromString("dbi.no-error"));
-	PyDict_SetItemString(
-		dict, "opError",
-		DbiOpError = PyString_FromString("dbi.operation-error"));
-	PyDict_SetItemString(
-		dict, "progError",
-		DbiProgError = PyString_FromString("dbi.program-error"));
-	PyDict_SetItemString(
-		dict, "integrityError",
-		DbiIntegrityError = PyString_FromString("dbi.integrity-error"));
-	PyDict_SetItemString(
-		dict, "dataError",
-		DbiDataError = PyString_FromString("dbi.data-error"));
-	PyDict_SetItemString(
-		dict, "internalError",
-		DbiInternalError = PyString_FromString("dbi.internal-error"));
+	if (PyType_Ready(&DbiDate_Type) == -1
+		||PyType_Ready(&DbiRaw_Type) == -1
+		||PyType_Ready(&DbiRowId_Type) == -1)
+		RETURN_ERROR;
+
+	/* These need to be unicode strings in Py3k and char strings in 2.x regardless if UNICODE
+		is defined. Py_BuildValue with 's' format is a convenient way to do so.
+		??? Why expose them in multiple ways ???
+	*/
+	char *szDbiString = "STRING";
+	char *szDbiRaw = "RAW";
+	char *szDbiNumber = "NUMBER";
+	char *szDbiDate = "DATE";
+	char *szDbiRowId = "ROWID";
+	PyObject *obtypes=Py_BuildValue("(sssss)",
+			szDbiString,
+			szDbiRaw,
+			szDbiNumber,
+			szDbiDate,
+			szDbiRowId);
+	// Steals a ref to obtypes, so it doesn't need to be DECREF'ed.
+	if (obtypes==NULL || PyModule_AddObject(module, "TYPES", obtypes) == -1)
+		RETURN_ERROR;
+	// These are exported and used in odbc.cpp, so keep our own ref
+	DbiString = PyTuple_GET_ITEM(obtypes, 0);
+	Py_INCREF(DbiString);
+	DbiRaw = PyTuple_GET_ITEM(obtypes, 1);
+	Py_INCREF(DbiRaw);
+	DbiNumber = PyTuple_GET_ITEM(obtypes, 2);
+	Py_INCREF(DbiNumber);
+	DbiDate = PyTuple_GET_ITEM(obtypes, 3);
+	Py_INCREF(DbiDate);
+	DbiRowId = PyTuple_GET_ITEM(obtypes, 4);
+	Py_INCREF(DbiRowId);
+	/* ??? These are also added to the module with attribute name same as value,
+			not sure what the point of this is ???
+	*/
+	if (PyDict_SetItem(dict, DbiString, DbiString) == -1
+		||PyDict_SetItem(dict, DbiRaw, DbiRaw) == -1
+		||PyDict_SetItem(dict, DbiNumber, DbiNumber) == -1
+		||PyDict_SetItem(dict, DbiDate, DbiDate) == -1
+		||PyDict_SetItem(dict, DbiRowId, DbiRowId) == -1)
+		RETURN_ERROR;
+
+	/* Establish errors
+		The class names have been changed to agree with the name with which they are added to the module.
+		Formerly they were actually invalid identifiers.
+	*/
+	DbiNoError = PyErr_NewException("dbi.noError", NULL, NULL);
+	if (DbiNoError == NULL || PyDict_SetItemString(dict, "noError", DbiNoError) == -1)
+		RETURN_ERROR;
+	DbiOpError = PyErr_NewException("dbi.opError", NULL, NULL);
+	if (DbiOpError == NULL || PyDict_SetItemString(dict, "opError", DbiOpError) == -1)
+		RETURN_ERROR;
+	DbiProgError = PyErr_NewException("dbi.progError", NULL, NULL);
+	if (DbiProgError == NULL || PyDict_SetItemString(dict, "progError", DbiProgError) == -1)
+		RETURN_ERROR;
+	DbiIntegrityError = PyErr_NewException("dbi.integrityError", NULL, NULL);
+	if (DbiIntegrityError == NULL || PyDict_SetItemString(dict, "integrityError", DbiIntegrityError) == -1)
+		RETURN_ERROR;
+	DbiDataError = PyErr_NewException("dbi.dataError", NULL, NULL);
+	if (DbiDataError == NULL || PyDict_SetItemString(dict, "dataError", DbiDataError) == -1)
+		RETURN_ERROR;
+	DbiInternalError = PyErr_NewException("dbi.internalError", NULL, NULL);
+	if (DbiInternalError == NULL || PyDict_SetItemString(dict, "internalError", DbiInternalError) == -1)
+		RETURN_ERROR;
 
 #if (PY_VERSION_HEX >= 0x03000000)
 	return module;
