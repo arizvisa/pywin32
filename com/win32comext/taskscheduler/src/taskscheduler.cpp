@@ -38,11 +38,6 @@ PyObject *PyInit_taskscheduler(void)
 #if (PY_VERSION_HEX < 0x03000000)
 #define RETURN_ERROR return;
 	module = Py_InitModule("taskscheduler", taskscheduler_methods);
-	if (!module)
-		return;
-	dict = PyModule_GetDict(module);
-	if (!dict)
-		return;
 #else
 #define RETURN_ERROR return NULL;
 	static PyModuleDef taskscheduler_def = {
@@ -53,12 +48,15 @@ PyObject *PyInit_taskscheduler(void)
 		taskscheduler_methods
 		};
 	module = PyModule_Create(&taskscheduler_def);
+#endif
+
 	if (!module)
-		return NULL;
+		RETURN_ERROR;
 	dict = PyModule_GetDict(module);
 	if (!dict)
-		return NULL;
-#endif
+		RETURN_ERROR;
+	if (PyType_Ready(&PyTASK_TRIGGERType) == -1)
+		RETURN_ERROR;
 
 	// Register all of our interfaces, gateways and IIDs.
 	PyCom_RegisterExtensionSupport(dict, register_data, sizeof(register_data)/sizeof(PyCom_InterfaceSupportInfo));
