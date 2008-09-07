@@ -1,12 +1,8 @@
 Some things that still need work for Python 3.0
 
 
-Places where need to call PyType_Ready for all types defined in module
-	perfmon
-	directsound
-	dbi, odbc
-	win32help
-
+odbc - input binding needs changes for longs, use SQL_C_LONG instead SQL_C_SBIGINT if value fits in a long
+ 
 Swig doesn't handle com_interface_parent, adsi will not build
 
 Several types set Py_TPFLAGS_BASETYPE but do not have required infrastructure to actually subclass.
