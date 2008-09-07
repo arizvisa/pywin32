@@ -13,17 +13,18 @@ WAV_FORMAT_PCM = 1
 WAV_HEADER_SIZE = struct.calcsize('<4sl4s4slhhllhh4sl')
 
 def wav_header_unpack(data):
+    print (struct.unpack('<4sl4s4slhhllhh4sl', data))
     (riff, riffsize, wave, fmt, fmtsize, format, nchannels, samplespersecond, 
      datarate, blockalign, bitspersample, data, datalength) \
      = struct.unpack('<4sl4s4slhhllhh4sl', data)
 
-    if riff != 'RIFF':
-        raise ValueError, 'invalid wav header'
+    if riff != b'RIFF':
+        raise ValueError('invalid wav header')
     
-    if fmtsize != 16 or fmt != 'fmt ' or data != 'data':
+    if fmtsize != 16 or fmt != b'fmt ' or data != b'data':
         # fmt chuck is not first chunk, directly followed by data chuck
         # It is nowhere required that they are, it is just very common
-        raise ValueError, 'cannot understand wav header'
+        raise ValueError('cannot understand wav header')
 
     wfx = pywintypes.WAVEFORMATEX()
     wfx.wFormatTag = format
@@ -260,7 +261,7 @@ class DirectSoundTest(unittest.TestCase):
 
     def testPlay(self):
         '''Mesdames et Messieurs, la cour de Devin Dazzle'''
-        fname=os.path.join(os.path.dirname(__file__), "01-Intro.wav")
+        fname=os.path.join(os.path.dirname(sys.argv[0]), "01-Intro.wav")
         f = open(fname, 'rb')
         hdr = f.read(WAV_HEADER_SIZE)
         wfx, size = wav_header_unpack(hdr)

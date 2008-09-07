@@ -22,8 +22,8 @@ sdesc.lpwfxFormat.nAvgBytesPerSec = 176400
 sdesc.lpwfxFormat.nBlockAlign = 4
 sdesc.lpwfxFormat.wBitsPerSample = 16
 
-print sdesc
-print d
+print (sdesc)
+print (d)
 buffer = d.CreateCaptureBuffer(sdesc)
 
 event = win32event.CreateEvent(None, 0, 0, None)
@@ -40,3 +40,4 @@ data = buffer.Update(0, 352800)
 f = open('recording.wav', 'wb')
 f.write(wav_header_pack(sdesc.lpwfxFormat, 352800))
 f.write(data)
+f.close()
