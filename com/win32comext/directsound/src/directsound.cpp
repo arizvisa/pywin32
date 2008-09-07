@@ -236,19 +236,8 @@ static struct PyMethodDef directsound_methods[]=
 	{ NULL, NULL },
 };
 
-static int AddConstant(PyObject *dict, const char *key, long value)
-{
-	PyObject *oval = PyInt_FromLong(value);
-	if (!oval)
-	{
-		return 1;
-	}
-	int rc = PyDict_SetItemString(dict, (char*)key, oval);
-	Py_DECREF(oval);
-	return rc;
-}
 
-#define ADD_CONSTANT(tok) AddConstant(dict, #tok, tok)
+#define ADD_CONSTANT(tok) if (PyModule_AddIntConstant(module, #tok, tok) == -1) RETURN_ERROR;
 
 static const PyCom_InterfaceSupportInfo g_interfaceSupportData[] =
 {
@@ -271,14 +260,10 @@ PyObject *PyInit_directsound(void)
 	PyWinGlobals_Ensure();
 
 #if (PY_VERSION_HEX < 0x03000000)
+#define RETURN_ERROR return;
 	module = Py_InitModule("directsound", directsound_methods);
-	if (!module)
-		return;
-	dict = PyModule_GetDict(module);
-	if (!dict)
-		return;
 #else
-
+#define RETURN_ERROR return NULL;
 	static PyModuleDef directsound_def = {
 		PyModuleDef_HEAD_INIT,
 		"directsound",
@@ -287,12 +272,14 @@ PyObject *PyInit_directsound(void)
 		directsound_methods
 		};
 	module = PyModule_Create(&directsound_def);
+#endif
+
 	if (!module)
-		return NULL;
+		RETURN_ERROR;
 	dict = PyModule_GetDict(module);
 	if (!dict)
-		return NULL;
-#endif
+		RETURN_ERROR;
+
 
 	// Register all of our interfaces, gateways and IIDs.
 	PyCom_RegisterExtensionSupport(dict, g_interfaceSupportData, sizeof(g_interfaceSupportData)/sizeof(g_interfaceSupportData[0]));
@@ -417,12 +404,19 @@ PyObject *PyInit_directsound(void)
 	ADD_CONSTANT(DSCBSTART_LOOPING);
 	ADD_CONSTANT(DSBPN_OFFSETSTOP);
 
-	PyDict_SetItemString(dict, "DSCAPSType", (PyObject *)&PyDSCAPSType);
-	PyDict_SetItemString(dict, "DSBCAPSType", (PyObject *)&PyDSBCAPSType);
-	PyDict_SetItemString(dict, "DSBUFFERDESCType", (PyObject *)&PyDSBUFFERDESCType);
-	PyDict_SetItemString(dict, "DSCCAPSType", (PyObject *)&PyDSCCAPSType);
-	PyDict_SetItemString(dict, "DSCBCAPSType", (PyObject *)&PyDSCBCAPSType);
-	PyDict_SetItemString(dict, "DSCBUFFERDESCType", (PyObject *)&PyDSCBUFFERDESCType);
+	if (PyType_Ready(&PyDSCAPSType) == -1
+		||PyType_Ready(&PyDSBCAPSType) == -1
+		||PyType_Ready(&PyDSBUFFERDESCType) == -1
+		||PyType_Ready(&PyDSCCAPSType) == -1
+		||PyType_Ready(&PyDSCBCAPSType) == -1
+		||PyType_Ready(&PyDSCBUFFERDESCType) == -1
+		||PyDict_SetItemString(dict, "DSCAPSType", (PyObject *)&PyDSCAPSType) == -1
+		||PyDict_SetItemString(dict, "DSBCAPSType", (PyObject *)&PyDSBCAPSType) == -1
+		||PyDict_SetItemString(dict, "DSBUFFERDESCType", (PyObject *)&PyDSBUFFERDESCType) == -1
+		||PyDict_SetItemString(dict, "DSCCAPSType", (PyObject *)&PyDSCCAPSType) == -1
+		||PyDict_SetItemString(dict, "DSCBCAPSType", (PyObject *)&PyDSCBCAPSType) == -1
+		||PyDict_SetItemString(dict, "DSCBUFFERDESCType", (PyObject *)&PyDSCBUFFERDESCType) == -1)
+		RETURN_ERROR;
 
 #if (PY_VERSION_HEX >= 0x03000000)
 	return module;

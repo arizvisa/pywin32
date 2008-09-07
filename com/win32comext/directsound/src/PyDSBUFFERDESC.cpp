@@ -152,8 +152,7 @@ PyDSBUFFERDESC::~PyDSBUFFERDESC()
 int PyDSBUFFERDESC::setattro(PyObject *self, PyObject *obname, PyObject *obvalue)
 {
 	PyDSBUFFERDESC *obself = (PyDSBUFFERDESC*)self;
-	char *name=PyString_AsString(obname);
-
+	char *name=PYWIN_ATTR_CONVERT(obname);
 	if (name==NULL)
 		return -1;
 
