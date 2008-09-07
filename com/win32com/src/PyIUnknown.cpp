@@ -36,9 +36,13 @@ PyIUnknown::~PyIUnknown()
 PyObject * PyIUnknown::repr()
 {
 	// @comm The repr of this object displays both the object's address, and its attached IUnknown's address
-	TCHAR buf[80];
-	wsprintf(buf, _T("<%hs at 0x%0lp with obj at 0x%0lp>"),ob_type->tp_name, this, m_obj);
-	return PyString_FromTCHAR(buf);
+	char buf[256];
+	_snprintf(buf, 256, "<%hs at 0x%0lp with obj at 0x%0lp>", ob_type->tp_name, this, m_obj);
+#if (PY_VERSION_HEX < 0x03000000)
+	return PyString_FromString(buf);
+#else
+	return PyUnicode_FromString(buf);
+#endif
 }
 
 /*static void PyIUnknown::CleanupTrackList()
