@@ -197,7 +197,7 @@ class AutoIndent:
             if i == n:
                 # the cursor is in or at leading indentation; just inject
                 # an empty line at the start
-                text.insert("insert linestart", '\n')
+                text.insert("insert linestart", '\r\n')
                 return "break"
             indent = line[:i]
             # strip whitespace before insert point

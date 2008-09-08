@@ -4,7 +4,7 @@ from pywin import is_platform_unicode, default_platform_encoding, default_scinti
 from . import scintillacon
 import win32con
 import string
-import array
+import os
 
 ParentScintillaDocument=docview.Document
 class CScintillaDocument(ParentScintillaDocument):
@@ -14,29 +14,19 @@ class CScintillaDocument(ParentScintillaDocument):
 
 	def OnOpenDocument(self, filename):
 		# init data members
-		#print "Opening", filename
+		# print ("CScintillaDocument.OnOpenDocument", filename)
 		self.SetPathName(filename) # Must set this early!
 		try:
-			if is_platform_unicode:
-				# Scintilla in UTF-8 mode - translate accordingly.
-				import codecs
-				f = codecs.open(filename, 'rb', default_platform_encoding)
-			else:
-				f = open(filename, 'r')
+			f = open(filename, 'r')
 			try:
 				text = f.read()
 			finally:
 				f.close()
-			# Translate from locale-specific (MCBS) encoding to UTF-8 for Scintilla
-			text = text.encode(default_scintilla_encoding)
 		except IOError:
 			win32ui.MessageBox("Could not load the file from %s" % filename)
 			return 0
 
 		self._SetLoadedText(text)
-##		if self.GetFirstView():
-##			self.GetFirstView()._SetLoadedText(text)
-##		self.SetModifiedFlag(0) # No longer dirty
 		return 1
 
 	def SaveFile(self, fileName):
@@ -53,16 +43,25 @@ class CScintillaDocument(ParentScintillaDocument):
 	# File related functions
 	# Helper to transfer text from the MFC document to the control.
 	def _SetLoadedText(self, text):
+		# In universal newlines mode, line endings read from file are translated to '\n',
+		#	but edit control expects CR/LF ('\r\n').
+		# Might be simpler to just tell scintilla to use '\n'
+		#       SendScintilla(scintillacon.SCI_SETEOLMODE, scintillacon.SC_EOL_LF)
+		#   and have eols automatically translated back when written to file
+		if os.linesep != '\n':
+			text=text.replace('\n', os.linesep)
+
+		# Translate from unicode to UTF-8 bytes for Scintilla
+		char_text = text.encode(default_scintilla_encoding)
+
 		view = self.GetFirstView()
 		if view.IsWindow():
 			# Turn off undo collection while loading 
 			view.SendScintilla(scintillacon.SCI_SETUNDOCOLLECTION, 0, 0)
 			# Make sure the control isnt read-only
 			view.SetReadOnly(0)
-
-			doc = self
 			view.SendScintilla(scintillacon.SCI_CLEARALL)
-			view.SendMessage(scintillacon.SCI_ADDTEXT, text)
+			view.SendMessage(scintillacon.SCI_ADDTEXT, char_text)
 			view.SendScintilla(scintillacon.SCI_SETUNDOCOLLECTION, 1, 0)
 			view.SendScintilla(win32con.EM_EMPTYUNDOBUFFER, 0, 0)
 
