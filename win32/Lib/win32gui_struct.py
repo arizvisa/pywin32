@@ -88,10 +88,11 @@ def PackMENUITEMINFO(fType=None, fState=None, wID=None, hSubMenu=None,
     else: fMask |= win32con.MIIM_BITMAP
     if text is not None:
         fMask |= win32con.MIIM_STRING
-        if isinstance(text, unicode):
-            text = text.encode("mbcs")
-        str_buf = array.array("c", text+'\0')
-        cch = len(str_buf)
+        if not isinstance(text, str):
+            raise TypeError('MENUITEMINFO text must be unicode')
+        encoded_text = (text+'\0').encode("utf-16-le")
+        str_buf = array.array("b", encoded_text)
+        cch = len(text)
         # We are taking address of strbuf - it must not die until windows
         # has finished with our structure.
         lptext = str_buf.buffer_info()[0]
@@ -108,17 +109,17 @@ def PackMENUITEMINFO(fType=None, fState=None, wID=None, hSubMenu=None,
                 fType,
                 fState,
                 wID,
-                long(hSubMenu),
-                long(hbmpChecked),
-                long(hbmpUnchecked),
+                int(hSubMenu),
+                int(hbmpChecked),
+                int(hbmpUnchecked),
                 dwItemData,
                 lptext,
                 cch,
-                long(hbmpItem)
+                int(hbmpItem)
                 )
     # Now copy the string to a writable buffer, so that the result
     # could be passed to a 'Get' function
-    return array.array("c", item), extras
+    return array.array("b", item), extras
 
 def UnpackMENUITEMINFO(s):
     (cb,
