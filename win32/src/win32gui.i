@@ -1589,10 +1589,10 @@ static PyObject *PyMakeBuffer(PyObject *self, PyObject *args)
 %native (PyMakeBuffer) PyMakeBuffer;
 
 %{
-// @pyswig object|PyGetString|Returns a string object from an address.
+// @pyswig bytes|PyGetString|Returns bytes from an address.
 static PyObject *PyGetString(PyObject *self, PyObject *args)
 {
-	TCHAR *addr = 0;
+	char *addr = 0;
 	size_t len = -1;
 #ifdef _WIN64
 	static char *input_fmt="L|L:PyGetString";
@@ -1613,10 +1613,10 @@ static PyObject *PyGetString(PyObject *self, PyObject *args)
 			PyErr_SetString(PyExc_ValueError, "The value is not a valid address for reading");
 			return NULL;
 			}
-		return PyWinObject_FromTCHAR(addr, len);
+		return PyString_FromStringAndSize(addr, len);
 		}
 	// This should probably be in a __try just in case.
-	return PyWinObject_FromTCHAR(addr);
+	return PyString_FromString(addr);
 }
 %}
 %native (PyGetString) PyGetString;
