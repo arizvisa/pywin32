@@ -211,7 +211,8 @@ class AutoIndent:
             while text.get("insert") in " \t":
                 text.delete("insert")
             # start new line
-            text.insert("insert", '\n')
+            ## Line ending needs to be configured somewhere instead of hardcoded
+            text.insert("insert", '\r\n')
 
             # adjust indentation for continuations and block
             # open/close first need to find the last stmt
