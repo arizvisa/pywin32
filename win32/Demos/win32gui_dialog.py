@@ -71,7 +71,20 @@ class _WIN32MASKEDSTRUCT:
                     vals.append(0)
                     vals.append(0)
                 else:
-                    str_buf = array.array("b", val+'\0')
+                    # Unicode object no longer supports buffer interface. According to pep 3137
+                    #   (http://www.python.org/dev/peps/pep-3137/)
+                    #   this is because the internal represention is platform dependent.  This seems
+                    #   spurious to me since whatever code receives the data alreeady needs to know
+                    #   the encoding anyway, whether it's python's internal encoding or not.  And since
+                    #   there is no way to specify the encoding in the data itself, what difference does
+                    #   it make ?
+                    if isinstance(val, str):
+                        val=(val+'\0').encode('utf-16-le')
+                    else:
+                        # Should this continue to accept a byte string, or would it be better to
+                        #	throw an error here ?
+                        val=val+b'\0'
+                    str_buf = array.array("b", val)
                     vals.append(str_buf.buffer_info()[0])
                     vals.append(len(val))
                     self._buffs.append(str_buf) # keep alive during the call.
@@ -218,11 +231,11 @@ class DemoWindowBase:
         lvc.iSubItem = 1
         lvc.text = "Title"
         lvc.cx = 200
-        win32gui.SendMessage(self.hwndList, commctrl.LVM_INSERTCOLUMN, 0, lvc.toparam())
+        win32gui.SendMessage(self.hwndList, commctrl.LVM_INSERTCOLUMNW, 0, lvc.toparam())
         lvc.iSubItem = 0
         lvc.text = "Order"
         lvc.cx = 50
-        win32gui.SendMessage(self.hwndList, commctrl.LVM_INSERTCOLUMN, 0, lvc.toparam())
+        win32gui.SendMessage(self.hwndList, commctrl.LVM_INSERTCOLUMNW, 0, lvc.toparam())
 
         win32gui.UpdateWindow(self.hwnd)
 
@@ -233,11 +246,11 @@ class DemoWindowBase:
     def AddListItem(self, data, *columns):
         num_items = win32gui.SendMessage(self.hwndList, commctrl.LVM_GETITEMCOUNT)
         item = LVITEM(text=columns[0], iItem = num_items)
-        new_index = win32gui.SendMessage(self.hwndList, commctrl.LVM_INSERTITEM, 0, item.toparam())
+        new_index = win32gui.SendMessage(self.hwndList, commctrl.LVM_INSERTITEMW, 0, item.toparam())
         col_no = 1
         for col in columns[1:]:
             item = LVITEM(text=col, iItem = new_index, iSubItem = col_no)
-            win32gui.SendMessage(self.hwndList, commctrl.LVM_SETITEM, 0, item.toparam())
+            win32gui.SendMessage(self.hwndList, commctrl.LVM_SETITEMW, 0, item.toparam())
             col_no += 1
         self.list_data[new_index] = data
 
@@ -293,7 +306,7 @@ class DemoWindowBase:
         print("OnSearchFinished")
 
     def OnNotify(self, hwnd, msg, wparam, lparam):
-        format = "iiiiiiiiiii"
+        format = "iiiiiiiiiii"  ## ??? needs adjustment for 64-bit ???
         buf = win32gui.PyMakeBuffer(struct.calcsize(format), lparam)
         hwndFrom, idFrom, code, iItem, iSubItem, uNewState, uOldState, uChanged, actionx, actiony, lParam \
                   = struct.unpack(format, buf)
