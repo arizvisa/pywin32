@@ -349,7 +349,7 @@ PyObject *PyWin_SetBasicCOMError(HRESULT hr)
 {
 
 	TCHAR buf[255];
-	int bufSize = sizeof(buf);
+	int bufSize = sizeof(buf)/sizeof(TCHAR);
 	int numCopied = ::FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM, NULL, hr, 0, buf, bufSize, NULL );
 	if (numCopied>0) {
 		if (numCopied<bufSize) {
@@ -360,9 +360,7 @@ PyObject *PyWin_SetBasicCOMError(HRESULT hr)
 	} else {
 		wsprintf(buf, _T("COM Error 0x%x"), hr);
 	}
-	PyObject *obBuf = PyString_FromTCHAR(buf);
-	PyObject *evalue = Py_BuildValue("iOzz", hr, obBuf, NULL, NULL);
-	Py_XDECREF(obBuf);
+	PyObject *evalue = Py_BuildValue("iNzz", hr, PyWinObject_FromTCHAR(buf), NULL, NULL);
 	PyErr_SetObject(PyWinExc_COMError, evalue);
 	Py_XDECREF(evalue);
 	return NULL;
