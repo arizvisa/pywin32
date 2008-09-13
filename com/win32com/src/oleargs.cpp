@@ -16,28 +16,15 @@ extern BOOL PyRecord_Check(PyObject *ob);
 #define BYREF_ARRAY_USE_EXISTING_ARRAY
 
 // A little helper just for this file
-static PyObject* OleSetTypeError(char *msg)
+static PyObject* OleSetTypeError(TCHAR *msg)
 {
-	PyErr_SetString(PyExc_TypeError, msg);
-	return NULL;
-}
-
-#ifdef UNICODE
-// In a Unicode environment, we provide a helper that
-// converts the argument to a string before raising the error.
-static PyObject* OleSetTypeErrorW(TCHAR *msg)
-{
-	PyObject *obMsg = PyString_FromUnicode(msg);
+	PyObject *obMsg = PyWinObject_FromTCHAR(msg);
 	if (obMsg) {
 		PyErr_SetObject(PyExc_TypeError, obMsg);
 		Py_DECREF(obMsg);
 	}
 	return NULL;
 }
-#define OleSetTypeErrorT OleSetTypeErrorW
-#else
-#define OleSetTypeErrorT OleSetTypeError
-#endif
 
 ///////////////////////////////////////////////////////////
 //
@@ -228,7 +215,7 @@ PyObject *PyCom_PyObjectFromVariant(const VARIANT *var)
 
 	/* ### note: we shouldn't see this, it is illegal in a VARIANT */
 	if (V_ISVECTOR(var)) {
-		return OleSetTypeError("Cant convert vectors!");
+		return OleSetTypeError(_T("Cant convert vectors!"));
 	}
 
 	if (V_ISARRAY(var)) {
@@ -266,7 +253,7 @@ PyObject *PyCom_PyObjectFromVariant(const VARIANT *var)
 			{
 				TCHAR buf[200];
 				wsprintf(buf, _T("Error converting integer variant (%08lx)"), hr);
-				OleSetTypeErrorT(buf);
+				OleSetTypeError(buf);
 				break;
 			}
 			// The result may be too large for a simple "long".  If so,
@@ -286,7 +273,7 @@ PyObject *PyCom_PyObjectFromVariant(const VARIANT *var)
 			{
 				TCHAR buf[200];
 				wsprintf(buf, _T("Error converting integer variant (%08lx)"), hr);
-				OleSetTypeErrorT(buf);
+				OleSetTypeError(buf);
 				break;
 			}
 			result = PyInt_FromLong(V_I4(&varValue));
@@ -304,7 +291,7 @@ PyObject *PyCom_PyObjectFromVariant(const VARIANT *var)
 			{
 				TCHAR buf[200];
 				wsprintf(buf, _T("Error converting floating point variant (%08lx)"), hr);
-				OleSetTypeErrorT(buf);
+				OleSetTypeError(buf);
 				break;
 			}
 			result = PyFloat_FromDouble(V_R8(&varValue));
@@ -367,7 +354,7 @@ PyObject *PyCom_PyObjectFromVariant(const VARIANT *var)
 				if (FAILED(hr)) {
 					TCHAR buf[200];
 					wsprintf(buf, _T("The Variant type (0x%x) is not supported, and it can not be converted to a string"), V_VT(var));
-					OleSetTypeErrorT(buf);
+					OleSetTypeError(buf);
 					break;
 				}
 				result = PyWinObject_FromBstr(V_BSTR(&varValue));
@@ -389,7 +376,7 @@ static BOOL PyCom_SAFEARRAYFromPyObjectBuildDimension(PyObject *obj, SAFEARRAY *
 {
 	LONG numElements = pBounds[dimNo-1].cElements;
 	if ((LONG)PySequence_Length(obj)!=numElements) {
-		OleSetTypeError("All dimensions must be a sequence of the same size");
+		OleSetTypeError(_T("All dimensions must be a sequence of the same size"));
 		return FALSE;
 	}
 	// See if we can take a short-cut for byte arrays - if
@@ -402,7 +389,7 @@ static BOOL PyCom_SAFEARRAYFromPyObjectBuildDimension(PyObject *obj, SAFEARRAY *
 			return FALSE;
 
 		if (bufSize != numElements) {
-			OleSetTypeError("Internal error - the buffer length is not the sequence length!");
+			OleSetTypeError(_T("Internal error - the buffer length is not the sequence length!"));
 			return FALSE;
 			}
 
@@ -433,7 +420,7 @@ static BOOL PyCom_SAFEARRAYFromPyObjectBuildDimension(PyObject *obj, SAFEARRAY *
 			} else {
 				// Complex conversion.
 				if (vt & VT_ARRAY || vt & VT_BYREF) {
-					OleSetTypeError("Internal error - unexpected argument - only simple VARIANTTYPE expected");
+					OleSetTypeError(_T("Internal error - unexpected argument - only simple VARIANTTYPE expected"));
 					ok = FALSE;
 				} else {
 					PythonOleArgHelper helper;
@@ -594,7 +581,7 @@ static BOOL PyCom_SAFEARRAYFromPyObjectEx(PyObject *obj, SAFEARRAY **ppSA, bool 
 	Py_DECREF(ppyobDimensionDictionary);
 
 	if (cDims==0) {
-		OleSetTypeError("Objects for SAFEARRAYS must be sequences (of sequences), or a buffer object.");
+		OleSetTypeError(_T("Objects for SAFEARRAYS must be sequences (of sequences), or a buffer object."));
 		return FALSE;
 	}
 	if (!bAllocNewArray) {
@@ -801,7 +788,7 @@ static PyObject *PyCom_PyObjectFromSAFEARRAYDimensionItem(SAFEARRAY *psa, VARENU
 		default: {
 			TCHAR buf[200];
 			wsprintf(buf, _T("The VARIANT type 0x%x is not supported for SAFEARRAYS"), vt);
-			OleSetTypeErrorT(buf);
+			OleSetTypeError(buf);
 		}
 	}
 	if (FAILED(hres)) {
@@ -890,7 +877,7 @@ PyObject *PyCom_PyObjectFromSAFEARRAY(SAFEARRAY *psa, VARENUM vt /* = VT_VARIANT
 {
 	// Our caller must has resolved all byref and array references.
 	if (vt & VT_ARRAY || vt & VT_BYREF) {
-		OleSetTypeError("Internal error - unexpected argument - only simple VARIANTTYPE expected");
+		OleSetTypeError(_T("Internal error - unexpected argument - only simple VARIANTTYPE expected"));
 		return FALSE;
 	}
 	UINT nDim = SafeArrayGetDim(psa);
@@ -1050,7 +1037,7 @@ BOOL PythonOleArgHelper::MakeObjToVariant(PyObject *obj, VARIANT *var, PyObject 
 		return TRUE; // All done with array!
 	}
 	if (m_reqdType & VT_VECTOR) { // we have been asked for an array.
-		OleSetTypeError("Sorry - cant support VT_VECTOR arguments");
+		OleSetTypeError(_T("Sorry - cant support VT_VECTOR arguments"));
 		return FALSE;
 	}
 	BOOL rc = TRUE;
@@ -1337,7 +1324,7 @@ BOOL PythonOleArgHelper::MakeObjToVariant(PyObject *obj, VARIANT *var, PyObject 
 		// beef up the VARIANT support, rather than default.
 		TCHAR buf[200];
 		wsprintf(buf, _T("The VARIANT type is unknown (0x%08lx)"), m_reqdType);
-		OleSetTypeErrorT(buf);
+		OleSetTypeError(buf);
 		rc = FALSE;
 		break;
 	}
