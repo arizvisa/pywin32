@@ -3,7 +3,8 @@ import struct
 import sys
 import os
 import pywintypes
-import win32event
+import win32event, win32api
+import os
 import win32com.directsound.directsound as ds
 # next two lines are for for debugging:
 # import win32com
@@ -13,7 +14,6 @@ WAV_FORMAT_PCM = 1
 WAV_HEADER_SIZE = struct.calcsize('<4sl4s4slhhllhh4sl')
 
 def wav_header_unpack(data):
-    print (struct.unpack('<4sl4s4slhhllhh4sl', data))
     (riff, riffsize, wave, fmt, fmtsize, format, nchannels, samplespersecond, 
      datarate, blockalign, bitspersample, data, datalength) \
      = struct.unpack('<4sl4s4slhhllhh4sl', data)
@@ -329,8 +329,8 @@ class DirectSoundCaptureTest(unittest.TestCase):
         event.Close()
 
         data = buffer.Update(0, 352800)
-
-        f = open('recording.wav', 'wb')
+        fname=os.path.join(win32api.GetTempPath(), 'test_directsound_record.wav')
+        f = open(fname, 'wb')
         f.write(wav_header_pack(sdesc.lpwfxFormat, 352800))
         f.write(data)
         f.close()
