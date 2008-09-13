@@ -1768,7 +1768,7 @@ static PyObject *PyDragQueryFile(PyObject *self, PyObject *args)
 	if (sz==NULL)
 		return PyErr_NoMemory();
 	nchars = ::DragQueryFile(hglobal, index, sz, nchars);
-	PyObject *ret = PyString_FromStringAndSize(sz, nchars);
+	PyObject *ret = PyWinObject_FromTCHAR(sz, nchars);
 	free(sz);
 	return ret;
 }
@@ -1967,7 +1967,11 @@ static PyObject *PyFILEGROUPDESCRIPTORAsString(PyObject *self, PyObject *args)
 	// <nl>In general, you can omit dwFlags - it will be set correctly based
 	// on what other attributes exist.
 	// @pyparm bool|make_unicode|False|If true, a FILEDESCRIPTORW object is created
+#ifdef UNICODE
+	int make_unicode = TRUE;
+#else
 	int make_unicode = FALSE;
+#endif
 	if (!PyArg_ParseTuple(args, "O|i", &ob, &make_unicode))
 		return NULL;
 	if (!PySequence_Check(ob))

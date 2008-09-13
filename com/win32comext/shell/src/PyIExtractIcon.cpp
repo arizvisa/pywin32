@@ -113,7 +113,7 @@ STDMETHODIMP PyGExtractIcon::Extract(
 {
 	PY_GATEWAY_METHOD;
 	PyObject *obpszFile;
-	obpszFile = PyString_FromString((LPTSTR)pszFile);
+	obpszFile = PyWinObject_FromTCHAR(pszFile);
 	PyObject *result;
 	HRESULT hr=InvokeViaPolicy("Extract", &result, "Oii", obpszFile, nIconIndex, nIconSize);
 	Py_XDECREF(obpszFile);
@@ -155,10 +155,10 @@ STDMETHODIMP PyGExtractIcon::GetIconLocation(
 		hr = PyInt_AsLong(result);
 	else {
 		if (PyArg_ParseTuple(result, "Oii", &obFileName, piIndex, pflags)) {
-			char *filename;
-			if (PyWinObject_AsString(obFileName, &filename)) {
-				strncpy(szIconFile, filename, cchMax);
-				PyWinObject_FreeString(filename);
+			TCHAR *filename;
+			if (PyWinObject_AsTCHAR(obFileName, &filename)) {
+				_tcsncpy(szIconFile, filename, cchMax);
+				PyWinObject_FreeTCHAR(filename);
 			}
 		}
 		hr = MAKE_PYCOM_GATEWAY_FAILURE_CODE("GetIconLocation");
