@@ -9,7 +9,7 @@ class Persists:
                          'GetSizeMax', 'InitNew' ]
     _com_interfaces_ = [ pythoncom.IID_IPersistStreamInit ]
     def __init__(self):
-        self.data = "abcdefg"
+        self.data = b"abcdefg"
         self.dirty = 1
     def GetClassID(self):
         return pythoncom.IID_NULL
@@ -54,7 +54,7 @@ class Stream:
         elif origin==pythoncom.STREAM_SEEK_END:
             self.index = len(self.data)+dist
         else:
-            raise ValueError, 'Unknown Seek type: ' +str(origin)
+            raise ValueError('Unknown Seek type: ' +str(origin))
         if self.index < 0:
             self.index = 0
         else:
@@ -66,7 +66,7 @@ class BadStream(Stream):
         returned more data than requested.
     """
     def Read(self, amount):
-        return 'x'*(amount+1)
+        return b'x'*(amount+1)
 
 class StreamTest(win32com.test.util.TestCase):
     def _readWrite(self, data, write_stream, read_stream = None):
@@ -80,7 +80,7 @@ class StreamTest(win32com.test.util.TestCase):
         self.assertEqual(data[1:-1], got)
 
     def testit(self):
-        mydata = 'abcdefghijklmnopqrstuvwxyz'
+        mydata = b'abcdefghijklmnopqrstuvwxyz'
     
         # First test the objects just as Python objects...
         s = Stream(mydata)
@@ -100,7 +100,7 @@ class StreamTest(win32com.test.util.TestCase):
         self._readWrite(mydata, s2, s)
         self._readWrite(mydata, s2, s2)
 
-        self._readWrite("string with\0a NULL", s2, s2)
+        self._readWrite(b"string with\0a NULL", s2, s2)
         # reset the stream
         s.Write(mydata)
         p2.Load(s2)
