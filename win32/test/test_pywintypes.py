@@ -24,9 +24,9 @@ class TestCase(unittest.TestCase):
     def testGUID(self):
         s = "{00020400-0000-0000-C000-000000000046}"
         iid = pywintypes.IID(s)
-        iid2 = pywintypes.IID(buffer(iid), True)
+        iid2 = pywintypes.IID(bytes(iid), True)
         self.assertEquals(iid, iid2)
-        self.assertRaises(ValueError, pywintypes.IID, '00', True) # too short
+        self.assertRaises(ValueError, pywintypes.IID, b'00', True) # too short
         self.assertRaises(TypeError, pywintypes.IID, 0, True) # no buffer
 
 if __name__ == '__main__':
