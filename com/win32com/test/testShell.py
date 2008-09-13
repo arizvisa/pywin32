@@ -30,7 +30,7 @@ class ShellTester(win32com.test.util.TestCase):
             num += 1
         if num == 0:
             # This isn't a fatal error, but is unlikely.
-            print "Could not find any links on your desktop, which is unusual"
+            print ("Could not find any links on your desktop, which is unusual")
 
     def testShellFolder(self):
         sf = shell.SHGetDesktopFolder()
@@ -67,22 +67,22 @@ class PIDLTester(win32com.test.util.TestCase):
 
     def testPIDL(self):
         # A PIDL of "\1" is:   cb    pidl   cb
-        expect =            "\03\00" "\1"  "\0\0"
-        self.assertEqual(shell.PIDLAsString(["\1"]), expect)
-        self._rtPIDL(["\0"])
-        self._rtPIDL(["\1", "\2", "\3"])
-        self._rtPIDL(["\0" * 2048] * 2048)
+        expect =            b"\03\00" b"\1"  b"\0\0"
+        self.assertEqual(shell.PIDLAsString([b"\1"]), expect)
+        self._rtPIDL([b"\0"])
+        self._rtPIDL([b"\1", b"\2", b"\3"])
+        self._rtPIDL([b"\0" * 2048] * 2048)
         # PIDL must be a list
         self.assertRaises(TypeError, shell.PIDLAsString, "foo")
 
     def testCIDA(self):
-        self._rtCIDA(["\0"], [ ["\0"] ])
-        self._rtCIDA(["\1"], [ ["\2"] ])
-        self._rtCIDA(["\0"], [ ["\0"], ["\1"], ["\2"] ])
+        self._rtCIDA([b"\0"], [ [b"\0"] ])
+        self._rtCIDA([b"\1"], [ [b"\2"] ])
+        self._rtCIDA([b"\0"], [ [b"\0"], [b"\1"], [b"\2"] ])
 
     def testBadShortPIDL(self):
         # A too-short child element:   cb    pidl   cb
-        pidl =                       "\01\00" "\1"
+        pidl =                       b"\01\00" b"\1"
         self.assertRaises(ValueError, shell.StringAsPIDL, pidl)
 
         # ack - tried to test too long PIDLs, but a len of 0xFFFF may not
@@ -90,16 +90,16 @@ class PIDLTester(win32com.test.util.TestCase):
 
 class FILEGROUPDESCRIPTORTester(win32com.test.util.TestCase):
     def _testRT(self, fd):
-        fgd_string = shell.FILEGROUPDESCRIPTORAsString([fd])
-        fd2 = shell.StringAsFILEGROUPDESCRIPTOR(fgd_string)[0]
+        fgd_string = shell.FILEGROUPDESCRIPTORAsString([fd], 1)
+        fd2 = shell.StringAsFILEGROUPDESCRIPTOR(fgd_string, 1)[0]
         
         fd = fd.copy()
         fd2 = fd2.copy()
         
         # The returned objects *always* have dwFlags and cFileName.
-        if not fd.has_key('dwFlags'):
+        if 'dwFlags' not in fd:
             del fd2['dwFlags']
-        if not fd.has_key('cFileName'):
+        if 'cFileName' not in fd:
             self.assertEqual(fd2['cFileName'], '')
             del fd2['cFileName']
 
@@ -129,7 +129,7 @@ class FILEGROUPDESCRIPTORTester(win32com.test.util.TestCase):
                  ftCreationTime=pythoncom.MakeTime(10),
                  ftLastAccessTime=pythoncom.MakeTime(11),
                  ftLastWriteTime=pythoncom.MakeTime(12),
-                 nFileSize=sys.maxint + 1)
+                 nFileSize=sys.maxsize + 1)
         self._testRT(d)
 
     def testUnicode(self):
@@ -137,30 +137,30 @@ class FILEGROUPDESCRIPTORTester(win32com.test.util.TestCase):
         if sys.hexversion < 0x2030000:
             # no kw-args to dict in 2.2 - not worth converting!
             return
-        d = [dict(cFileName=u"foo.txt",
+        d = [dict(cFileName="foo.txt",
                  sizel=(1,2),
                  pointl=(3,4),
                  dwFileAttributes = win32con.FILE_ATTRIBUTE_NORMAL,
                  ftCreationTime=pythoncom.MakeTime(10),
                  ftLastAccessTime=pythoncom.MakeTime(11),
                  ftLastWriteTime=pythoncom.MakeTime(12),
-                 nFileSize=sys.maxint + 1),
-            dict(cFileName=u"foo2.txt",
+                 nFileSize=sys.maxsize + 1),
+            dict(cFileName="foo2.txt",
                  sizel=(1,2),
                  pointl=(3,4),
                  dwFileAttributes = win32con.FILE_ATTRIBUTE_NORMAL,
                  ftCreationTime=pythoncom.MakeTime(10),
                  ftLastAccessTime=pythoncom.MakeTime(11),
                  ftLastWriteTime=pythoncom.MakeTime(12),
-                 nFileSize=sys.maxint + 1),
-            dict(cFileName=u"foo\xa9.txt",
+                 nFileSize=sys.maxsize + 1),
+            dict(cFileName="foo\xa9.txt",
                  sizel=(1,2),
                  pointl=(3,4),
                  dwFileAttributes = win32con.FILE_ATTRIBUTE_NORMAL,
                  ftCreationTime=pythoncom.MakeTime(10),
                  ftLastAccessTime=pythoncom.MakeTime(11),
                  ftLastWriteTime=pythoncom.MakeTime(12),
-                 nFileSize=sys.maxint + 1),
+                 nFileSize=sys.maxsize + 1),
             ]
         s = shell.FILEGROUPDESCRIPTORAsString(d, 1)
         d2 = shell.StringAsFILEGROUPDESCRIPTOR(s)
@@ -174,8 +174,8 @@ class FileOperationTester(win32com.test.util.TestCase):
         import tempfile
         self.src_name = os.path.join(tempfile.gettempdir(), "pywin32_testshell")
         self.dest_name = os.path.join(tempfile.gettempdir(), "pywin32_testshell_dest")
-        self.test_data = "Hello from\0Python"
-        f=file(self.src_name, "wb")
+        self.test_data = b"Hello from\0Python"
+        f=open(self.src_name, "wb")
         f.write(self.test_data)
         f.close()
         try:
