@@ -23,7 +23,7 @@ HRESULT PySafeArrayGetRecordInfo( SAFEARRAY *  psa, IRecordInfo **  prinfo )
 {
 	static HRESULT (STDAPICALLTYPE *pfnSAGRI)(SAFEARRAY *, IRecordInfo **) = NULL;
 	if (pfnSAGRI==NULL) {
-		HMODULE hmod = GetModuleHandle("oleaut32.dll");
+		HMODULE hmod = GetModuleHandle(_T("oleaut32.dll"));
 		if (hmod==NULL)
 			return E_NOTIMPL;
 		pfnSAGRI = (HRESULT (STDAPICALLTYPE *)(SAFEARRAY *, IRecordInfo **))
@@ -37,7 +37,7 @@ HRESULT PyGetRecordInfoFromGuids( REFGUID g, ULONG major, ULONG minor, LCID lcid
 {
 	static HRESULT (STDAPICALLTYPE *pfnGRIFG)(REFGUID, ULONG, ULONG, LCID, REFGUID, IRecordInfo **) = NULL;
 	if (pfnGRIFG==NULL) {
-		HMODULE hmod = GetModuleHandle("oleaut32.dll");
+		HMODULE hmod = GetModuleHandle(_T("oleaut32.dll"));
 		if (hmod==NULL)
 			return E_NOTIMPL;
 		pfnGRIFG = (HRESULT (STDAPICALLTYPE *)(REFGUID, ULONG, ULONG, LCID, REFGUID, IRecordInfo **))

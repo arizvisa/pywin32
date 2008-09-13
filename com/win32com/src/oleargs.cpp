@@ -5,8 +5,6 @@
 #include "stdafx.h"
 #include "PythonCOM.h"
 
-extern void PyCom_LogF(const TCHAR *fmt, ...);
-
 extern PyObject *PyObject_FromRecordInfo(IRecordInfo *, void *, ULONG);
 extern PyObject *PyObject_FromSAFEARRAYRecordInfo(SAFEARRAY *psa);
 extern BOOL PyObject_AsVARIANTRecordInfo(PyObject *ob, VARIANT *pv);

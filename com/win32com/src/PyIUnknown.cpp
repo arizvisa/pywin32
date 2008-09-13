@@ -5,9 +5,6 @@
 #include "PythonCOM.h"
 #include "PythonCOMServer.h"
 
-extern void PyCom_LogF(const char *fmt, ...);
-#define LogF PyCom_LogF
-
 char *PyIUnknown::szErrMsgObjectReleased = "The COM object has been released.";
 
 static LONG cUnknowns=0;
@@ -49,7 +46,7 @@ PyObject * PyIUnknown::repr()
 {
 #ifdef _DEBUG
 	int numInMap = m_obTrackList ? PyMapping_Length(m_obTrackList) : 0;
-	LogF("Cleaning up %d COM objects...", numInMap);
+	PyCom_LogF("Cleaning up %d COM objects...", numInMap);
 	OLECHAR FAR *pythonOb = L"pythonObject";
 #endif
 	if (m_obTrackList) {
@@ -63,7 +60,7 @@ PyObject * PyIUnknown::repr()
 				if (pLook) {
 #ifdef NOPE_DEBUG
 					const char *relDesc = pLook->m_obj ? "NOT RELEASED" : "released";
-					LogF(" object <%s> at 0x%0lx, m_obj at 0x%0lx, ob_refcnt=%d, %s", pLook->ob_type->tp_name, pLook, pLook->m_obj, pLook->ob_refcnt, relDesc);
+					PyCom_LogF(" object <%s> at 0x%0lx, m_obj at 0x%0lx, ob_refcnt=%d, %s", pLook->ob_type->tp_name, pLook, pLook->m_obj, pLook->ob_refcnt, relDesc);
 					if ( pLook->m_obj )
 					{
 						IDispatch *pdisp;
@@ -83,11 +80,11 @@ PyObject * PyIUnknown::repr()
 									PyObject *ob = (PyObject *)V_I4(&result);
 									if ( PyInstance_Check(ob) )
 									{
-										LogF("   object is a Python class instance of: %s", PyString_AsString(((PyInstanceObject *)ob)->in_class->cl_name));
+										PyCom_LogF("   object is a Python class instance of: %s", PyString_AsString(((PyInstanceObject *)ob)->in_class->cl_name));
 									}
 									else
 									{
-										LogF("   object is a Python object of type: %s", ob->ob_type->tp_name);
+										PyCom_LogF("   object is a Python object of type: %s", ob->ob_type->tp_name);
 									}
 								}
 							}
@@ -109,7 +106,7 @@ PyObject * PyIUnknown::repr()
 		FreeThreadState();
 	}
 #ifdef _DEBUG
-	LogF("COM object cleanup complete.");
+	PyCom_LogF("COM object cleanup complete.");
 #endif
 }
 */
@@ -143,14 +140,14 @@ PyObject * PyIUnknown::repr()
 			PyEval_RestoreThread(_save);
 
 #ifdef _DEBUG_LIFETIMES
-			LogF(buf, "   SafeRelease(%ld) -> %s at 0x%0lx, IUnknown at 0x%0lx - Release() returned %ld",GetCurrentThreadId(), ob->ob_type->tp_name,ob, ob->m_obj,rcnt);
+			PyCom_LogF(buf, "   SafeRelease(%ld) -> %s at 0x%0lx, IUnknown at 0x%0lx - Release() returned %ld",GetCurrentThreadId(), ob->ob_type->tp_name,ob, ob->m_obj,rcnt);
 #endif
 			ob->m_obj = NULL;
 		}
 		PYWINTYPES_EXCEPT
 		{
 			PyEval_RestoreThread(_save);
-			LogF(_T("Win32 exception occurred releasing IUnknown at 0x%08x"), ob->m_obj);
+			PyCom_LogF("Win32 exception occurred releasing IUnknown at 0x%08x", ob->m_obj);
 			ob->m_obj = NULL;
 #ifdef _DEBUG
 			DebugBreak();
