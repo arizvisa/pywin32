@@ -353,7 +353,7 @@ PyObject *PyInit_ifilter(void)
 
 	// Tell pywintypes that IFilter error messages can be extracted from
 	// query.dll
-	HMODULE hmod = GetModuleHandle("query.dll");
+	HMODULE hmod = GetModuleHandle(_T("query.dll"));
 	if (hmod)
 		// According to FiltErr.h, "Codes 0x1700-0x172F are reserved for FILTER"
 		PyWin_RegisterErrorMessageModule(0x80041700, 0x8004172F, hmod);
