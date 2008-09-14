@@ -30,19 +30,9 @@
 #define false 0
 #endif
 
-#ifdef _WIN64
-# define mktime _mktime32
-#endif
-
-/* Python 1.5.2 doesn't have PyObject_New
-   PyObject_NEW is not *quite* as safe, but seem to work fine
-   (as all win32all for 1.5.2 used it! */
-#ifndef PyObject_New 
-#define PyObject_New PyObject_NEW
-#endif
-#ifndef PyObject_Del 
-#define PyObject_Del PyMem_DEL
-#endif
+// #ifdef _WIN64
+// # define mktime _mktime32
+// #endif
 
 #include "dbi.h"  /*$ This is a hack */
 static PyObject *odbcError;
@@ -628,7 +618,7 @@ static PyObject *dateCopy(const void *v, int sz)
 	gt.tm_hour = dt->hour;
 	gt.tm_min = dt->minute;
 	gt.tm_sec = dt->second;
-	return dbiMakeDate(PyInt_FromLong(mktime(&gt)));
+	return dbiMakeDate(PyLong_FromLongLong(mktime(&gt)));
 }
 
 static PyObject *rawCopy(const void *v, int sz)
