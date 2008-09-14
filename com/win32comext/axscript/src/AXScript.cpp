@@ -140,16 +140,37 @@ static const PyCom_InterfaceSupportInfo g_interfaceSupportData[] =
 };
 
 /* Module initialisation */
-extern "C" __declspec(dllexport) void initaxscript()
+extern "C" __declspec(dllexport)
+#if (PY_VERSION_HEX < 0x03000000)
+void initaxscript(void)
+#else
+PyObject *PyInit_axscript(void)
+#endif
 {
+	PyObject *dict, *module;
 	char *modName = "axscript";
-	PyObject *oModule;
 	// Create the module and add the functions
-	oModule = Py_InitModule(modName, axcom_methods);
-	if (!oModule) /* Eeek - some serious error! */
-		return;
-	PyObject *dict = PyModule_GetDict(oModule);
-	if (!dict) return; /* Another serious error!*/
+#if (PY_VERSION_HEX < 0x03000000)
+#define RETURN_ERROR return;
+	module = Py_InitModule(modName, axcom_methods);
+
+#else
+#define RETURN_ERROR return NULL;
+	static PyModuleDef axscript_def = {
+		PyModuleDef_HEAD_INIT,
+		"axscript",
+		"A module, encapsulating the ActiveX Scripting interfaces.",
+		-1,
+		axcom_methods
+		};
+	module = PyModule_Create(&axscript_def);
+#endif
+
+	if (!module) /* Eeek - some serious error! */
+		RETURN_ERROR;
+	dict = PyModule_GetDict(module);
+	if (!dict)	/* Another serious error!*/
+		RETURN_ERROR;
 
 	// Register all of our interfaces, gateways and IIDs.
 	PyCom_RegisterExtensionSupport(dict, g_interfaceSupportData, sizeof(g_interfaceSupportData)/sizeof(PyCom_InterfaceSupportInfo));
@@ -209,5 +230,9 @@ extern "C" __declspec(dllexport) void initaxscript()
 	// ie 4 SDK has these!
 	ADD_CONSTANT(INTERFACE_USES_DISPEX);	// Object knows to use IDispatchEx
 	ADD_CONSTANT(INTERFACE_USES_SECURITY_MANAGER);	// Object knows to use IInternetHostSecurityManager
+#endif
+
+#if (PY_VERSION_HEX >= 0x03000000)
+	return module;
 #endif
 }
