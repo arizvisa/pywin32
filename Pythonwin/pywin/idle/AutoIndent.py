@@ -101,7 +101,7 @@ class AutoIndent:
 
     def set_indentation_params(self, ispythonsource, guess=1):
         if guess and ispythonsource:
-            i = 4 ## self.guess_indent()
+            i = self.guess_indent()
             if 2 <= i <= 8:
                 self.indentwidth = i
             if self.indentwidth != self.tabwidth:
