@@ -687,11 +687,6 @@ static TCHAR doParse(parseContext *ct)
 }
 
 
-static void OutOfMemory()
-{
-	PyErr_SetString(odbcError, "out of memory");
-}
-
 static SQLLEN NTS = SQL_NTS;
 
 static InputBinding *initInputBinding(cursorObject *cur, Py_ssize_t len)
@@ -706,7 +701,7 @@ static InputBinding *initInputBinding(cursorObject *cur, Py_ssize_t len)
 	}
 	else
 	{
-		OutOfMemory();
+		PyErr_NoMemory();
 	}
 	return ib;
 }
@@ -742,24 +737,42 @@ static int ibindInt(cursorObject *cur, int column, PyObject *item)
 	return 1;
 }
 
-static int ibindLong(cursorObject*cur,int column, PyObject *item) 
+static int ibindLong(cursorObject*cur,int column, PyObject *item)
 {
-	int len = sizeof(long long);
-	long long  val = PyLong_AsLongLong(item);
-	if (val == -1 && PyErr_Occurred())
-		return 0;
-	InputBinding *ib = initInputBinding(cur, len);
-	if (!ib)
-		return 0;
-
-	memcpy(ib->bind_area, &val, len);
+	/* This will always be called in Py3k, so differentiate between an int
+		that fits in a long, and one that requires a 64=bit datatype. */
+	int len;
+	InputBinding *ib;
+	SQLSMALLINT ParamType=SQL_PARAM_INPUT, CType, SqlType;
+	long longval = PyLong_AsLong(item);
+	if (longval != -1 || !PyErr_Occurred()){
+		CType = SQL_C_LONG;
+		SqlType = SQL_INTEGER;
+		len = sizeof(long);
+		ib = initInputBinding(cur, len);
+		if (!ib)
+			return 0;
+		memcpy(ib->bind_area, &longval, len);
+		}
+	else{
+		long long longlongval = PyLong_AsLongLong(item);
+		if (longlongval == -1 && PyErr_Occurred())
+			return 0;
+		CType = SQL_C_SBIGINT;
+		SqlType = SQL_BIGINT;
+		len = sizeof(long long);
+		ib = initInputBinding(cur, len);
+		if (!ib)
+			return 0;
+		memcpy(ib->bind_area, &longlongval, len);
+		}	
 
 	if (unsuccessful(SQLBindParameter(
 		cur->hstmt,
 		column,
-		SQL_PARAM_INPUT,
-		SQL_C_SBIGINT,
-		SQL_BIGINT,
+		ParamType,
+		CType,
+		SqlType,
 		len,
 		0, 
 		ib->bind_area,
@@ -1373,8 +1386,7 @@ static PyObject *odbcCurExec(PyObject *self, PyObject *args)
 		Py_DECREF(cur->description);
 		cur->description = NULL;
 		PyWinObject_FreeTCHAR(sql);
-		OutOfMemory();
-		return NULL;
+		return PyErr_NoMemory();
 	}
 
 	SQLFreeStmt(cur->hstmt, SQL_CLOSE); /* ignore errors here */
