@@ -1,7 +1,4 @@
 Some things that still need work for Python 3.0
-
-
-odbc - input binding needs changes for longs, use SQL_C_LONG instead SQL_C_SBIGINT if value fits in a long
  
 Swig doesn't handle com_interface_parent, adsi will not build
 
@@ -9,8 +6,6 @@ Several types set Py_TPFLAGS_BASETYPE but do not have required infrastructure to
 
 servicemanager (PythonService.cpp) - Py_SetProgram and PySys_SetArgv don't work for 2.x, need char * args
 	but __argv is NULL
-
-pythoncom - Get*String routines for looking up error codes return bytes instead of unicode
 
 Pythonwin -
 	xxx LVITEM and TVITEM conversions use PyWinobject_AsTCHAR, result needs to be freed
@@ -33,9 +28,9 @@ Pythonwin -
 		As prelim work, convert functions that create MFC objects (CreateDialog, CreateMenu, etc) to keyword args,
 			as they will be very similar to tp_new for created type
 
-	
-
-	Pasted text ends up with empty lines
+	xxx Pasted text ends up with empty lines
+	Need to define scintilla line ending alongside default_scintilla_encoding,
+		can be switched using SCI_SETEOLMODE with SC_EOL_LF
 
 	Autoindent gets spaces/tabs wrong
 
