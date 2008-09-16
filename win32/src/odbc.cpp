@@ -35,11 +35,17 @@
 // # define mktime _mktime32
 // #endif
 
-#include "dbi.h"  /*$ This is a hack */
-static PyObject *odbcError;
+
 static PyObject *datetime_module, *datetime_class;
 
-#define MAX_STR		45
+// Type names
+static PyObject *DbiString, *DbiRaw, *DbiNumber, *DbiDate;
+// Exceptions
+static PyObject *odbcError;
+static PyObject *DbiNoError, *DbiOpError, *DbiProgError;
+static PyObject *DbiIntegrityError, *DbiDataError, *DbiInternalError;
+
+#define MAX_STR		256
 static HENV Env;
 
 typedef struct
@@ -620,7 +626,18 @@ static PyObject *dateCopy(const void *v, int sz)
 
 static PyObject *rawCopy(const void *v, int sz)
 {
-	return dbiMakeRaw(PyString_FromStringAndSize((char *)v, sz));
+	PyObject *ret = PyBuffer_New(sz);
+	if (!ret)
+		return NULL;
+	void *buf;
+	DWORD buflen;
+	// Should not fail, but check anyway
+	if (!PyWinObject_AsWriteBuffer(ret, &buf, &buflen)){
+		Py_DECREF(ret);
+		return NULL;
+		}
+	memcpy(buf, v, sz);
+	return ret;
 }
 
 typedef struct {
@@ -752,12 +769,12 @@ static int ibindLong(cursorObject*cur,int column, PyObject *item)
 		memcpy(ib->bind_area, &longval, len);
 		}
 	else{
-		long long longlongval = PyLong_AsLongLong(item);
+		__int64 longlongval = PyLong_AsLongLong(item);
 		if (longlongval == -1 && PyErr_Occurred())
 			return 0;
 		CType = SQL_C_SBIGINT;
 		SqlType = SQL_BIGINT;
-		len = sizeof(long long);
+		len = sizeof(longlongval);
 		ib = initInputBinding(cur, len);
 		if (!ib)
 			return 0;
@@ -880,9 +897,10 @@ static int ibindDate(cursorObject*cur, int column, PyObject *item)
 
 static int ibindRaw(cursorObject *cur, int column, PyObject *item)
 {
-  const char *val = PyString_AsString(item);
-  Py_ssize_t len = PyObject_Length(item);
-
+  void *val;
+  DWORD len;
+  if (!PyWinObject_AsReadBuffer(item, &val, &len))
+	  return 0;
   InputBinding *ib = initInputBinding(cur, len);
   if (!ib)
       return 0;
@@ -1064,11 +1082,7 @@ static int bindInput
 	{
 		item = PySequence_GetItem(vars, i);
 		iCol = i + 1;
-		if (dbiIsRaw(item))
-		{
-			rv = ibindRaw(cur, iCol, dbiValue(item));
-		}
-		else if (PyLong_Check(item))
+		if (PyLong_Check(item))
 		{
 			rv = ibindLong(cur, iCol, item);
 		}
@@ -1096,8 +1110,19 @@ static int bindInput
 		{
 			rv = ibindDate(cur, iCol, item);
 		}
+		#if (PY_VERSION_HEX < 0x03000000)
+		else if (PyBuffer_Check(item))
+		#else
+		else if (PyObject_CheckReadBuffer(item))
+		#endif
+		{
+			rv = ibindRaw(cur, iCol, item);
+		}		
 		else
 		{
+			OutputDebugString(_T("bindInput - using repr conversion for type: '"));
+			OutputDebugStringA(item->ob_type->tp_name);
+			OutputDebugString(_T("'\n"));
 			PyObject *sitem = PyObject_Str(item);
 			if (sitem==NULL)
 				rv = 0;
@@ -1955,8 +1980,6 @@ PyObject *PyInit_odbc(void)
 	dict = PyModule_GetDict(module);
 	if (!dict)
 		RETURN_ERROR;
-	if (!PyImport_ImportModule("dbi"))
-		RETURN_ERROR;
 
 	// Sql dates are now returned as python's datetime object.
 	//	C Api for datetime didn't exist in 2.3, stick to dynamic semantics for now.
@@ -1973,10 +1996,56 @@ PyObject *PyInit_odbc(void)
 		RETURN_ERROR;
     }
 
+	/* Names of various sql datatypes.
+		's' format of Py_BuildValue creates unicode on py3k, and char string on 2.x
+	*/
+	char *szDbiString = "STRING";
+	char *szDbiRaw = "RAW";
+	char *szDbiNumber = "NUMBER";
+	char *szDbiDate = "DATE";
+	PyObject *obtypes=Py_BuildValue("(ssss)",
+			szDbiString,
+			szDbiRaw,
+			szDbiNumber,
+			szDbiDate);
+	// Steals a ref to obtypes, so it doesn't need to be DECREF'ed.
+	if (obtypes==NULL || PyModule_AddObject(module, "TYPES", obtypes) == -1)
+		RETURN_ERROR;
+	DbiString = PyTuple_GET_ITEM(obtypes, 0);
+	DbiRaw = PyTuple_GET_ITEM(obtypes, 1);
+	DbiNumber = PyTuple_GET_ITEM(obtypes, 2);
+	DbiDate = PyTuple_GET_ITEM(obtypes, 3);
+	/* ??? These are also added to the module with attribute name same as value,
+			not sure what the point of this is ???
+	*/
+	if (PyDict_SetItem(dict, DbiString, DbiString) == -1
+		||PyDict_SetItem(dict, DbiRaw, DbiRaw) == -1
+		||PyDict_SetItem(dict, DbiNumber, DbiNumber) == -1
+		||PyDict_SetItem(dict, DbiDate, DbiDate) == -1)
+		RETURN_ERROR;
+
+	// Initialize various exception types
 	odbcError = PyErr_NewException("odbc.odbcError", NULL, NULL);
 	if (odbcError == NULL || PyDict_SetItemString(dict, "error", odbcError) == -1)
 		RETURN_ERROR;
-
+	DbiNoError = PyErr_NewException("dbi.noError", NULL, NULL);
+	if (DbiNoError == NULL || PyDict_SetItemString(dict, "noError", DbiNoError) == -1)
+		RETURN_ERROR;
+	DbiOpError = PyErr_NewException("dbi.opError", NULL, NULL);
+	if (DbiOpError == NULL || PyDict_SetItemString(dict, "opError", DbiOpError) == -1)
+		RETURN_ERROR;
+	DbiProgError = PyErr_NewException("dbi.progError", NULL, NULL);
+	if (DbiProgError == NULL || PyDict_SetItemString(dict, "progError", DbiProgError) == -1)
+		RETURN_ERROR;
+	DbiIntegrityError = PyErr_NewException("dbi.integrityError", NULL, NULL);
+	if (DbiIntegrityError == NULL || PyDict_SetItemString(dict, "integrityError", DbiIntegrityError) == -1)
+		RETURN_ERROR;
+	DbiDataError = PyErr_NewException("dbi.dataError", NULL, NULL);
+	if (DbiDataError == NULL || PyDict_SetItemString(dict, "dataError", DbiDataError) == -1)
+		RETURN_ERROR;
+	DbiInternalError = PyErr_NewException("dbi.internalError", NULL, NULL);
+	if (DbiInternalError == NULL || PyDict_SetItemString(dict, "internalError", DbiInternalError) == -1)
+		RETURN_ERROR;
 	/* The indices go to indices in the ODBC error table */
 	dbiErrors[0] = DbiNoError;
 	dbiErrors[1] = DbiOpError;
