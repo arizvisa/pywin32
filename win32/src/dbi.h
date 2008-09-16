@@ -21,15 +21,11 @@
 #define DBI_FUNC(x) x
 #endif
 
-DBI_FUNC(int) dbiIsDate(const PyObject *o);
 DBI_FUNC(int) dbiIsRaw(const PyObject *o);
-DBI_FUNC(int) dbiIsRowId(const PyObject *o);
 
 /* These do not INCREF */
 DBI_FUNC(PyObject) *dbiValue(PyObject *o);  
-DBI_FUNC(PyObject) *dbiMakeDate(PyObject *contents);
 DBI_FUNC(PyObject) *dbiMakeRaw(PyObject *contents);
-DBI_FUNC(PyObject) *dbiMakeRowId(PyObject *contents);
 
 DBI_FUNC(PyObject)*DbiString;
 DBI_FUNC(PyObject)*DbiRaw;

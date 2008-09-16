@@ -15,6 +15,7 @@
 #include <string.h>
 
 #include "PyWinTypes.h"
+#include "PyWinObjects.h"
 #include "structmember.h"
 
 #include <sql.h>
@@ -36,6 +37,7 @@
 
 #include "dbi.h"  /*$ This is a hack */
 static PyObject *odbcError;
+static PyObject *datetime_module, *datetime_class;
 
 #define MAX_STR		45
 static HENV Env;
@@ -610,15 +612,10 @@ static PyObject *doubleCopy(const void *v, int sz)
 static PyObject *dateCopy(const void *v, int sz)
 {
 	const TIMESTAMP_STRUCT  *dt = (const TIMESTAMP_STRUCT *) v;
-	struct tm gt;
-	gt.tm_isdst = -1; /* figure out DST */
-	gt.tm_year = dt->year-1900;
-	gt.tm_mon = dt->month-1;
-	gt.tm_mday = dt->day;
-	gt.tm_hour = dt->hour;
-	gt.tm_min = dt->minute;
-	gt.tm_sec = dt->second;
-	return dbiMakeDate(PyLong_FromLongLong(mktime(&gt)));
+	return PyObject_CallFunction(datetime_class, "hhhhhhl",
+		dt->year, dt->month, dt->day,
+		dt->hour, dt->minute, dt->second, dt->fraction);
+	// ??? Not sure what units fraction uses ???
 }
 
 static PyObject *rawCopy(const void *v, int sz)
@@ -818,23 +815,49 @@ static int ibindNull(cursorObject*cur, int column)
 
 static int ibindDate(cursorObject*cur, int column, PyObject *item) 
 {
-	long val = PyInt_AsLong(item);
 	int len = sizeof(TIMESTAMP_STRUCT);
-
 	InputBinding *ib = initInputBinding(cur, len);
 	if (!ib)
 		return 0;
-
 	TIMESTAMP_STRUCT *dt = (TIMESTAMP_STRUCT*) ib->bind_area ;
-	struct tm *gt = localtime((const time_t *)&val);
-
-	dt->year = 1900 + gt->tm_year;
-	dt->month = gt->tm_mon + 1;
-	dt->day = gt->tm_mday;
-	dt->hour = gt->tm_hour;
-	dt->minute = gt->tm_min;
-	dt->second = gt->tm_sec;
-	dt->fraction = 0;
+	ZeroMemory(dt, sizeof(*dt));
+	// Accept either a PyTime or datetime object
+	if (PyTime_Check(item)){
+		SYSTEMTIME st;
+		if (!((PyTime *)item)->GetTime(&st))
+			return 0;
+		dt->year = st.wYear;
+		dt->month = st.wMonth;
+		dt->day = st.wDay;
+		dt->hour = st.wHour;
+		dt->minute = st.wMinute;
+		dt->second = st.wSecond;
+		dt->fraction = st.wMilliseconds;
+		// ??? Not sure what units fraction is in ???
+		}
+	else{
+		// Python 2.3 doesn't have C Api for datetime
+		PyObject *timeseq = PyObject_CallMethod(item, "timetuple", NULL);
+		if (timeseq==NULL)
+			return 0;
+		PyObject *timetuple=PySequence_Tuple(timeseq);
+		if (timetuple==NULL){
+			Py_DECREF(timeseq);
+			return 0;
+			}
+		// Last 3 items are ignored.  Need to figure out how to get fractional seconds also.
+		PyObject *obwday, *obyday, *obdst;
+		if (!PyArg_ParseTuple(timetuple, "hhh|hhhOOO:TIMESTAMP_STRUCT",
+			&dt->year, &dt->month, &dt->day,
+			&dt->hour, &dt->minute, &dt->second,
+			&obwday, &obyday, &obdst)){
+			Py_DECREF(timeseq);
+			Py_DECREF(timetuple);
+			return 0;
+			}
+		Py_DECREF(timeseq);
+		Py_DECREF(timetuple);
+		}
 
 	if (unsuccessful(SQLBindParameter(
 		cur->hstmt,
@@ -964,14 +987,14 @@ static int ibindString(cursorObject *cur, int column, PyObject *item)
 static int ibindUnicode(cursorObject *cur, int column, PyObject *item)
 {
   const WCHAR *wval = (WCHAR *)PyUnicode_AsUnicode(item);
-  Py_ssize_t nchars = PyUnicode_GetSize(item);
+  Py_ssize_t nchars = PyUnicode_GetSize(item) + 1;
   Py_ssize_t nbytes = nchars * sizeof(WCHAR);
 
   InputBinding *ib = initInputBinding(cur, nbytes);
   if (!ib)
       return 0;
 
-  wcscpy((WCHAR *)ib->bind_area, wval);
+  wcsncpy((WCHAR *)ib->bind_area, wval, nchars);
   /* See above re SQL_VARCHAR */
   int sqlType = SQL_WVARCHAR;
   if (nbytes > 255)
@@ -1044,10 +1067,6 @@ static int bindInput
 		if (dbiIsRaw(item))
 		{
 			rv = ibindRaw(cur, iCol, dbiValue(item));
-		} 
-		else if (dbiIsDate(item))
-		{
-			rv = ibindDate(cur, iCol, dbiValue(item));
 		}
 		else if (PyLong_Check(item))
 		{
@@ -1072,6 +1091,10 @@ static int bindInput
 		else if (PyFloat_Check(item))
 		{
 			rv = ibindFloat(cur, iCol, item);
+		}
+		else if (PyTime_Check(item) || PyObject_HasAttrString(item, "timetuple"))
+		{
+			rv = ibindDate(cur, iCol, item);
 		}
 		else
 		{
@@ -1240,8 +1263,8 @@ static int bindOutput(cursorObject *cur)
 			return 0;
 		}
 		new_tuple = Py_BuildValue(
-			"(sOiiiii)",
-			name, typeOf, dsize,
+			"(NOiiiii)",
+			PyWinObject_FromTCHAR(name), typeOf, dsize,
 			(int)vsize, prec, scale, nullok);
 
 		if (!new_tuple)
@@ -1933,6 +1956,15 @@ PyObject *PyInit_odbc(void)
 	if (!dict)
 		RETURN_ERROR;
 	if (!PyImport_ImportModule("dbi"))
+		RETURN_ERROR;
+
+	// Sql dates are now returned as python's datetime object.
+	//	C Api for datetime didn't exist in 2.3, stick to dynamic semantics for now.
+	datetime_module=PyImport_ImportModule("datetime");
+	if (datetime_module == NULL)
+		RETURN_ERROR;
+	datetime_class = PyObject_GetAttrString(datetime_module, "datetime");
+	if (datetime_class == NULL)
 		RETURN_ERROR;
 
     if (unsuccessful(SQLAllocEnv(&Env)))
