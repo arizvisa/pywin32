@@ -599,10 +599,16 @@ static void bindOutputVar
 	}
 }
 
+static PyObject *wcharCopy(const void *v, int sz)
+{
+	return PyWinObject_FromWCHAR((WCHAR *)v, sz/sizeof(WCHAR));
+}
+
 static PyObject *stringCopy(const void *v, int sz)
 {
-	return Py_BuildValue("s", v);
+	return PyString_FromStringAndSize((char *)v, sz);
 }
+
 static PyObject *longCopy(const void *v, int sz)
 {
 	return PyInt_FromLong(*(unsigned long *)v);
@@ -1274,8 +1280,11 @@ static int bindOutput(cursorObject *cur)
 				false);
 			typeOf = DbiRaw;
 			break;
+		case SQL_VARCHAR:
+		case SQL_WVARCHAR:
 		case SQL_LONGVARCHAR:
-			bindOutputVar(cur, stringCopy, SQL_C_CHAR, cur->max_width, pos, true);
+		case SQL_WLONGVARCHAR:
+			bindOutputVar(cur, wcharCopy, SQL_C_WCHAR, cur->max_width, pos, true);
 			typeOf = DbiString;
 			break;
 		default:
