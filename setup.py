@@ -1276,9 +1276,8 @@ win32_extensions.append(
     )
 
 for info in (
-        ("dbi", "", True),
         ("mmapfile", "", True),
-        ("odbc", "odbc32 odbccp32 dbi", True),
+        ("odbc", "odbc32 odbccp32", True),
         ("perfmon", "", True),
         ("timer", "user32", True),
         ("win2kras", "rasapi32", True, 0x0500),
