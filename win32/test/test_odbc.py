@@ -3,7 +3,6 @@ import sys
 import os
 import unittest
 import odbc
-import dbi
 import tempfile
 
 # We use the DAO ODBC driver
@@ -32,7 +31,7 @@ class TestStuff(unittest.TestCase):
                 except pythoncom.com_error:
                     pass
             else:
-                raise RuntimeError, "Can't find a DB engine"
+                raise RuntimeError("Can't find a DB engine")
     
             workspace = dbe.Workspaces(0)
     
@@ -49,23 +48,26 @@ class TestStuff(unittest.TestCase):
         self.cur = self.conn.cursor()
         try:
             self.cur.execute("""drop table pywin32test_users""")
-        except (odbc.error, dbi.progError):
+        except (odbc.error, odbc.progError):
             pass
         
         self.assertEqual(self.cur.execute(
             """create table pywin32test_users (
-                    userid varchar(5),  username varchar(25),
-                    bitfield bit,       intfield integer,
+                    userid varchar(25),
+                    username varchar(25),
+                    bitfield bit,
+                    intfield integer,
                     floatfield float,
                     datefield date,
-                )"""),-1)
+                    rawfield varbinary(100)
+            )"""),-1)
 
     def tearDown(self):
         if self.cur is not None:
             try:
                 self.cur.execute("""drop table pywin32test_users""")
-            except (odbc.error, dbi.progError), why:
-                print "Failed to delete test table:", why
+            except (odbc.error, odbc.progError) as why:
+                print ("Failed to delete test table:", why)
 
             self.cur.close()
             self.cur = None
@@ -88,10 +90,10 @@ class TestStuff(unittest.TestCase):
         # (but for now ignore a warning about the value being truncated)
         try:
             self.test_insert_select(userid='Frank' * 200, username='Frank Millman' * 200)
-        except dbi.noError:
+        except odbc.noError:
             pass
 
-    def test_insert_select_unicode(self, userid=u'Frank', username=u"Frank Millman"):
+    def test_insert_select_unicode(self, userid='Frank', username="Frank Millman"):
         self.assertEqual(self.cur.execute("insert into pywin32test_users (userid, username)\
             values (?,?)", [userid, username]),1)
         self.assertEqual(self.cur.execute("select * from pywin32test_users \
@@ -100,8 +102,8 @@ class TestStuff(unittest.TestCase):
             where username = ?", [username.lower()]),0)
 
     def test_insert_select_unicode_ext(self):
-        userid = unicode("t-\xe0\xf2", "mbcs")
-        username = unicode("test-\xe0\xf2 name", "mbcs")
+        userid = str(b"t-\xe0\xf2", "mbcs")
+        username = str(b"test-\xe0\xf2 name", "mbcs")
         self.test_insert_select_unicode(userid, username)
 
     def _test_val(self, fieldName, value):
@@ -123,8 +125,8 @@ class TestStuff(unittest.TestCase):
     def testInt(self):
         self._test_val('intfield', 1)
         self._test_val('intfield', 0)
-        self._test_val('intfield', sys.maxint)
-
+        self._test_val('intfield', sys.maxsize)
+        
     def testFloat(self):
         self._test_val('floatfield', 1.01)
         self._test_val('floatfield', 0)
@@ -132,13 +134,23 @@ class TestStuff(unittest.TestCase):
     def testVarchar(self, ):
         self._test_val('username', 'foo')
 
+    def testRaw(self):
+        ## Test binary data
+        self._test_val('rawfield', memoryview(b'\1\2\3\4\0\5\6\7\8'))
+
+    def test_widechar(self):
+        """Test a unicode character that would be mangled if bound as plain character.
+            For example, previously the below was returned as ascii 'a'
+        """
+        self._test_val('username', '\u0101')
+
     def testDates(self):
         import datetime
         for v in (
             (1800, 12, 25, 23, 59,),
             ):
             d = datetime.datetime(*v)
-            self._test_val('datefield', 'd')
+            self._test_val('datefield', d)
 
     def test_set_nonzero_length(self):
         self.assertEqual(self.cur.execute("insert into pywin32test_users (userid,username) "
@@ -150,13 +162,13 @@ class TestStuff(unittest.TestCase):
 
     def test_set_zero_length(self):
         self.assertEqual(self.cur.execute("insert into pywin32test_users (userid,username) "
-            "values (?,?)",['Frank', '']),1)
+            "values (?,?)",[b'Frank', '']),1)
         self.assertEqual(self.cur.execute("select * from pywin32test_users"),0)
         self.assertEqual(len(self.cur.fetchone()[1]),0)
 
     def test_set_zero_length_unicode(self):
         self.assertEqual(self.cur.execute("insert into pywin32test_users (userid,username) "
-            "values (?,?)",[u'Frank', u'']),1)
+            "values (?,?)",['Frank', '']),1)
         self.assertEqual(self.cur.execute("select * from pywin32test_users"),0)
         self.assertEqual(len(self.cur.fetchone()[1]),0)
 
