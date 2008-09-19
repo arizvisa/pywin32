@@ -2487,9 +2487,6 @@ extern "C" PYW_EXPORT BOOL Win32uiApplicationInit(Win32uiHostGlue *pGlue, TCHAR 
 	if (additionalPaths)
 		Python_addpath(additionalPaths);
 
-	// ??? Site fails to import on Py3k ???
-	if (Python_run_command_with_log("import site"))
-		return FALSE;
 	if (cmd!=NULL) {
 		USES_CONVERSION;
 		if (Python_run_command_with_log(T2A(cmd)))

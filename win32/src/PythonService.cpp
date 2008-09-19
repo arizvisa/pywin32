@@ -1554,7 +1554,6 @@ int _tmain(int argc, TCHAR **argv)
 	FARPROC proc;
 	Py_Initialize();
 	PyEval_InitThreads();
-	module = PyImport_ImportModule("site"); // ??? remove when site bug is fixed ???
 	module = PyImport_ImportModule("servicemanager");
 	if (!module) goto failed;
 	f = PyObject_GetAttrString(module, "__file__");
