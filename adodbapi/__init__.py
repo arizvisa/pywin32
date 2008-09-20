@@ -1,1 +1,1 @@
-from adodbapi import *
+from .adodbapi import *

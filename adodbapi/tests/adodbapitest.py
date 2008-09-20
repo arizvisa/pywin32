@@ -24,12 +24,18 @@
 """
 
 import unittest
-import win32com.client
+
+try:
+    import win32com.client
+    win32 = True
+except ImportError:
+    win32 = False
 
 import adodbapi
+## from adodbapi.tests
 import adodbapitestconfig
 
-#adodbapi.verbose = True
+#adodbapi.adodbapi.verbose = 3
 
 import types
 try:
@@ -47,7 +53,7 @@ class CommonDBTests(unittest.TestCase):
         return self.engine
     
     def getConnection(self):
-        raise "This method must be overriden by a subclass"  
+        raise NotImplementedError("This method must be overriden by a subclass")
 
     def getCursor(self):
         return self.getConnection().cursor()
@@ -123,7 +129,7 @@ class CommonDBTests(unittest.TestCase):
         oldconverter=adodbapi.variantConversions[adodbapi.adoStringTypes]
         try:
             duplicatingConverter=lambda aStringField: aStringField*2
-            assert duplicatingConverter(u'gabba') == u'gabbagabba'
+            assert duplicatingConverter('gabba') == 'gabbagabba'
 
             adodbapi.variantConversions[adodbapi.adoStringTypes]=duplicatingConverter
 
@@ -157,9 +163,7 @@ class CommonDBTests(unittest.TestCase):
             CREATE TABLE tblTemp (
                 fldId integer NOT NULL,
                 fldData """ + sqlDataTypeString + ")\n"
-            ##    """  NULL
-            ##)
-            ##"""
+
         crsr.execute(tabdef)
         
         #Test Null values mapped to None
@@ -175,17 +179,17 @@ class CommonDBTests(unittest.TestCase):
         assert descTuple[0] == 'fldData'
 
         if DBAPIDataTypeString=='STRING':
-            assert descTuple[1] == adodbapi.STRING
+            assert descTuple[1] == adodbapi.STRING, 'was "%s"'%descTuple[1]
         elif DBAPIDataTypeString == 'NUMBER':
-            assert descTuple[1] == adodbapi.NUMBER
+            assert descTuple[1] == adodbapi.NUMBER, 'was "%s"'%descTuple[1]
         elif DBAPIDataTypeString == 'BINARY':
-            assert descTuple[1] == adodbapi.BINARY
+            assert descTuple[1] == adodbapi.BINARY, 'was "%s"'%descTuple[1]
         elif DBAPIDataTypeString == 'DATETIME':
-            assert descTuple[1] == adodbapi.DATETIME
+            assert descTuple[1] == adodbapi.DATETIME, 'was "%s"'%descTuple[1]
         elif DBAPIDataTypeString == 'ROWID':
-            assert descTuple[1] == adodbapi.ROWID
+            assert descTuple[1] == adodbapi.ROWID, 'was "%s"'%descTuple[1]
         else:
-            raise "DBAPIDataTypeString not provided"
+            raise NotImplementedError("DBAPIDataTypeString not provided")
 
         #Test data binding
         inputs=[pyData]
@@ -199,13 +203,16 @@ class CommonDBTests(unittest.TestCase):
                 crsr.execute("INSERT INTO tblTemp (fldId,fldData) VALUES (?,?)", (fldId,pyData))
             except:
                 conn.printADOerrors()
-
+                raise
             crsr.execute("SELECT fldData FROM tblTemp WHERE ?=fldID", [fldId])
             rs=crsr.fetchone()
             if allowedReturnValues:
-                self.assertEquals(type(rs[0]),type(allowedReturnValues[0]) )
+                allowedTypes = tuple([type(aRV) for aRV in allowedReturnValues])
+                assert isinstance(rs[0],allowedTypes), \
+                       'result type "%s" must be one of %s'%(type(rs[0]),allowedTypes)
             else:
-                self.assertEquals( type(rs[0]) ,type(pyData))
+                assert isinstance(rs[0] ,type(pyData)), \
+                       'result type "%s" must be instance of %s'%(type(rs[0]),type(pyData))
 
             if compareAlmostEqual and DBAPIDataTypeString == 'DATETIME':
                 iso1=adodbapi.dateconverter.DateObjectToIsoFormatString(rs[0])
@@ -223,36 +230,36 @@ class CommonDBTests(unittest.TestCase):
                     assert ok
                 else:                
                     self.assertEquals(rs[0] , pyData)
-
         self.helpRollbackTblTemp()
           
     def testDataTypeFloat(self):       
         self.helpTestDataType("real",'NUMBER',3.45,compareAlmostEqual=1)
         self.helpTestDataType("float",'NUMBER',1.79e37,compareAlmostEqual=1)
 
-        #v2.1 Cole -- use decimal for money
+    def testDataTypeMoney(self):    #v2.1 Cole -- use decimal for money
         if self.getEngine() != 'MySQL':
             self.helpTestDataType("smallmoney",'NUMBER',decimal.Decimal('214748.02'))        
             self.helpTestDataType("money",'NUMBER',decimal.Decimal('-922337203685477.5808'))
         
-    def testDataTypeInt(self):              
+    def testDataTypeInt(self):
         self.helpTestDataType("tinyint",'NUMBER',115)
         self.helpTestDataType("smallint",'NUMBER',-32768)
-        self.helpTestDataType("int",'NUMBER',2147483647)
+        self.helpTestDataType("int",'NUMBER',2147483647,
+                              pyDataInputAlternatives='2137483647')
         if self.getEngine() != 'ACCESS':
             self.helpTestDataType("bit",'NUMBER',1) #Does not work correctly with access        
-            self.helpTestDataType("bigint",'NUMBER',3000000000L) 
+            self.helpTestDataType("bigint",'NUMBER',3000000000) 
 
     def testDataTypeChar(self):
         for sqlDataType in ("char(6)","nchar(6)"):
-            self.helpTestDataType(sqlDataType,'STRING',u'spam  ',allowedReturnValues=[u'spam','spam',u'spam  ','spam  '])
+            self.helpTestDataType(sqlDataType,'STRING','spam  ',allowedReturnValues=['spam','spam','spam  ','spam  '])
 
     def testDataTypeVarChar(self):
         stringKinds = ["varchar(10)","nvarchar(10)","text","ntext"]
         if self.getEngine() == 'MySQL':
             stringKinds = ["varchar(10)","text"]
         for sqlDataType in stringKinds:
-            self.helpTestDataType(sqlDataType,'STRING',u'spam',['spam'])
+            self.helpTestDataType(sqlDataType,'STRING','spam',['spam'])
             
     def testDataTypeDate(self):
         #Does not work with pytonTimeConvertor        
@@ -261,15 +268,16 @@ class CommonDBTests(unittest.TestCase):
         self.helpTestDataType("datetime",'DATETIME',adodbapi.Date(2002,10,28),compareAlmostEqual=True)
         if self.getEngine() != 'MySQL':
             self.helpTestDataType("smalldatetime",'DATETIME',adodbapi.Date(2002,10,28),compareAlmostEqual=True)
-        self.helpTestDataType("datetime",'DATETIME',adodbapi.Timestamp(2002,10,28,12,15,01),compareAlmostEqual=True)
+        self.helpTestDataType("datetime",'DATETIME',adodbapi.Timestamp(2002,10,28,12,15,1),compareAlmostEqual=True)
 
     def testDataTypeBinary(self):
         if self.getEngine() == 'MySQL':
             pass #self.helpTestDataType("BLOB",'BINARY',adodbapi.Binary('\x00\x01\xE2\x40'))
         else:
-            self.helpTestDataType("binary(4)",'BINARY',adodbapi.Binary('\x00\x01\xE2\x40'))
-            self.helpTestDataType("varbinary(100)",'BINARY',adodbapi.Binary('\x00\x01\xE2\x40'))
-            self.helpTestDataType("image",'BINARY',adodbapi.Binary('\x00\x01\xE2\x40'))
+            ## Py3k no longer has the buffer interface for unicode objects
+            self.helpTestDataType("binary(4)",'BINARY',adodbapi.Binary(b'\x00\x01\xE2\x40'))
+            self.helpTestDataType("varbinary(100)",'BINARY',adodbapi.Binary(b'\x00\x01\xE2\x40'))
+            self.helpTestDataType("image",'BINARY',adodbapi.Binary(b'\x00\x01\xE2\x40'))
 
     def helpRollbackTblTemp(self):
         try:
@@ -312,7 +320,7 @@ class CommonDBTests(unittest.TestCase):
         values = [ (111,) , (222,) ]
         crsr.executemany("INSERT INTO tblTemp (fldData) VALUES (?)",values)
         if crsr.rowcount==-1:
-            print self.getEngine(),"Provider does not support rowcount (on .executemany())"
+            print(self.getEngine(),"Provider does not support rowcount (on .executemany())")
         else:
             self.assertEquals( crsr.rowcount,2)
         crsr.execute("SELECT fldData FROM tblTemp")
@@ -337,7 +345,7 @@ class CommonDBTests(unittest.TestCase):
         self.helpCreateAndPopulateTableTemp(crsr)
         crsr.execute("DELETE FROM tblTemp WHERE fldData >= 5")
         if crsr.rowcount==-1:
-            print self.getEngine(), "Provider does not support rowcount (on DELETE)"
+            print(self.getEngine(), "Provider does not support rowcount (on DELETE)")
         else:
             self.assertEquals( crsr.rowcount,4)
         self.helpRollbackTblTemp()        
@@ -387,34 +395,23 @@ class CommonDBTests(unittest.TestCase):
         conn=self.getConnection()
         crsr=conn.cursor()
         crsr.execute(tabdef)
-        
         for multiplier in (1,decimal.Decimal('2.5'),78,9999,99999,7007):
             crsr.execute("DELETE FROM tblTemp")
             correct = decimal.Decimal('12.50') * multiplier
             crsr.execute("INSERT INTO tblTemp(fldCurr) VALUES (?)",[correct])
-
             sql="SELECT fldCurr FROM tblTemp "
             try:
                 crsr.execute(sql)
             except:
                 conn.printADOerrors()
-                print sql
             fldcurr=crsr.fetchone()[0]
             self.assertEquals( fldcurr,correct)
-
+        
     def testErrorConnect(self):
-        self.assertRaises(adodbapi.DatabaseError,adodbapi.connect,'not a valid connect string')
+         self.assertRaises(adodbapi.DatabaseError,adodbapi.connect,'not a valid connect string')
 
 class TestADOwithSQLServer(CommonDBTests):
     def setUp(self):
-        try:
-            conn=win32com.client.Dispatch("ADODB.Connection")
-        except:
-            self.fail('SetUpError: Is MDAC installed?')
-        try:
-            conn.Open(adodbapitestconfig.connStrSQLServer)
-        except:
-            self.fail('SetUpError: Can not connect to the testdatabase, all other tests will fail...\nAdo error:%s' % conn.Errors(0))
         self.conn=adodbapi.connect(adodbapitestconfig.connStrSQLServer)
         self.engine = 'MSSQL'
 
@@ -433,21 +430,24 @@ class TestADOwithSQLServer(CommonDBTests):
         return self.conn
 
     def testSQLServerDataTypes(self):
-        self.helpTestDataType("decimal(18,2)",'NUMBER',3.45, allowedReturnValues=[u'3.45',u'3,45'])
-        self.helpTestDataType("numeric(18,2)",'NUMBER',3.45, allowedReturnValues=[u'3.45',u'3,45'])
+        self.helpTestDataType("decimal(18,2)",'NUMBER',3.45,
+                              allowedReturnValues=['3.45','3,45',decimal.Decimal('3.45')])
+        self.helpTestDataType("numeric(18,2)",'NUMBER',3.45,
+                              allowedReturnValues=['3.45','3,45',decimal.Decimal('3.45')])
 
     def testUserDefinedConversionForExactNumericTypes(self):
-        # By default decimal and numbers are returned as strings.
-        # (see testSQLServerDataTypes method)
+        # By default decimal and numbers are returned as decimals.
         # Instead, make them return as  floats
-        oldconverter=adodbapi.variantConversions[adodbapi.adoExactNumericTypes]
-        
-        adodbapi.variantConversions[adodbapi.adoExactNumericTypes]=adodbapi.cvtFloat
+        oldconverter=adodbapi.variantConversions[adodbapi.adNumeric]
+        adodbapi.variantConversions[adodbapi.adNumeric]=adodbapi.cvtFloat
         self.helpTestDataType("decimal(18,2)",'NUMBER',3.45,compareAlmostEqual=1)
         self.helpTestDataType("numeric(18,2)",'NUMBER',3.45,compareAlmostEqual=1)        
-     
-        adodbapi.variantConversions[adodbapi.adoExactNumericTypes]=oldconverter #Restore
-        
+        # now strings
+        adodbapi.variantConversions[adodbapi.adNumeric]=adodbapi.cvtString
+        self.helpTestDataType("numeric(18,2)",'NUMBER','3.45')
+        # now the way they were
+        adodbapi.variantConversions[adodbapi.adNumeric]=oldconverter #Restore
+        self.helpTestDataType("numeric(18,2)",'NUMBER',decimal.Decimal('3.45'))
 
     def testVariableReturningStoredProcedure(self):
         crsr=self.conn.cursor()
@@ -479,26 +479,28 @@ class TestADOwithSQLServer(CommonDBTests):
         self.helpCreateAndPopulateTableTemp(crsr)
         
         spdef= """
-            CREATE PROCEDURE sp_DeleteMeOnlyForTesting
+            CREATE PROCEDURE sp_DeleteMe_OnlyForTesting
             AS
                 SELECT fldData FROM tblTemp ORDER BY fldData ASC
+                SELECT fldData From tblTemp where fldData = -9999
                 SELECT fldData FROM tblTemp ORDER BY fldData DESC
                     """
         try:
-            crsr.execute("DROP PROCEDURE sp_DeleteMeOnlyForTesting")
+            crsr.execute("DROP PROCEDURE sp_DeleteMe_OnlyForTesting")
             self.conn.commit()
         except: #Make sure it is empty
             pass
         crsr.execute(spdef)
 
-        retvalues=crsr.callproc('sp_DeleteMeOnlyForTesting')
+        retvalues=crsr.callproc('sp_DeleteMe_OnlyForTesting')
         row=crsr.fetchone()
         self.assertEquals(row[0], 0) 
-        assert crsr.nextset()
+        assert crsr.nextset() == True, 'Operation should succede'
+        assert not crsr.fetchall(), 'Should be an empty second set'
+        assert crsr.nextset() == True, 'third set should be present'
         rowdesc=crsr.fetchall()
         self.assertEquals(rowdesc[0][0],8) 
-        s=crsr.nextset()
-        assert s== None,'No more return sets, should return None'
+        assert crsr.nextset() == None,'No more return sets, should return None'
 
         self.helpRollbackTblTemp()
 
@@ -524,15 +526,7 @@ class TestADOwithSQLServer(CommonDBTests):
  
 class TestADOwithAccessDB(CommonDBTests):
     def setUp(self):
-        try:
-            adoConn=win32com.client.Dispatch("ADODB.Connection")
-        except:
-            self.fail('SetUpError: Is MDAC installed?')
-
-        try:
-            adoConn.Open(adodbapitestconfig.connStrAccess)
-        except:
-            self.fail('SetUpError: Can not connect to the testdatabase, all other tests will fail...\nAdo error:%s' % adoConn.Errors(0))
+        self.conn = adodbapi.connect(adodbapitestconfig.connStrAccess)
         self.engine = 'ACCESS'
 
     def tearDown(self):
@@ -545,28 +539,33 @@ class TestADOwithAccessDB(CommonDBTests):
         except:
             pass
         self.conn=None
- 
+            
     def getConnection(self):
-        return adodbapi.connect(adodbapitestconfig.connStrAccess)
+        return self.conn
 
     def testOkConnect(self):
         c=adodbapi.connect(adodbapitestconfig.connStrAccess)
         assert c != None
+        c.close()
         
 class TestADOwithMySql(CommonDBTests):
     def setUp(self):
-        try:
-            adoConn=win32com.client.Dispatch("ADODB.Connection")
-        except:
-            self.fail('SetUpError: Is MDAC installed?')
-        try:
-            adoConn.Open(adodbapitestconfig.connStrMySql)
-        except:
-            self.fail('SetUpError: Can not connect to the testdatabase, all other tests will fail...\nAdo error:%s' % adoConn.Errors(0))
+        self.conn = adodbapi.connect(adodbapitestconfig.connStrMySql)
         self.engine = 'MySQL'
 
+    def tearDown(self):
+        try:
+            self.conn.rollback()
+        except:
+            pass
+        try:
+            self.conn.close()
+        except:
+            pass
+        self.conn=None
+
     def getConnection(self):
-        return adodbapi.connect(adodbapitestconfig.connStrMySql)
+        return self.conn
 
     def testOkConnect(self):
         c=adodbapi.connect(adodbapitestconfig.connStrMySql)
@@ -600,7 +599,7 @@ class TimeConverterInterfaceTest(unittest.TestCase):
         correct=34653.5
         self.assertEquals( comDate ,correct)
         
-        d=self.tc.Timestamp(2003,05,06,14,15,17)
+        d=self.tc.Timestamp(2003,5,6,14,15,17)
         comDate=self.tc.COMDate(d)
         correct=37747.593946759262
         self.assertEquals( comDate ,correct)
@@ -621,14 +620,14 @@ class TestMXDateTimeConverter(TimeConverterInterfaceTest):
         self.tc=adodbapi.mxDateTimeConverter()
   
     def testCOMDate(self):       
-        t=mx.DateTime.DateTime(2002,06,28,18,15,02)       
+        t=mx.DateTime.DateTime(2002,6,28,18,15,2)       
         cmd=self.tc.COMDate(t)       
         assert cmd == t.COMDate()
     
     def testDateObjectFromCOMDate(self):
         cmd=self.tc.DateObjectFromCOMDate(37435.7604282)
-        t=mx.DateTime.DateTime(2002,06,28,18,15,00)
-        t2=mx.DateTime.DateTime(2002,06,28,18,15,02)
+        t=mx.DateTime.DateTime(2002,6,28,18,15,00)
+        t2=mx.DateTime.DateTime(2002,6,28,18,15,2)
         assert t2>cmd>t
     
     def testDate(self):
@@ -638,8 +637,8 @@ class TestMXDateTimeConverter(TimeConverterInterfaceTest):
         assert mx.DateTime.Time(13,11,4)==self.tc.Time(13,11,4)
 
     def testTimestamp(self):
-        t=mx.DateTime.DateTime(2002,6,28,18,15,01)   
-        obj=self.tc.Timestamp(2002,6,28,18,15,01)
+        t=mx.DateTime.DateTime(2002,6,28,18,15,1)   
+        obj=self.tc.Timestamp(2002,6,28,18,15,1)
         assert t == obj
 
 import time
@@ -648,21 +647,21 @@ class TestPythonTimeConverter(TimeConverterInterfaceTest):
         self.tc=adodbapi.pythonTimeConverter()
     
     def testCOMDate(self):
-        t=time.localtime(time.mktime((2002,6,28,18,15,01, 4,31+28+31+30+31+28,-1)))
+        mk = time.mktime((2002,6,28,18,15,1, 4,31+28+31+30+31+28,-1))
+        t=time.localtime(mk)
         # Fri, 28 Jun 2002 18:15:01 +0000
         cmd=self.tc.COMDate(t)
-        assert abs(cmd - 37435.7604282) < 1.0/24,"more than an hour wrong"
+        assert abs(cmd - 37435.7604282) < 1.0/24,"%f more than an hour wrong" % cmd
 
-    
     def testDateObjectFromCOMDate(self):
         cmd=self.tc.DateObjectFromCOMDate(37435.7604282)
-        t1=time.localtime(time.mktime((2002,6,28,18,14,01, 4,31+28+31+30+31+28,-1)))
-        t2=time.localtime(time.mktime((2002,6,28,18,16,01, 4,31+28+31+30+31+28,-1)))
-        assert t1<cmd<t2,cmd
+        t1=time.gmtime(time.mktime((2002,6,28,12,14,1, 4,31+28+31+30+31+28,-1)))
+        t2=time.gmtime(time.mktime((2002,6,28,12,16,1, 4,31+28+31+30+31+28,-1)))
+        assert t1<cmd<t2,repr(cmd)+' should be about 2002-6-28 12:15:01'
     
     def testDate(self):
-        t1=time.mktime((2002,6,28,18,15,01, 4,31+28+31+30+31+30,0))
-        t2=time.mktime((2002,6,30,18,15,01, 4,31+28+31+30+31+28,0))
+        t1=time.mktime((2002,6,28,18,15,1, 4,31+28+31+30+31+30,0))
+        t2=time.mktime((2002,6,30,18,15,1, 4,31+28+31+30+31+28,0))
         obj=self.tc.Date(2002,6,29)
         assert t1< time.mktime(obj)<t2,obj
 
@@ -670,9 +669,9 @@ class TestPythonTimeConverter(TimeConverterInterfaceTest):
         self.assertEquals( self.tc.Time(18,15,2),time.gmtime(18*60*60+15*60+2))
 
     def testTimestamp(self):
-        t1=time.localtime(time.mktime((2002,6,28,18,14,01, 4,31+28+31+30+31+28,-1)))
-        t2=time.localtime(time.mktime((2002,6,28,18,16,01, 4,31+28+31+30+31+28,-1)))
-        obj=self.tc.Timestamp(2002,6,28,18,15,02)
+        t1=time.localtime(time.mktime((2002,6,28,18,14,1, 4,31+28+31+30+31+28,-1)))
+        t2=time.localtime(time.mktime((2002,6,28,18,16,1, 4,31+28+31+30+31+28,-1)))
+        obj=self.tc.Timestamp(2002,6,28,18,15,2)
         assert t1< obj <t2,obj
 
 if adodbapitestconfig.doDateTimeTest:
@@ -682,16 +681,15 @@ class TestPythonDateTimeConverter(TimeConverterInterfaceTest):
         self.tc=adodbapi.pythonDateTimeConverter()
     
     def testCOMDate(self):
-        t=datetime.datetime( 2002,6,28,18,15,01)
+        t=datetime.datetime( 2002,6,28,18,15,1)
         # Fri, 28 Jun 2002 18:15:01 +0000
         cmd=self.tc.COMDate(t)
         assert abs(cmd - 37435.7604282) < 1.0/24,"more than an hour wrong"
-
-    
+        
     def testDateObjectFromCOMDate(self):
         cmd=self.tc.DateObjectFromCOMDate(37435.7604282)
-        t1=datetime.datetime(2002,6,28,18,14,01)
-        t2=datetime.datetime(2002,6,28,18,16,01)
+        t1=datetime.datetime(2002,6,28,18,14,1)
+        t2=datetime.datetime(2002,6,28,18,16,1)
         assert t1<cmd<t2,cmd
     
     def testDate(self):
@@ -704,9 +702,9 @@ class TestPythonDateTimeConverter(TimeConverterInterfaceTest):
         self.assertEquals( self.tc.Time(18,15,2).isoformat()[:8],'18:15:02')
 
     def testTimestamp(self):
-        t1=datetime.datetime(2002,6,28,18,14,01)
-        t2=datetime.datetime(2002,6,28,18,16,01)
-        obj=self.tc.Timestamp(2002,6,28,18,15,02)
+        t1=datetime.datetime(2002,6,28,18,14,1)
+        t2=datetime.datetime(2002,6,28,18,16,1)
+        obj=self.tc.Timestamp(2002,6,28,18,15,2)
         assert t1< obj <t2,obj
 
         
@@ -727,12 +725,12 @@ if adodbapitestconfig.doMySqlTest:
 suite=unittest.TestSuite(suites)
 if __name__ == '__main__':       
     defaultDateConverter=adodbapi.dateconverter
-    print __doc__
+    print(__doc__)
     try:
-        print adodbapi.version # show version
+        print(adodbapi.version) # show version
     except:
-        print '"adodbapi.version()" not present or not working.'
-    print "Default Date Converter is %s" %(defaultDateConverter,)
+        print('"adodbapi.version()" not present or not working.')
+    print("Default Date Converter is %s" %(defaultDateConverter,))
     unittest.TextTestRunner().run(suite)
     if adodbapitestconfig.iterateOverTimeTests:
         for test,dateconverter in (
@@ -742,7 +740,7 @@ if __name__ == '__main__':
                                     ):
             if test and not isinstance(defaultDateConverter,dateconverter):
                 adodbapi.dateconverter=dateconverter()
-                print "Changed dateconverter to "
-                print adodbapi.dateconverter
+                print("Changed dateconverter to ")
+                print(adodbapi.dateconverter)
                 unittest.TextTestRunner().run(suite)
                 

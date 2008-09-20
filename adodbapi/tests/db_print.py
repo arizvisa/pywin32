@@ -62,26 +62,26 @@ c = con.cursor()
 
 #run an SQL statement on the cursor
 sql = 'select * from %s' % _table_name
-print 'Executing the command: "%s"' % sql
+print('Executing the command: "%s"' % sql)
 c.execute(sql)
 
 #check the results
-print 'result rowcount shows as= %d. (Note: -1 means "not known")' \
-      % (c.rowcount,)
-print
-print 'result data description is:'
-print '            NAME TypeCd DispSize IntrnlSz Prec Scale Null?'
+print('result rowcount shows as= %d. (Note: -1 means "not known")' \
+      % (c.rowcount,))
+print()
+print('result data description is:')
+print('            NAME TypeCd DispSize IntrnlSz Prec Scale Null?')
 for d in c.description:
-    print ('%16s %6d %8d %8d %4d %5d %5d') % d
-print
-print 'result first ten records are:' 
+    print(('%16s %6d %8d %8d %4d %5d %5d') % d)
+print()
+print('result first ten records are:') 
 
 #get the results
 db = c.fetchmany(10)
 
 #print them
 for rec in db:
-    print repr(rec)
+    print(repr(rec))
 
 c.close()
 con.close()
