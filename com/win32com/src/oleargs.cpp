@@ -15,6 +15,13 @@ extern BOOL PyRecord_Check(PyObject *ob);
 // new array (old behaviour)
 #define BYREF_ARRAY_USE_EXISTING_ARRAY
 
+// Need to put this in pywintypes.h with rest of compatibility macros
+#if (PY_VERSION_HEX < 0x03000000)
+#define PYWIN_BUFFER_CHECK PyBuffer_Check
+#else
+#define PYWIN_BUFFER_CHECK PyObject_CheckBuffer
+#endif
+
 // A little helper just for this file
 static PyObject* OleSetTypeError(TCHAR *msg)
 {
@@ -151,9 +158,7 @@ BOOL PyCom_VariantFromPyObject(PyObject *obj, VARIANT *var)
 		V_VT(var) = VT_DATE;
 		PyWinObject_AsDATE(obj, &(V_DATE(var)));
 	}
-	// PyBuffer_Check has gone away in py3k
-	// else if (PyBuffer_Check(obj)) {
-	else if (obj->ob_type->tp_as_buffer) {
+	else if (PYWIN_BUFFER_CHECK(obj)) {
 		// We have a buffer object - convert to safe array of VT_UI1
 		if (!PyCom_SAFEARRAYFromPyObject(obj, &V_ARRAY(var), VT_UI1))
 			return FALSE;
@@ -375,7 +380,7 @@ PyObject *PyCom_PyObjectFromVariant(const VARIANT *var)
 static BOOL PyCom_SAFEARRAYFromPyObjectBuildDimension(PyObject *obj, SAFEARRAY *pSA, VARENUM vt, UINT dimNo, UINT nDims, SAFEARRAYBOUND *pBounds, LONG *pIndices)
 {
 	LONG numElements = pBounds[dimNo-1].cElements;
-	if ((LONG)PySequence_Length(obj)!=numElements) {
+	if ((LONG)PyObject_Length(obj)!=numElements) {
 		OleSetTypeError(_T("All dimensions must be a sequence of the same size"));
 		return FALSE;
 	}
@@ -465,94 +470,94 @@ static BOOL PyCom_SAFEARRAYFromPyObjectBuildDimension(PyObject *obj, SAFEARRAY *
 // Arbitrary-sized array dimensions contributed by Stefan Schukat Feb-2004
 static long PyCom_CalculatePyObjectDimension(PyObject *obItemCheck, long lDimension, PyObject* ppyobDimensionDictionary)
 {
-	long      lReturnDimension  = lDimension;
-	// Allow arbitrary sequences, but not strings or Unicode objects.
-	if(obItemCheck && 
-		PySequence_Check(obItemCheck) && 
-		!PyString_Check(obItemCheck) && 
-		!PyUnicode_Check(obItemCheck)) 
-	{
-		PyObject* ppyobDimension;
-		PyObject* ppyobSize;
-		PyObject* ppyobDimensionSize;
-		PyObject* ppyobItem;
-		Py_ssize_t lIndex;
-		long      lMinimalDimension = -1;
-		long      lActualDimension  = -1;
-		Py_ssize_t lObjectSize;
+	// Buffers are a special case - they define 1 new dimension.
+	// Buffers supported sequence semantics in 2.x, but for some reason memoryview objects
+	//	in py3k do not, so check separately
+	if (PYWIN_BUFFER_CHECK(obItemCheck))
+		return lDimension+1;
 
-		if (obItemCheck->ob_type->tp_as_buffer)
-			// buffers are a special case - they define 1 new dimension.
+	// Allow arbitrary sequences, but not strings or Unicode objects.
+	if (PyString_Check(obItemCheck) || PyUnicode_Check(obItemCheck)
+		||!PySequence_Check(obItemCheck)) 
+		return lDimension;
+
+	long      lReturnDimension  = lDimension;
+	PyObject* ppyobDimension;
+	PyObject* ppyobSize;
+	PyObject* ppyobDimensionSize;
+	PyObject* ppyobItem;
+	Py_ssize_t lIndex;
+	long      lMinimalDimension = -1;
+	long      lActualDimension  = -1;
+	Py_ssize_t lObjectSize;
+
+	// Retrieve the size of the object
+	lObjectSize = PySequence_Length(obItemCheck);
+	if (lObjectSize == -1) {
+		/* has a __len__, but it failed.  Treat as not a sequence */
+		assert(PyErr_Occurred()); // can't *really* have -1 elems! */
+		PyErr_Clear();
+	}
+	if (lObjectSize != -1) { // A real sequence of size zero should be OK though.
+		ppyobSize   = PyInt_FromSsize_t(lObjectSize);
+
+		// Retrieve the stored size in this dimension 
+		ppyobDimension = PyInt_FromLong(lDimension);
+		// Note: No ref added by PyDict_GetItem
+		ppyobDimensionSize = PyDict_GetItem(ppyobDimensionDictionary, ppyobDimension);
+		if (NULL == ppyobDimensionSize) {
+			// Not found so first element defines the size in this dimension
+			PyErr_Clear();
+			PyDict_SetItem(ppyobDimensionDictionary, ppyobDimension, ppyobSize);
+		} else {
+			// Check if stored size in this dimension equals the size of the element to check
+			Py_ssize_t lStoredSize = PyInt_AsSsize_t(ppyobDimensionSize);
+			if (lStoredSize != lObjectSize) 
+			{
+				// if not the same size => no new dimension
+				Py_XDECREF(ppyobSize);
+				Py_XDECREF(ppyobDimension);
+				return lReturnDimension;
+			}
+		}
+		Py_XDECREF(ppyobSize);
+		Py_XDECREF(ppyobDimension);
+
+		// A special case for a zero-length sequence - we accept this as
+		// a new dimension, but no children to check.
+		// ie an empty list has 1 dimension.
+		if (lObjectSize==0)
 			return lReturnDimension+1;
 
-		// Retrieve the size of the object
-		lObjectSize = PySequence_Length(obItemCheck);
-		if (lObjectSize == -1) {
-			/* has a __len__, but it failed.  Treat as not a sequence */
-			assert(PyErr_Occurred()); // can't *really* have -1 elems! */
-			PyErr_Clear();
-		}
-		if (lObjectSize != -1) { // A real sequence of size zero should be OK though.
-			ppyobSize   = PyInt_FromSsize_t(lObjectSize);
-
-			// Retrieve the stored size in this dimension 
-			ppyobDimension = PyInt_FromLong(lDimension);
-			// Note: No ref added by PyDict_GetItem
-			ppyobDimensionSize = PyDict_GetItem(ppyobDimensionDictionary, ppyobDimension);
-			if (NULL == ppyobDimensionSize) {
-				// Not found so first element defines the size in this dimension
+		// Now check for all elements in this list for their dimensionality
+		// Their size is compared to the size stored in the dimension dictionary
+		for(lIndex = 0; lIndex < lObjectSize; lIndex++) {
+			ppyobItem = PySequence_GetItem(obItemCheck, lIndex);
+			if (ppyobItem == NULL) {
+				// Says it is a sequence, but getting the item failed.
+				// (eg, may be a COM instance that has __getitem__, but fails when attempting)
+				// Ignore the error, and pretend it is not a sequence.
 				PyErr_Clear();
-				PyDict_SetItem(ppyobDimensionDictionary, ppyobDimension, ppyobSize);
+				break;
+			}
+			// Call method recursively
+			lActualDimension = PyCom_CalculatePyObjectDimension(ppyobItem, lDimension + 1, ppyobDimensionDictionary);
+			if (-1 == lMinimalDimension) {
+				// First call so store it
+				lMinimalDimension = lActualDimension;
+				lReturnDimension  = lActualDimension;
 			} else {
-				// Check if stored size in this dimension equals the size of the element to check
-				Py_ssize_t lStoredSize = PyInt_AsSsize_t(ppyobDimensionSize);
-				if (lStoredSize != lObjectSize) 
-				{
-					// if not the same size => no new dimension
-					Py_XDECREF(ppyobSize);
-					Py_XDECREF(ppyobDimension);
-					return lReturnDimension;
-				}
-			}
-			Py_XDECREF(ppyobSize);
-			Py_XDECREF(ppyobDimension);
-
-			// A special case for a zero-length sequence - we accept this as
-			// a new dimension, but no children to check.
-			// ie an empty list has 1 dimension.
-			if (lObjectSize==0)
-				return lReturnDimension+1;
-
-			// Now check for all elements in this list for their dimensionality
-			// Their size is compared to the size stored in the dimension dictionary
-			for(lIndex = 0; lIndex < lObjectSize; lIndex++) {
-				ppyobItem = PySequence_GetItem(obItemCheck, lIndex);
-				if (ppyobItem == NULL) {
-					// Says it is a sequence, but getting the item failed.
-					// (eg, may be a COM instance that has __getitem__, but fails when attempting)
-					// Ignore the error, and pretend it is not a sequence.
-					PyErr_Clear();
-					break;
-				}
-				// Call method recursively
-				lActualDimension = PyCom_CalculatePyObjectDimension(ppyobItem, lDimension + 1, ppyobDimensionDictionary);
-				if (-1 == lMinimalDimension) {
-					// First call so store it
+				// Get the smallest dimension
+				if (lActualDimension < lMinimalDimension) {
 					lMinimalDimension = lActualDimension;
-					lReturnDimension  = lActualDimension;
-				} else {
-					// Get the smallest dimension
-					if (lActualDimension < lMinimalDimension) {
-						lMinimalDimension = lActualDimension;
-					}
-					// Check if all dimensions of the sublist are equal
-					if (lReturnDimension != lActualDimension) {
-						// if not set the minimal dimension
-						lReturnDimension = lMinimalDimension;
-					} 
 				}
-				Py_XDECREF(ppyobItem);
+				// Check if all dimensions of the sublist are equal
+				if (lReturnDimension != lActualDimension) {
+					// if not set the minimal dimension
+					lReturnDimension = lMinimalDimension;
+				} 
 			}
+			Py_XDECREF(ppyobItem);
 		}
 	}
 	return lReturnDimension;
@@ -598,7 +603,8 @@ static BOOL PyCom_SAFEARRAYFromPyObjectEx(PyObject *obj, SAFEARRAY **ppSA, bool 
 	Py_INCREF(obItemCheck);
 	for (LONG dimLook = 1;dimLook <= cDims;dimLook++) {
 		pBounds[dimLook-1].lLbound = 0; // always!
-		pBounds[dimLook-1].cElements = PySequence_Length(obItemCheck);
+		// Don't use PySequence_Length due to memoryview not supporting sequence protocol
+		pBounds[dimLook-1].cElements = PyObject_Length(obItemCheck);
 		if (!bAllocNewArray) {
 			LONG exist_lbound, exist_ubound;
 			SafeArrayGetLBound(*ppSA, dimLook, &exist_lbound);
@@ -610,14 +616,17 @@ static BOOL PyCom_SAFEARRAYFromPyObjectEx(PyObject *obj, SAFEARRAY **ppSA, bool 
 				return FALSE;
 			}
 		}
-		PyObject *obSave = obItemCheck;
-		if (pBounds[dimLook-1].cElements) {
-			obItemCheck = PySequence_GetItem(obItemCheck,0);
-			Py_DECREF(obSave);
-			if (obItemCheck==NULL) {
-				Py_XDECREF(obItemCheck);
-				delete [] pBounds;
-				return FALSE;
+		// Don't need to do this check if buffer is last dim
+		if (!PYWIN_BUFFER_CHECK(obItemCheck)){
+			PyObject *obSave = obItemCheck;
+			if (pBounds[dimLook-1].cElements) {
+				obItemCheck = PySequence_GetItem(obItemCheck,0);
+				Py_DECREF(obSave);
+				if (obItemCheck==NULL) {
+					// Py_XDECREF(obItemCheck);
+					delete [] pBounds;
+					return FALSE;
+				}
 			}
 		}
 	}
