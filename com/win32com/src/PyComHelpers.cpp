@@ -43,6 +43,11 @@ PyObject *MakeOLECHARToObj(const OLECHAR * str)
 // Currency conversions.
 PyObject *PyObject_FromCurrency(CURRENCY &cy)
 {
+#if (PY_VERSION_HEX < 0x03000000)
+	static char *divname = "__div__";
+#else
+	static char *divname = "__truediv__";
+#endif
 	static PyObject *decimal_module=NULL;
 	PyObject *result = NULL;
 	
@@ -59,7 +64,7 @@ PyObject *PyObject_FromCurrency(CURRENCY &cy)
 	PyObject *unscaled_result;
 	unscaled_result=PyObject_CallMethod(decimal_module, "Decimal", "L", cy.int64);
 	if (unscaled_result!=NULL){
-		result=PyObject_CallMethod(unscaled_result, "__div__", "l", 10000);
+		result=PyObject_CallMethod(unscaled_result, divname, "l", 10000);
 		Py_DECREF(unscaled_result);
 		}
 	return result;
