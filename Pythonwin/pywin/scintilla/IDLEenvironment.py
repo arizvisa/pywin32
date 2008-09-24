@@ -8,11 +8,13 @@ import win32con
 import sys
 
 from pywin.mfc.dialog import GetSimpleInput
+from pywin import default_scintilla_encoding
 
 wordchars = string.ascii_uppercase + string.ascii_lowercase + string.digits
 
 class TextError(Exception): # When a TclError would normally be raised.
 	pass
+
 
 class EmptyRange(Exception): # Internally raised.
 	pass
@@ -47,8 +49,8 @@ def fast_readline(self):
 	sl = self._scint_lines
 	i = self.i = self.i + 1
 	if i >= len(sl):
-		return ""
-	return sl[i]+"\n"
+		return b""
+	return (sl[i]+"\n").encode(default_scintilla_encoding)
 
 try:
 	GetIDLEModule("AutoIndent").IndentSearcher.readline = fast_readline
@@ -351,14 +353,18 @@ class TkText:
 			raise TextError("Empty range")
 		self.edit.SetSel((pos, pos))
 		self.edit.SCIAddText(text)
+
 		"""
+
 		# IDLE only deals with "\n" - we will be nicer
+
 		bits = text.split('\n')
 		self.edit.SCIAddText(bits[0])
 		for bit in bits[1:]:
 			self.edit.SCINewline()
 			self.edit.SCIAddText(bit)
 		"""
+
 
 	def delete(self, start, end=None):
 		try:

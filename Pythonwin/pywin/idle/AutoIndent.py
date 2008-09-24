@@ -1,5 +1,6 @@
-import string
+import string, tokenize
 from . import PyParse
+from pywin import default_scintilla_encoding
 
 class AutoIndent:
 
@@ -463,10 +464,6 @@ def classifyws(s, tabwidth):
             break
     return raw, effective
 
-import tokenize
-_tokenize = tokenize
-del tokenize
-
 class IndentSearcher:
 
     # .run() chews over the Text widget, looking for a block opener
@@ -486,26 +483,29 @@ class IndentSearcher:
         i = self.i = self.i + 1
         mark = repr(i) + ".0"
         if self.text.compare(mark, ">=", "end"):
-            return ""
-        return self.text.get(mark, mark + " lineend+1c")
+            return b""
+        return self.text.get(mark, mark + " lineend+1c").encode(default_scintilla_encoding)
 
     def run(self):
         OPENERS=('class', 'def', 'for', 'if', 'try', 'while')
-        save_tabsize = _tokenize.tabsize
-        _tokenize.tabsize = self.tabwidth
+        INDENT=tokenize.INDENT
+        NAME=tokenize.NAME
+                   
+        save_tabsize = tokenize.tabsize
+        tokenize.tabsize = self.tabwidth
         try:
             try:
-                for (typ, token, start, end, line) in _tokenize.tokenize(self.readline):
+                for (typ, token, start, end, line) in tokenize.tokenize(self.readline):
                     if typ == NAME and token in OPENERS:
                         self.blkopenline = line
                     elif type == INDENT and self.blkopenline:
                         self.indentedline = line
                         break
 
-            except (_tokenize.TokenError, IndentationError):
+            except (tokenize.TokenError, IndentationError):
                 # since we cut off the tokenizer early, we can trigger
                 # spurious errors
                 pass
         finally:
-            _tokenize.tabsize = save_tabsize
+            tokenize.tabsize = save_tabsize
         return self.blkopenline, self.indentedline
