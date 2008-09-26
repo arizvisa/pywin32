@@ -17,12 +17,6 @@ import win32security, sspicon
 
 error = win32security.error
 
-try:
-    True, False
-except NameError:
-    False = 1==0
-    True = not False
-
 class _BaseAuth(object):
     def __init__(self):
         self.reset()
@@ -223,9 +217,9 @@ if __name__=='__main__':
         err, sec_buffer = sspiserver.authorize(sec_buffer)
         if err==0:
             break
-    sig = sspiclient.sign("hello")
-    sspiserver.verify("hello", sig)
+    sig = sspiclient.sign(b"hello")
+    sspiserver.verify(b"hello", sig)
 
-    data, key = sspiclient.encrypt("hello")
-    assert sspiserver.decrypt(data, key) == "hello"
+    data, key = sspiclient.encrypt(b"hello")
+    assert sspiserver.decrypt(data, key) == b"hello"
     print("cool!")
