@@ -45,6 +45,7 @@
 #endif
 
 #define NEED_PYWINOBJECTS_H
+#include "win32file_comm.h"
 %}
 
 %include "typemaps.i"
@@ -2395,22 +2396,6 @@ Error:
 #define FD_ADDRESS_LIST_CHANGE FD_ADDRESS_LIST_CHANGE
 
 #endif // MS_WINCE
-
-// The communications related functions.
-// The COMM port enhancements were added by Mark Hammond, and are
-// (c) 2000-2001, ActiveState Tools Corp.
-
-%{
-// The comms port helpers.
-extern PyObject *PyWinObject_FromCOMSTAT(const COMSTAT *pCOMSTAT);
-extern BOOL PyWinObject_AsCOMSTAT(PyObject *ob, COMSTAT **ppCOMSTAT, BOOL bNoneOK = TRUE);
-extern BOOL PyWinObject_AsDCB(PyObject *ob, DCB **ppDCB, BOOL bNoneOK = TRUE);
-extern PyObject *PyWinObject_FromDCB(const DCB *pDCB);
-extern PyObject *PyWinMethod_NewDCB(PyObject *self, PyObject *args);
-extern PyObject *PyWinObject_FromCOMMTIMEOUTS( COMMTIMEOUTS *p);
-extern BOOL PyWinObject_AsCOMMTIMEOUTS( PyObject *ob, COMMTIMEOUTS *p);
-
-%}
 
 %native (DCB) PyWinMethod_NewDCB;
 
@@ -5222,8 +5207,11 @@ PyCFunction pfnpy_GetFullPathName=(PyCFunction)py_GetFullPathName;
 #define RETURN_ERROR return NULL;
 #endif
 
-	if (PyType_Ready(&FindFileIterator_Type) == -1)
+	if (PyType_Ready(&FindFileIterator_Type) == -1
+		||PyType_Ready(&PyDCB::type) == -1
+		||PyType_Ready(&PyCOMSTAT::type) == -1)
 		RETURN_ERROR;
+
 	if (PyDict_SetItemString(d, "error", PyWinExc_ApiError) == -1)
 		RETURN_ERROR;
 	if (PyDict_SetItemString(d, "INVALID_HANDLE_VALUE", PyWinLong_FromHANDLE(INVALID_HANDLE_VALUE)) == -1)

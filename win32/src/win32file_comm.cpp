@@ -8,6 +8,7 @@
 #include "structmember.h"
 #include "PyWinTypes.h"
 #include "PyWinObjects.h"
+#include "win32file_comm.h"
 
 // Small enough we can use a tuple!
 // @object COMMTIMEOUTS|A tuple representing a COMMTIMEOUTS structure.
@@ -18,7 +19,7 @@
 // @tupleitem 4|int|WriteTotalTimeoutConstant| 
 PyObject *PyWinObject_FromCOMMTIMEOUTS( COMMTIMEOUTS *p)
 {
-	return Py_BuildValue("iiiii",
+	return Py_BuildValue("kkkkk",
 		p->ReadIntervalTimeout,
 		p->ReadTotalTimeoutMultiplier,
 		p->ReadTotalTimeoutConstant,
@@ -28,7 +29,7 @@ PyObject *PyWinObject_FromCOMMTIMEOUTS( COMMTIMEOUTS *p)
 
 BOOL PyWinObject_AsCOMMTIMEOUTS( PyObject *ob, COMMTIMEOUTS *p)
 {
-	return PyArg_ParseTuple(ob, "iiiii",
+	return PyArg_ParseTuple(ob, "kkkkk",
 		&p->ReadIntervalTimeout,
 		&p->ReadTotalTimeoutMultiplier,
 		&p->ReadTotalTimeoutConstant,
@@ -37,32 +38,6 @@ BOOL PyWinObject_AsCOMMTIMEOUTS( PyObject *ob, COMMTIMEOUTS *p)
 }
 
 static const char *szNeedIntAttr = "Attribute '%s' must be an integer";
-
-class PyDCB : public PyObject
-{
-public:
-	DCB *GetDCB() {return &m_DCB;}
-
-	PyDCB(void);
-	PyDCB(const DCB &);
-	~PyDCB();
-
-	/* Python support */
-	int compare(PyObject *ob);
-
-	static void deallocFunc(PyObject *ob);
-	static int compareFunc(PyObject *ob1, PyObject *ob2);
-
-	static PyObject *getattro(PyObject *self, PyObject *obname);
-	static int setattro(PyObject *self, PyObject *obname, PyObject *v);
-	static struct PyMemberDef members[];
-	static PyTypeObject type;
-
-protected:
-	DCB m_DCB;
-};
-
-#define PyDCB_Check(x) ((x)->ob_type==&PyDCB::type)
 
 // @pymethod <o PyDCB>|win32file|DCB|Creates a new DCB object
 PyObject *PyWinMethod_NewDCB(PyObject *self, PyObject *args)
@@ -119,8 +94,28 @@ PyTypeObject PyDCB::type =
 	0,						/* tp_call */
 	0,						/* tp_call */
 	0,						/* tp_str */
-	PyDCB::getattro,			/* tp_getattro */
-	PyDCB::setattro,			/* tp_setattro */
+	PyDCB::getattro,		/* tp_getattro */
+	PyDCB::setattro,		/* tp_setattro */
+	0,						/*tp_as_buffer*/
+	Py_TPFLAGS_DEFAULT,		/* tp_flags */
+	"Wraps a DCB struct",	/* tp_doc */
+	0,						/* tp_traverse */
+	0,						/* tp_clear */
+	0,						/* tp_richcompare */
+	0,						/* tp_weaklistoffset */
+	0,						/* tp_iter */
+	0,						/* tp_iternext */
+	0,						/* tp_methods */
+	PyDCB::members,			/* tp_members */
+	0,						/* tp_getset */
+	0,						/* tp_base */
+	0,						/* tp_dict */
+	0,						/* tp_descr_get */
+	0,						/* tp_descr_set */
+	0,						/* tp_dictoffset */
+	0,						/* tp_init */
+	0,						/* tp_alloc */
+	0,						/* tp_new */
 };
 
 
@@ -259,32 +254,6 @@ int PyDCB::setattro(PyObject *self, PyObject *obname, PyObject *v)
 // COMSTAT object.
 //
 ////////////////////////////////////////////////////////////////
-class PyCOMSTAT : public PyObject
-{
-public:
-	COMSTAT *GetCOMSTAT() {return &m_COMSTAT;}
-
-	PyCOMSTAT(void);
-	PyCOMSTAT(const COMSTAT &);
-	~PyCOMSTAT();
-
-	/* Python support */
-	int compare(PyObject *ob);
-
-	static void deallocFunc(PyObject *ob);
-	static int compareFunc(PyObject *ob1, PyObject *ob2);
-
-	static PyObject *getattro(PyObject *self, PyObject *obname);
-	static int setattro(PyObject *self, PyObject *obname, PyObject *v);
-	static struct PyMemberDef members[];
-	static PyTypeObject type;
-
-protected:
-	COMSTAT m_COMSTAT;
-};
-
-#define PyCOMSTAT_Check(x) ((x)->ob_type==&PyCOMSTAT::type)
-
 // @pymethod <o PyCOMSTAT>|win32file|COMSTAT|Creates a new COMSTAT object
 PyObject *PyWinMethod_NewCOMSTAT(PyObject *self, PyObject *args)
 {
@@ -340,6 +309,26 @@ PyTypeObject PyCOMSTAT::type =
 	0,						/* tp_str */
 	PyCOMSTAT::getattro,	/* tp_getattr */
 	PyCOMSTAT::setattro,	/* tp_setattr */
+	0,						/*tp_as_buffer*/
+	Py_TPFLAGS_DEFAULT,		/* tp_flags */
+	"Wraps a COMMSTAT struct",	/* tp_doc */
+	0,						/* tp_traverse */
+	0,						/* tp_clear */
+	0,						/* tp_richcompare */
+	0,						/* tp_weaklistoffset */
+	0,						/* tp_iter */
+	0,						/* tp_iternext */
+	0,						/* tp_methods */
+	PyCOMSTAT::members,		/* tp_members */
+	0,						/* tp_getset */
+	0,						/* tp_base */
+	0,						/* tp_dict */
+	0,						/* tp_descr_get */
+	0,						/* tp_descr_set */
+	0,						/* tp_dictoffset */
+	0,						/* tp_init */
+	0,						/* tp_alloc */
+	0,						/* tp_new */
 };
 
 #undef OFF
