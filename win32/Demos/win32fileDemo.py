@@ -2,7 +2,6 @@
 # demo, so has been moved to the test directory.
 
 # Please contribute your favourite simple little demo.
-import pywintypes ## This can go away when bug fixed
 import win32file, win32api, win32con
 import os
 
