@@ -671,7 +671,7 @@ extern PYWINTYPES_EXPORT void PyWinThreadState_Clear();
 extern PYWINTYPES_EXPORT void PyWinInterpreterLock_Acquire();
 extern PYWINTYPES_EXPORT void PyWinInterpreterLock_Release();
 
-extern PYWINTYPES_EXPORT void PyWinGlobals_Ensure();
+extern PYWINTYPES_EXPORT int PyWinGlobals_Ensure();
 extern PYWINTYPES_EXPORT void PyWinGlobals_Free();
 #else
 #define PyWinThreadState_Ensure PyThreadState_Ensure

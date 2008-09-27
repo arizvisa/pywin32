@@ -835,14 +835,47 @@ static struct PyMethodDef pywintypes_functions[] = {
 	{NULL,			NULL}
 };
 
-void PyWinGlobals_Ensure()
+int PyWinGlobals_Ensure()
 {
 	PyEval_InitThreads();
 	PyWinInterpreterState_Ensure();
 	if (PyWinExc_ApiError==NULL) {
 		PyWinExc_ApiError = PyErr_NewException("pywintypes.error", NULL, NULL);
+		if (PyWinExc_ApiError==NULL)
+			return -1;
+		}
+	if (PyWinExc_COMError == NULL){
 		PyWinExc_COMError = PyErr_NewException("pywintypes.com_error", NULL, NULL);
-	}
+		if (PyWinExc_COMError == NULL)
+			return -1;
+		}
+
+	/* PyType_Ready needs to be called anytime pywintypesxx.dll is loaded, since
+		other extension modules can use types defined here without pywintypes itself
+		having been imported.
+		??? All extension modules that call this need to be changed to check the exit code ???
+	*/
+	if (PyType_Ready(&PyHANDLEType) == -1
+		||PyType_Ready(&PyOVERLAPPEDType) == -1
+		||PyType_Ready(&PyDEVMODEType) == -1
+		||PyType_Ready(&PyDEVMODEWType) == -1
+		||PyType_Ready(&PyWAVEFORMATEXType) == -1
+#ifndef NO_PYWINTYPES_TIME
+		||PyType_Ready(&PyTimeType) == -1
+#endif // NO_PYWINTYPES_TIME
+#ifndef NO_PYWINTYPES_IID
+		||PyType_Ready(&PyIIDType) == -1
+#endif // NO_PYWINTYPES_IID
+#ifndef NO_PYWINTYPES_SECURITY
+		||PyType_Ready(&PySECURITY_DESCRIPTORType) == -1
+		||PyType_Ready(&PySECURITY_ATTRIBUTESType) == -1
+		||PyType_Ready(&PySIDType) == -1
+		||PyType_Ready(&PyACLType) == -1
+#endif
+		)
+		return -1;
+
+	return 0;
 }
 
 void PyWinGlobals_Free()
