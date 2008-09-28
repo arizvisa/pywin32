@@ -56,8 +56,8 @@ typedef PDH_STATUS (WINAPI * FuncPdhEnumObjectItems)(
    );	
 
 typedef PDH_STATUS (WINAPI * FuncPdhOpenQuery)(
-    LPVOID pReserved,	// DataSource
-    DWORD dwUserData,	// a value associated with this query
+    LPCTSTR szDataSource,	// DataSource
+    DWORD_PTR dwUserData,	// a value associated with this query
     HQUERY *phQuery	// pointer to a buffer that will receive the query handle
    ) ;
 
@@ -183,9 +183,13 @@ FuncPdhLookupPerfNameByIndex pPdhLookupPerfNameByIndex = NULL;
 
 static PyObject *win32pdh_counter_error;
 
-// ??? Loads all wide-character versions of the functions.  Should either
-//	have a way to switch between *A and *W functions as win32api does, or
-//	change all TCHAR to explicit WCHAR ???
+// Select whether to load ansi or unicode API functions
+#ifdef UNICODE
+#define A_OR_W "W"
+#else
+#define A_OR_W "A"
+#endif
+
 BOOL LoadPointers()
 {
 	HMODULE handle = LoadLibrary(_T("pdh.dll"));
@@ -193,25 +197,25 @@ BOOL LoadPointers()
 //		PyErr_SetString(PyExc_RuntimeError, "The PDH DLL could not be located");
 		return FALSE;
 	}
-	pPdhEnumObjects = (FuncPdhEnumObjects)GetProcAddress(handle, "PdhEnumObjectsW");
-	pPdhEnumObjectItems = (FuncPdhEnumObjectItems)GetProcAddress(handle, "PdhEnumObjectItemsW");
+	pPdhEnumObjects = (FuncPdhEnumObjects)GetProcAddress(handle, "PdhEnumObjects" A_OR_W);
+	pPdhEnumObjectItems = (FuncPdhEnumObjectItems)GetProcAddress(handle, "PdhEnumObjectItems" A_OR_W);
 	pPdhCloseQuery = (FuncPdhCloseQuery)GetProcAddress(handle, "PdhCloseQuery");
 	pPdhRemoveCounter = (FuncPdhRemoveCounter)GetProcAddress(handle, "PdhRemoveCounter");
-	pPdhOpenQuery = (FuncPdhOpenQuery)GetProcAddress(handle, "PdhOpenQuery");
-	pPdhAddCounter = (FuncPdhAddCounter)GetProcAddress(handle, "PdhAddCounterW");
-	pPdhMakeCounterPath = (FuncPdhMakeCounterPath)GetProcAddress(handle, "PdhMakeCounterPathW");
-	pPdhGetCounterInfo = (FuncPdhGetCounterInfo)GetProcAddress(handle, "PdhGetCounterInfoW");
+	pPdhOpenQuery = (FuncPdhOpenQuery)GetProcAddress(handle, "PdhOpenQuery" A_OR_W);
+	pPdhAddCounter = (FuncPdhAddCounter)GetProcAddress(handle, "PdhAddCounter" A_OR_W);
+	pPdhMakeCounterPath = (FuncPdhMakeCounterPath)GetProcAddress(handle, "PdhMakeCounterPath" A_OR_W);
+	pPdhGetCounterInfo = (FuncPdhGetCounterInfo)GetProcAddress(handle, "PdhGetCounterInfo" A_OR_W);
 	pPdhGetFormattedCounterValue = (FuncPdhGetFormattedCounterValue)GetProcAddress(handle, "PdhGetFormattedCounterValue");
 	pPdhCollectQueryData = (FuncPdhCollectQueryData)GetProcAddress(handle, "PdhCollectQueryData");
-	pPdhValidatePath	= (FuncPdhValidatePath)GetProcAddress(handle, "PdhValidatePathW");
-	pPdhExpandCounterPath	= (FuncPdhExpandCounterPath)GetProcAddress(handle, "PdhExpandCounterPathW");
-	pPdhParseCounterPath = (FuncPdhParseCounterPath)GetProcAddress(handle, "PdhParseCounterPathW");
+	pPdhValidatePath	= (FuncPdhValidatePath)GetProcAddress(handle, "PdhValidatePath" A_OR_W);
+	pPdhExpandCounterPath	= (FuncPdhExpandCounterPath)GetProcAddress(handle, "PdhExpandCounterPath" A_OR_W);
+	pPdhParseCounterPath = (FuncPdhParseCounterPath)GetProcAddress(handle, "PdhParseCounterPath" A_OR_W);
 	pPdhSetCounterScaleFactor = (FuncPdhSetCounterScaleFactor)GetProcAddress(handle, "PdhSetCounterScaleFactor");
-	pPdhParseInstanceName = (FuncPdhParseInstanceName)GetProcAddress(handle, "PdhParseInstanceNameW");
-	pPdhBrowseCounters = (FuncPdhBrowseCounters)GetProcAddress(handle, "PdhBrowseCountersW");
-	pPdhConnectMachine = (FuncPdhConnectMachine)GetProcAddress(handle, "PdhConnectMachineW");
-	pPdhLookupPerfNameByIndex = (FuncPdhLookupPerfNameByIndex)GetProcAddress(handle, "PdhLookupPerfNameByIndexW");
-	pPdhLookupPerfIndexByName = (FuncPdhLookupPerfIndexByName)GetProcAddress(handle, "PdhLookupPerfIndexByNameW");
+	pPdhParseInstanceName = (FuncPdhParseInstanceName)GetProcAddress(handle, "PdhParseInstanceName" A_OR_W);
+	pPdhBrowseCounters = (FuncPdhBrowseCounters)GetProcAddress(handle, "PdhBrowseCounters" A_OR_W);
+	pPdhConnectMachine = (FuncPdhConnectMachine)GetProcAddress(handle, "PdhConnectMachine" A_OR_W);
+	pPdhLookupPerfNameByIndex = (FuncPdhLookupPerfNameByIndex)GetProcAddress(handle, "PdhLookupPerfNameByIndex" A_OR_W);
+	pPdhLookupPerfIndexByName = (FuncPdhLookupPerfIndexByName)GetProcAddress(handle, "PdhLookupPerfIndexByName" A_OR_W);
 
 	// Pdh error codes are in 2 different ranges
 	PyWin_RegisterErrorMessageModule(PDH_CSTATUS_NO_MACHINE, PDH_CANNOT_SET_DEFAULT_REALTIME_DATASOURCE, handle);
@@ -478,23 +482,31 @@ static PyObject *PyRemoveCounter(PyObject *self, PyObject *args)
 // @pymethod int|win32pdh|OpenQuery|Opens a new query
 static PyObject *PyOpenQuery(PyObject *self, PyObject *args)
 {
-	DWORD userData = 0;
-	TCHAR *reserved = NULL;		// DataSource (name of a performance log file)
-	if (!PyArg_ParseTuple(args, "|zi:OpenQuery", 
-	          &reserved, // @pyparm object|reserved|None|Must be None
-	          &userData)) // @pyparm int|userData|0|User data associated with the query.
+	DWORD_PTR userData = 0;
+	TCHAR *DataSource = NULL;
+	PyObject *obDataSource = Py_None, *obuserData = Py_None;
+	if (!PyArg_ParseTuple(args, "|OO:OpenQuery", 
+	          &obDataSource, // @pyparm str|DataSource|None|Name of a performaance log file, or None for live data
+	          &obuserData)) // @pyparm int|userData|0|User data associated with the query.
 		return NULL;
 
 	HQUERY hQuery;
 	CHECK_PDH_PTR(pPdhOpenQuery);
 	PDH_STATUS pdhStatus;
+	if (obuserData != Py_None)
+		if (!PyWinLong_AsDWORD_PTR(obuserData, &userData))
+			return NULL;
+	if (!PyWinObject_AsTCHAR(obDataSource, &DataSource, TRUE))
+		return NULL;
+
 	Py_BEGIN_ALLOW_THREADS
     pdhStatus = (*pPdhOpenQuery) (
-        (void *)reserved,
+        DataSource,
 	    userData,
 	    &hQuery);
 	Py_END_ALLOW_THREADS
 
+	PyWinObject_FreeTCHAR(DataSource);
     if (pdhStatus != ERROR_SUCCESS) 
 		return PyWin_SetAPIError("OpenQuery", pdhStatus);
 	return PyWinLong_FromHANDLE(hQuery);
