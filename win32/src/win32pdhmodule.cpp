@@ -183,6 +183,9 @@ FuncPdhLookupPerfNameByIndex pPdhLookupPerfNameByIndex = NULL;
 
 static PyObject *win32pdh_counter_error;
 
+// ??? Loads all wide-character versions of the functions.  Should either
+//	have a way to switch between *A and *W functions as win32api does, or
+//	change all TCHAR to explicit WCHAR ???
 BOOL LoadPointers()
 {
 	HMODULE handle = LoadLibrary(_T("pdh.dll"));
@@ -190,25 +193,25 @@ BOOL LoadPointers()
 //		PyErr_SetString(PyExc_RuntimeError, "The PDH DLL could not be located");
 		return FALSE;
 	}
-	pPdhEnumObjects = (FuncPdhEnumObjects)GetProcAddress(handle, "PdhEnumObjectsA");
-	pPdhEnumObjectItems = (FuncPdhEnumObjectItems)GetProcAddress(handle, "PdhEnumObjectItemsA");
+	pPdhEnumObjects = (FuncPdhEnumObjects)GetProcAddress(handle, "PdhEnumObjectsW");
+	pPdhEnumObjectItems = (FuncPdhEnumObjectItems)GetProcAddress(handle, "PdhEnumObjectItemsW");
 	pPdhCloseQuery = (FuncPdhCloseQuery)GetProcAddress(handle, "PdhCloseQuery");
 	pPdhRemoveCounter = (FuncPdhRemoveCounter)GetProcAddress(handle, "PdhRemoveCounter");
 	pPdhOpenQuery = (FuncPdhOpenQuery)GetProcAddress(handle, "PdhOpenQuery");
-	pPdhAddCounter = (FuncPdhAddCounter)GetProcAddress(handle, "PdhAddCounterA");
-	pPdhMakeCounterPath = (FuncPdhMakeCounterPath)GetProcAddress(handle, "PdhMakeCounterPathA");
-	pPdhGetCounterInfo = (FuncPdhGetCounterInfo)GetProcAddress(handle, "PdhGetCounterInfoA");
+	pPdhAddCounter = (FuncPdhAddCounter)GetProcAddress(handle, "PdhAddCounterW");
+	pPdhMakeCounterPath = (FuncPdhMakeCounterPath)GetProcAddress(handle, "PdhMakeCounterPathW");
+	pPdhGetCounterInfo = (FuncPdhGetCounterInfo)GetProcAddress(handle, "PdhGetCounterInfoW");
 	pPdhGetFormattedCounterValue = (FuncPdhGetFormattedCounterValue)GetProcAddress(handle, "PdhGetFormattedCounterValue");
 	pPdhCollectQueryData = (FuncPdhCollectQueryData)GetProcAddress(handle, "PdhCollectQueryData");
-	pPdhValidatePath	= (FuncPdhValidatePath)GetProcAddress(handle, "PdhValidatePathA");
-	pPdhExpandCounterPath	= (FuncPdhExpandCounterPath)GetProcAddress(handle, "PdhExpandCounterPathA");
-	pPdhParseCounterPath = (FuncPdhParseCounterPath)GetProcAddress(handle, "PdhParseCounterPathA");
+	pPdhValidatePath	= (FuncPdhValidatePath)GetProcAddress(handle, "PdhValidatePathW");
+	pPdhExpandCounterPath	= (FuncPdhExpandCounterPath)GetProcAddress(handle, "PdhExpandCounterPathW");
+	pPdhParseCounterPath = (FuncPdhParseCounterPath)GetProcAddress(handle, "PdhParseCounterPathW");
 	pPdhSetCounterScaleFactor = (FuncPdhSetCounterScaleFactor)GetProcAddress(handle, "PdhSetCounterScaleFactor");
-	pPdhParseInstanceName = (FuncPdhParseInstanceName)GetProcAddress(handle, "PdhParseInstanceNameA");
-	pPdhBrowseCounters = (FuncPdhBrowseCounters)GetProcAddress(handle, "PdhBrowseCountersA");
-	pPdhConnectMachine = (FuncPdhConnectMachine)GetProcAddress(handle, "PdhConnectMachineA");
-	pPdhLookupPerfNameByIndex = (FuncPdhLookupPerfNameByIndex)GetProcAddress(handle, "PdhLookupPerfNameByIndexA");
-	pPdhLookupPerfIndexByName = (FuncPdhLookupPerfIndexByName)GetProcAddress(handle, "PdhLookupPerfIndexByName");
+	pPdhParseInstanceName = (FuncPdhParseInstanceName)GetProcAddress(handle, "PdhParseInstanceNameW");
+	pPdhBrowseCounters = (FuncPdhBrowseCounters)GetProcAddress(handle, "PdhBrowseCountersW");
+	pPdhConnectMachine = (FuncPdhConnectMachine)GetProcAddress(handle, "PdhConnectMachineW");
+	pPdhLookupPerfNameByIndex = (FuncPdhLookupPerfNameByIndex)GetProcAddress(handle, "PdhLookupPerfNameByIndexW");
+	pPdhLookupPerfIndexByName = (FuncPdhLookupPerfIndexByName)GetProcAddress(handle, "PdhLookupPerfIndexByNameW");
 
 	// Pdh error codes are in 2 different ranges
 	PyWin_RegisterErrorMessageModule(PDH_CSTATUS_NO_MACHINE, PDH_CANNOT_SET_DEFAULT_REALTIME_DATASOURCE, handle);
@@ -892,7 +895,10 @@ PDH_STATUS __stdcall PyCounterPathCallback(DWORD_PTR dwArg)
 	MY_DLG_CONFIG *pMy = (MY_DLG_CONFIG *)dwArg;
 	DWORD rc = PDH_INVALID_DATA;
 	CEnterLeavePython _celp;
-	PyObject *args = Py_BuildValue("(s)", pMy->pcfg->szReturnPathBuffer);
+	/* ??? This does the wrong thing when multiple counters are selected.
+		Should use PyWinObject_AsMultipleString, but will break code that expects a single string. ???
+	*/
+	PyObject *args = Py_BuildValue("(N)", PyWinObject_FromTCHAR(pMy->pcfg->szReturnPathBuffer));
 	PyObject *result = PyEval_CallObject(pMy->func, args);
 	Py_XDECREF(args);
 	if (result==NULL) { // What to do with exceptions?
@@ -1099,17 +1105,13 @@ PyObject *PyInit_win32pdh(void)
 {
 	InitializeCriticalSection(&critSec);
 	PyObject *dict, *module;
-	PyWinGlobals_Ensure();
 
 #if (PY_VERSION_HEX < 0x03000000)
+#define RETURN_ERROR return;
 	module = Py_InitModule("win32pdh", win32pdh_functions);
-	if (!module)
-		return;
-	dict = PyModule_GetDict(module);
-	if (!dict)
-		return;
 #else
 
+#define RETURN_ERROR return NULL;
 	static PyModuleDef win32pdh_def = {
 		PyModuleDef_HEAD_INIT,
 		"win32pdh",
@@ -1118,17 +1120,19 @@ PyObject *PyInit_win32pdh(void)
 		win32pdh_functions
 		};
 	module = PyModule_Create(&win32pdh_def);
-	if (!module)
-		return NULL;
-	dict = PyModule_GetDict(module);
-	if (!dict)
-		return NULL;
 #endif
 
-	Py_INCREF(PyWinExc_ApiError);
+	if (!module)
+		RETURN_ERROR;
+	dict = PyModule_GetDict(module);
+	if (!dict)
+		RETURN_ERROR;
+	if (PyWinGlobals_Ensure() == -1)
+		RETURN_ERROR;
+
 	PyDict_SetItemString(dict, "error", PyWinExc_ApiError);
-	win32pdh_counter_error = PyString_FromString("win32pdh counter status error");
-	PyDict_SetItemString(dict, "counter status error", win32pdh_counter_error);
+	win32pdh_counter_error = PyErr_NewException("win32pdh.counter_status_error", NULL, NULL);
+	PyDict_SetItemString(dict, "counter_status_error", win32pdh_counter_error);
 	LoadPointers(); // Setting an error in this function will cause Python to spew.
   
 	ADD_CONSTANT(PDH_VERSION);
