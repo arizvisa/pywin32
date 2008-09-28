@@ -18,7 +18,7 @@ Example:
   the easiest way is often to simply use PerfMon to find out the names.
 """
 
-import win32pdh, string, time
+import win32pdh, time
 
 error = win32pdh.error
 
@@ -78,7 +78,7 @@ def FindPerformanceAttributesByName(instanceName, object = None,
     if counter is None: counter = find_pdh_counter_localized_name("ID Process", machine)
     if bRefresh: # PDH docs say this is how you do a refresh.
         win32pdh.EnumObjects(None, machine, 0, 1)
-    instanceName = string.lower(instanceName)
+    instanceName = instanceName.lower()
     items, instances = win32pdh.EnumObjectItems(None,None,object, -1)
     # Track multiple instances.
     instance_dict = {}
@@ -90,8 +90,8 @@ def FindPerformanceAttributesByName(instanceName, object = None,
 
     ret = []
     for instance, max_instances in instance_dict.items():
-        for inum in xrange(max_instances+1):
-            if string.lower(instance) == instanceName:
+        for inum in range(max_instances+1):
+            if instance.lower() == instanceName:
                 ret.append(GetPerformanceAttributes(object, counter,
                                                     instance, inum, format,
                                                     machine))
@@ -111,9 +111,9 @@ def ShowAllProcesses():
 
     # Bit of a hack to get useful info.
     items = [find_pdh_counter_localized_name("ID Process")] + items[:5]
-    print "Process Name", string.join(items,",")
+    print ("Process Name", ",".join(items))
     for instance, max_instances in instance_dict.items():
-        for inum in xrange(max_instances+1):
+        for inum in range(max_instances+1):
             hq = win32pdh.OpenQuery()
             hcs = []
             for item in items:
@@ -125,10 +125,10 @@ def ShowAllProcesses():
             # counters need two collections
             time.sleep(0.01)
             win32pdh.CollectQueryData(hq)
-            print "%-15s\t" % (instance[:15]),
+            print ("%-15s\t" % (instance[:15]),)
             for hc in hcs:
                 type, val = win32pdh.GetFormattedCounterValue(hc, win32pdh.PDH_FMT_LONG)
-                print "%5d" % (val),
+                print ("%5d" % (val),)
                 win32pdh.RemoveCounter(hc)
             print
             win32pdh.CloseQuery(hq)
@@ -139,9 +139,9 @@ def BrowseCallBackDemo(counter):
 
     result = GetPerformanceAttributes(object, counterName, instance, index,
                                       win32pdh.PDH_FMT_DOUBLE, machine)
-    print "Value of '%s' is" % counter, result
-    print "Added '%s' on object '%s' (machine %s), instance %s(%d)-parent of %s" \
-          % (counterName, object, machine, instance, index, parentInstance)
+    print ("Value of '%s' is" % counter, result)
+    print ("Added '%s' on object '%s' (machine %s), instance %s(%d)-parent of %s" \
+          % (counterName, object, machine, instance, index, parentInstance))
 
 def browse(callback = BrowseCallBackDemo, title="Python Browser",
            level=win32pdh.PERF_DETAIL_WIZARD):
@@ -151,11 +151,11 @@ if __name__=='__main__':
     ShowAllProcesses()
     # Show how to get a couple of attributes by name.
     counter = find_pdh_counter_localized_name("Virtual Bytes")
-    print "Virtual Bytes = ", FindPerformanceAttributesByName("python",
-                                                              counter=counter)
-    print "Available Bytes = ", GetPerformanceAttributes(
+    print ("Virtual Bytes = ", FindPerformanceAttributesByName("python",
+                                                              counter=counter))
+    print ("Available Bytes = ", GetPerformanceAttributes(
                                         find_pdh_counter_localized_name("Memory"),
-                                        find_pdh_counter_localized_name("Available Bytes"))
+                                        find_pdh_counter_localized_name("Available Bytes")))
     # And a browser.
-    print "Browsing for counters..."
+    print ("Browsing for counters...")
     browse()
