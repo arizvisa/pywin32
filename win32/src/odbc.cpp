@@ -1119,7 +1119,7 @@ static int bindInput
 		#if (PY_VERSION_HEX < 0x03000000)
 		else if (PyBuffer_Check(item))
 		#else
-		else if (PyObject_CheckReadBuffer(item))
+		else if (PyObject_CheckBuffer(item))
 		#endif
 		{
 			rv = ibindRaw(cur, iCol, item);
