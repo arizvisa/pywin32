@@ -72,7 +72,7 @@ typedef PDH_STATUS (WINAPI * FuncPdhRemoveCounter)(
 typedef PDH_STATUS (WINAPI * FuncPdhAddCounter)(
     HQUERY hQuery,	// handle to the query
     LPCTSTR szFullCounterPath,	// path of the counter
-    DWORD dwUserData,	// user-defined value
+    DWORD_PTR dwUserData,	// user-defined value
     HCOUNTER *phCounter	// pointer to the counter handle buffer
    );	
 
@@ -428,19 +428,24 @@ static PyObject *PyAddCounter(PyObject *self, PyObject *args)
 	HQUERY hQuery;
 	PyObject *obhQuery;
 	PyObject *obPath;
-	DWORD userData = 0;
-	if (!PyArg_ParseTuple(args, "OO|i:AddCounter", 
+	PyObject *obuserData = Py_None;	// Might make more sense to use actual PyObject for userData
+	DWORD_PTR userData = 0;
+	CHECK_PDH_PTR(pPdhAddCounter);
+	if (!PyArg_ParseTuple(args, "OO|O:AddCounter", 
 	          &obhQuery, // @pyparm int|hQuery||Handle to an open query.
 	          &obPath, // @pyparm string|path||Full path to the performance data
-	          &userData)) // @pyparm int|userData|0|User data associated with the counter.
+	          &obuserData)) // @pyparm int|userData|0|User data associated with the counter.
 		return NULL;
 	if (!PyWinObject_AsHANDLE(obhQuery, &hQuery))
 		return NULL;
+	if (obuserData != Py_None)
+		if (!PyWinLong_AsDWORD_PTR(obuserData, &userData))
+			return NULL;
 	TCHAR *szPath;
 	if (!PyWinObject_AsTCHAR(obPath, &szPath, FALSE))
 		return NULL;
 	HCOUNTER hCounter;
-	CHECK_PDH_PTR(pPdhAddCounter);
+
 	PyW32_BEGIN_ALLOW_THREADS
     PDH_STATUS pdhStatus = (*pPdhAddCounter) (
         hQuery,
@@ -645,28 +650,29 @@ static PyObject *PyGetCounterInfo(PyObject *self, PyObject *args)
 	Py_END_ALLOW_THREADS
     PyObject *rc;
     if (pdhStatus != ERROR_SUCCESS)
-    	rc = PyWin_SetAPIError("GetCounterInfo for data", pdhStatus);
+		rc = PyWin_SetAPIError("GetCounterInfo for data", pdhStatus);
     else {
-    	if (!CheckCounterStatusOK(pInfo->CStatus))
-    		rc = NULL;
-    	else 
-		   	rc = Py_BuildValue("iiiiiiz(zzzziz)z",     
-	                      pInfo->dwType,
-	                      pInfo->CVersion,
-	                      pInfo->lScale,
-	                      pInfo->lDefaultScale,
-	                      pInfo->dwUserData,
-	                      pInfo->dwQueryUserData,
-	                      pInfo->szFullPath,
-	                      
-	                     pInfo->szMachineName,
-		                 pInfo->szObjectName,
-		                 pInfo->szInstanceName,
-		                 pInfo->szParentInstance,
-		                 pInfo->dwInstanceIndex,
-		                 pInfo->szCounterName,
-            
-		                 pInfo->szExplainText);
+		if (!CheckCounterStatusOK(pInfo->CStatus))
+			rc = NULL;
+		else 
+			rc = Py_BuildValue("iiiiNNN(NNNNiN)N",
+				pInfo->dwType,
+				pInfo->CVersion,
+				// ??? CStatus is missing ???
+				pInfo->lScale,
+				pInfo->lDefaultScale,
+				PyWinObject_FromDWORD_PTR(pInfo->dwUserData),
+				PyWinObject_FromDWORD_PTR(pInfo->dwQueryUserData),
+				PyWinObject_FromTCHAR(pInfo->szFullPath),
+						  
+				PyWinObject_FromTCHAR(pInfo->szMachineName),
+				PyWinObject_FromTCHAR(pInfo->szObjectName),
+				PyWinObject_FromTCHAR(pInfo->szInstanceName),
+				PyWinObject_FromTCHAR(pInfo->szParentInstance),
+				pInfo->dwInstanceIndex,
+				PyWinObject_FromTCHAR(pInfo->szCounterName),
+			
+				PyWinObject_FromTCHAR(pInfo->szExplainText));
     }
     free(pInfo);
     return rc;
