@@ -709,7 +709,8 @@ static PyObject *PyGetFormattedCounterValue(PyObject *self, PyObject *args)
 		rc = PyFloat_FromDouble(result.doubleValue);
 	else if (format & PDH_FMT_LONG)
 		rc = PyInt_FromLong(result.longValue);
-	// XXX - need long int support
+	else if (format & PDH_FMT_LARGE)
+		rc = PyLong_FromLongLong(result.largeValue);
 	else {
 		PyErr_SetString(PyExc_ValueError, "Dont know how to convert the result");
 		rc = NULL;
@@ -844,13 +845,13 @@ static PyObject *PyParseCounterPath(PyObject *self, PyObject *args)
 	if (pdhStatus != 0) {
 		rc = PyWin_SetAPIError("ParseCounterPath", pdhStatus);
 	} else {
-		rc = Py_BuildValue("zzzziz", 
-			pCPE->szMachineName,
-			pCPE->szObjectName,
-			pCPE->szInstanceName,
-			pCPE->szParentInstance,
+		rc = Py_BuildValue("NNNNkN", 
+			PyWinObject_FromTCHAR(pCPE->szMachineName),
+			PyWinObject_FromTCHAR(pCPE->szObjectName),
+			PyWinObject_FromTCHAR(pCPE->szInstanceName),
+			PyWinObject_FromTCHAR(pCPE->szParentInstance),
 			pCPE->dwInstanceIndex,
-			pCPE->szCounterName);
+			PyWinObject_FromTCHAR(pCPE->szCounterName));
 	}
 	free(pBuf);
 	return rc;
@@ -877,7 +878,10 @@ static PyObject *PyParseInstanceName(PyObject *self, PyObject *args)
 	PyWinObject_FreeTCHAR(iname);
 	if (pdhStatus != 0)
 		return PyWin_SetAPIError("ParseInstanceName", pdhStatus);
-	return Py_BuildValue("ssi", szName, szParent, dwInstance);
+	return Py_BuildValue("NNk",
+		PyWinObject_FromTCHAR(szName),
+		PyWinObject_FromTCHAR(szParent),
+		dwInstance);
 }
 
 // @pymethod |win32pdh|SetCounterScaleFactor|Sets the scale factor that is applied to the calculated value of the specified counter when you request the formatted counter value.
