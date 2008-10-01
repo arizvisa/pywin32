@@ -840,15 +840,80 @@ int PyWinGlobals_Ensure()
 	PyEval_InitThreads();
 	PyWinInterpreterState_Ensure();
 	if (PyWinExc_ApiError==NULL) {
-		PyWinExc_ApiError = PyErr_NewException("pywintypes.error", NULL, NULL);
-		if (PyWinExc_ApiError==NULL)
+		// Setup our exception objects so they have attributes.
+		// do things the easy way - but also the (hopefully!) smart way
+		// as our exception objects always behave exactly like they were
+		// defined in regular .py code - because the are!
+		PyObject *d = PyDict_New();
+		if (!d)
+			return -1;
+		PyObject *name = PyWinCoreString_FromString("pywintypes");
+		if (!name) {
+			Py_DECREF(d);
 			return -1;
 		}
-	if (PyWinExc_COMError == NULL){
-		PyWinExc_COMError = PyErr_NewException("pywintypes.com_error", NULL, NULL);
-		if (PyWinExc_COMError == NULL)
-			return -1;
+		PyDict_SetItemString(d, "Exception", PyExc_Exception);
+		PyDict_SetItemString(d, "__name__", name);
+		Py_DECREF(name);
+		PyObject *bimod = PyImport_ImportModule(
+#if PY_VERSION_HEX > 0x2030300
+							"builtins");
+#else
+							"__builtin__");
+#endif
+		if (bimod) {
+			PyDict_SetItemString(d, "__builtins__", bimod);
+			Py_DECREF(bimod);
 		}
+		// Note using 'super()' doesn't work as expected on py23...
+		PyRun_String("class error(Exception):\n"
+			     "  def __init__(self, *args, **kw):\n"
+			     "    self.winerror, self.funcname, self.strerror = args[:3]\n"
+			     "    Exception.__init__(self, *args, **kw)\n"
+			     "class com_error(Exception):\n"
+			     "  def __init__(self, *args, **kw):\n"
+			     "    self.hresult = args[0]\n"
+			     "    if len(args)>1: self.strerror = args[1]\n"
+			     "    else: self.strerror = None\n"
+			     "    if len(args)>2: self.excepinfo = args[2]\n"
+			     "    else: self.excepinfo = None\n"
+			     "    if len(args)>3: self.argerror = args[3]\n"
+			     "    else: self.argerror = None\n"
+			     "    Exception.__init__(self, *args, **kw)\n"
+			     ,
+			     Py_file_input, d, d);
+		PyWinExc_ApiError = PyDict_GetItemString(d, "error");
+		Py_XINCREF(PyWinExc_ApiError);
+		PyWinExc_COMError = PyDict_GetItemString(d, "com_error");
+		Py_XINCREF(PyWinExc_COMError);
+		Py_DECREF(d);
+		// @object error|An exception raised when a win32 error occurs
+		// @comm This error is defined in the pywintypes module, but most
+		// of the win32 modules expose this error object via their own
+		// error attribute - eg, win32api.error is pywintypes.error is
+		// win32gui.error.
+		// @comm This exception is derived from the standard Python Exception object.
+		// @comm Instances of these exception can be accessed via indexing
+		// or via attribute access.  Attribute access is more forwards
+		// compatible with Python 3, so is recommended.
+		// @comm See also <o com_error>
+		// @tupleitem 0|int|winerror|The windows error code.
+		// @tupleitem 1|string|funcname|The name of the windows function that failed.
+		// @tupleitem 2|string|strerror|The error message.
+
+		// @object com_error|An exception raised when a COM exception occurs.
+		// @comm This error is defined in the pywintypes module, but is
+		// also available via pythoncom.com_error.
+		// @comm This exception is derived from the standard Python Exception object.
+		// @comm Instances of these exception can be accessed via indexing
+		// or via attribute access.  Attribute access is more forwards
+		// compatible with Python 3, so is recommended.
+		// @comm See also <o error>
+		// @tupleitem 0|int|hresult|The COM hresult
+		// @tupleitem 1|string|strerror|The error message
+		// @tupleitem 2|None/tuple|excepinfo|An optional EXCEPINFO tuple.
+		// @tupleitem 3|None/int|argerror|The index of the argument in error, or (usually) None or -1
+	}
 
 	/* PyType_Ready needs to be called anytime pywintypesxx.dll is loaded, since
 		other extension modules can use types defined here without pywintypes itself
