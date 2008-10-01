@@ -518,7 +518,7 @@ static BOOL CreateEnvironmentString(PyObject *env, LPVOID *ppRet, BOOL *pRetIsUn
 				bufLen += PyString_Size(key) + 1;
 			} else if (PyUnicode_Check(key)) {
 				bIsUnicode = TRUE;
-				bufLen += PyUnicode_Size(key) + 1;
+				bufLen += PyUnicode_GET_SIZE(key) + 1;
 			} else {
 				PyErr_SetString(PyExc_TypeError, "dictionary must have keys and values as strings or unicode objects.");
 				goto done;
@@ -529,7 +529,7 @@ static BOOL CreateEnvironmentString(PyObject *env, LPVOID *ppRet, BOOL *pRetIsUn
 					PyErr_SetString(PyExc_TypeError, "All dictionary items must be strings, or all must be unicode");
 					goto done;
 				}
-				bufLen += PyUnicode_Size(key) + 1;
+				bufLen += PyUnicode_GET_SIZE(key) + 1;
 			}
 			else {
 				if (!PyString_Check(key)) {
@@ -545,7 +545,7 @@ static BOOL CreateEnvironmentString(PyObject *env, LPVOID *ppRet, BOOL *pRetIsUn
 				PyErr_SetString(PyExc_TypeError, "All dictionary items must be strings, or all must be unicode");
 				goto done;
 			}
-			bufLen += PyUnicode_Size(val) + 2; // For the '=' and '\0'
+			bufLen += PyUnicode_GET_SIZE(val) + 2; // For the '=' and '\0'
 		}
 		else {
 			if (!PyString_Check(val)) {
