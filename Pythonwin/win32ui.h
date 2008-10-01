@@ -37,6 +37,11 @@
 #define DODECREF(o) Py_DECREF(o)
 #define XDODECREF(o) Py_XDECREF(o)
 
+inline PyObject *PyWinObject_FromTCHAR(CString *str )
+{
+	return PyWinObject_FromTCHAR((const TCHAR *)str);
+}
+
 // we cant use these memory operators - must use make and python handles delete
 #undef NEWOBJ
 #undef DEL

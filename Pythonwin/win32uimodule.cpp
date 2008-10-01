@@ -271,6 +271,11 @@ ui_base_class *ui_base_class::make( ui_type &makeTypeRef)
 		}
 
 	// ??? I think this leaks a ref to obattr ???
+	// Right - we are *replacing* 'o' so the caller magically gets the
+	// _obj_ - so there is definately a leak here:  Either:
+	// * Callers do manage ref-counts correctly - in which case we must
+	//   decref the existing object before swapping the value.
+	// * Callers don't manage ref-counts correctly - they need to be fixed.
 	o = obattr;
 	return is_uiobject(o, which);
 }
@@ -328,9 +333,13 @@ ui_base_class::sui_repr( PyObject *op )
 
 CString ui_base_class::repr()
 {
-	USES_CONVERSION;
 	CString csRet;
-	csRet.Format(_T("object '%s'"), A2T(ob_type->tp_name));
+#if (PY_VERSION_HEX < 0x03000000)
+	USES_CONVERSION;
+ 	csRet.Format(_T("object '%s'"), A2T(ob_type->tp_name));
+#else
+ 	csRet.Format(_T("object '%S'"), ob_type->tp_name);
+#endif
 	return csRet;
 }
 void ui_base_class::cleanup()
@@ -601,6 +610,11 @@ void gui_print_error(void)
 	static BOOL bInError = FALSE;
 	if (bInError) {
 		TRACE("gui_print_error: recursive call!\n");
+		PyObject *type, *value, *traceback;
+		PyErr_Fetch(&type, &value, &traceback);
+		TRACE(GetPythonTraceback(type, value, traceback));
+		PyErr_Restore(type, value, traceback);
+		PyErr_Clear();
 		return;
 	}
 	bInError=TRUE;
@@ -642,6 +656,7 @@ void DefaultExceptionHandler(int action, const TCHAR *context, const TCHAR *extr
 	}
 	else
 		TRACE("DefaultExceptionHandler: unknown action (%d)\n", action);
+	PyErr_Clear();
 }
 
 void ExceptionHandler(int action, const TCHAR *context, const TCHAR *extraTitleMsg)
@@ -2448,16 +2463,23 @@ extern "C" PYW_EXPORT BOOL Win32uiApplicationInit(Win32uiHostGlue *pGlue, TCHAR 
 	// win32ui is attached to Python - otherwise there is
 	// a risk that when Python does "import win32ui", it
 	// will locate a different one, causing obvious grief!
+	PyObject *argv = PySys_GetObject("argv");
 #if (PY_VERSION_HEX < 0x03000000)
 	initwin32ui();
-#else
-	PyInit_win32ui();
-#endif
-
 	// Set sys.argv if not already done!
-	PyObject *argv = PySys_GetObject("argv");
 	if (argv==NULL && __targv!=NULL && __argc > 0)
 		PySys_SetArgv(__argc-1, __targv+1);
+#else
+	PyInit_win32ui();
+	if (argv==NULL) {
+		int myargc;
+		LPWSTR *myargv = CommandLineToArgvW(GetCommandLineW(), &myargc);
+		if (myargv) {
+			PySys_SetArgv(myargc-1, myargv+1);
+			LocalFree(myargv);
+		}
+	}
+#endif
 	// If the versions of the .h file are not in synch, then we are in trouble!
 	if (pGlue->versionNo != WIN32UIHOSTGLUE_VERSION) {
 		MessageBox(0, _T("There is a mismatch between version of the application and win32ui.pyd.\n\nIt is likely the application needs to be rebuilt."), _T("Error"), MB_OK);
