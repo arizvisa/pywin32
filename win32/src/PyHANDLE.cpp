@@ -321,15 +321,15 @@ long PyHANDLE::hash(void)
 
 int PyHANDLE::print(FILE *fp, int flags)
 {
-	TCHAR resBuf[160];
-	wsprintf(resBuf, _T("<%hs at %Id (%Id)>"), GetTypeName(), this, m_handle);
+	WCHAR resBuf[160];
+	wsprintfW(resBuf, L"<%hs at %Id (%Id)>", GetTypeName(), this, m_handle);
     // ### ACK! Python uses a non-debug runtime. We can't use stream
 	// ### functions when in DEBUG mode!!  (we link against a different
 	// ### runtime library)  Hack it by getting Python to do the print!
 	//
 	// ### - Double Ack - Always use the hack!
 //#ifdef _DEBUG
-	PyObject *ob = PyString_FromTCHAR(resBuf);
+	PyObject *ob = PyUnicode_FromWideChar(resBuf, wcslen(resBuf));
 	PyObject_Print(ob, fp, flags|Py_PRINT_RAW);
 	Py_DECREF(ob);
 /***
@@ -342,13 +342,9 @@ int PyHANDLE::print(FILE *fp, int flags)
 
 PyObject * PyHANDLE::asStr(void)
 {
-	char resBuf[160];
-	snprintf(resBuf, 160, "<%s:%Id>", GetTypeName(), m_handle);
-#if (PY_VERSION_HEX < 0x03000000)
-	return PyString_FromString(resBuf);
-#else
-	return PyUnicode_FromString(resBuf);
-#endif
+	WCHAR resBuf[160];
+	_snwprintf(resBuf, 160, L"<%s:%Id>", GetTypeName(), m_handle);
+	return PyWinCoreString_FromString(resBuf);
 }
 
 char *failMsg = "bad operand type";
