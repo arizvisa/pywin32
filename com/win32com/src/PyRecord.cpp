@@ -2,6 +2,21 @@
 #include "PythonCOM.h"
 
 // @doc
+
+// A refugee from pywintypes and should die
+PyObject *PyString_FromUnicode( const OLECHAR *str )
+{
+	if (str==NULL) {
+		Py_INCREF(Py_None);
+		return Py_None;
+	}
+	PyObject *uo = PyWinObject_FromOLECHAR(str);
+	if (uo==NULL) return NULL;
+	PyObject *ret = PyUnicode_EncodeMBCS(PyUnicode_AS_UNICODE(uo), PyUnicode_GET_SIZE(uo), NULL);
+	Py_DECREF(uo);
+	return ret;
+}
+
 #ifdef LINK_AGAINST_RECORDINFO
 // Helpers to avoid linking directly to these newer functions
 static const IID g_IID_IRecordInfo = IID_IRecordInfo;
@@ -670,12 +685,7 @@ int PyRecord::tp_compare(PyObject *self, PyObject *other)
 	for (ULONG i=0;i<num_names;i++) {
 		ret = 0;
 		PyObject *obattrname;
-#if (PY_VERSION_HEX < 0x03000000)
-		obattrname=PyString_FromUnicode(strings[i]);
-#else
-		// Py3k passes attr names as unicode
-		obattrname=PyWinObject_FromWCHAR(strings[i]);
-#endif
+		obattrname=PyWinCoreString_FromString(strings[i]);
 		if (obattrname==NULL)
 			return -2;
 		// There appear to be several problems here.  This will leave an exception hanging
