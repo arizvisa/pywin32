@@ -2,7 +2,7 @@ import win32evtlog, traceback
 import win32api, win32con
 import win32security # To translate NT Sids to account names.
 
-from win32evtlogutil import *
+import win32evtlogutil
 
 def ReadLog(computer, logType="Application", dumpEachRecord = 0):
     # read the entire log back.
@@ -17,7 +17,7 @@ def ReadLog(computer, logType="Application", dumpEachRecord = 0):
             break
         for object in objects:
             # get it for testing purposes, but dont print it.
-            msg = SafeFormatMessage(object, logType).encode("mbcs")
+            msg = win32evtlogutil.SafeFormatMessage(object, logType)
             if object.Sid is not None:
                 try:
                     domain, user, typ = win32security.LookupAccountSid(computer, object.Sid)
@@ -82,9 +82,19 @@ def test():
         if opt=='-v':
             verbose = verbose + 1
     if do_write:
-        ReportEvent(logType, 2, strings=["The message text for event 2"], data = "Raw\0Data")
-        ReportEvent(logType, 1, eventType=win32evtlog.EVENTLOG_WARNING_TYPE, strings=["A warning"], data = "Raw\0Data")
-        ReportEvent(logType, 1, eventType=win32evtlog.EVENTLOG_INFORMATION_TYPE, strings=["An info"], data = "Raw\0Data")
+        ph=win32api.GetCurrentProcess()
+        th = win32security.OpenProcessToken(ph,win32con.TOKEN_READ)
+        my_sid = win32security.GetTokenInformation(th,win32security.TokenUser)[0]
+
+        win32evtlogutil.ReportEvent(logType, 2,
+            strings=["The message text for event 2","Another insert"],
+            data = b"Raw\0Data", sid = my_sid)
+        win32evtlogutil.ReportEvent(logType, 1, eventType=win32evtlog.EVENTLOG_WARNING_TYPE,
+            strings=["A warning","An even more dire warning"],
+            data = b"Raw\0Data", sid = my_sid)
+        win32evtlogutil.ReportEvent(logType, 1, eventType=win32evtlog.EVENTLOG_INFORMATION_TYPE,
+            strings=["An info","Too much info"],
+            data = b"Raw\0Data", sid = my_sid)
         print("Successfully wrote 3 records to the log")
 
     if do_read:
