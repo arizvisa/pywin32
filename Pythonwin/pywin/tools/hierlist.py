@@ -123,15 +123,15 @@ class HierList(object.Object):
 		self.listControl = None
 		self.notify_parent = None # Break a possible cycle
 
-	def OnTreeItemDoubleClick(self, xxx_todo_changeme, extra):
-		(hwndFrom, idFrom, code) = xxx_todo_changeme
+	def OnTreeItemDoubleClick(self, info, extra):
+		(hwndFrom, idFrom, code) = info
 		if idFrom != self.listBoxId: return None
 		item = self.itemHandleMap[self.listControl.GetSelectedItem()]
 		self.TakeDefaultAction(item)
 		return 1
 
-	def OnTreeItemExpanding(self, xxx_todo_changeme1, extra):
-		(hwndFrom, idFrom, code) = xxx_todo_changeme1
+	def OnTreeItemExpanding(self, info, extra):
+		(hwndFrom, idFrom, code) = info
 		if idFrom != self.listBoxId: return None
 		action, itemOld, itemNew, pt = extra
 		itemHandle = itemNew[0]
@@ -141,8 +141,8 @@ class HierList(object.Object):
 			self.filledItemHandlesMap[itemHandle] = None
 		return 0
 
-	def OnTreeItemSelChanged(self, xxx_todo_changeme2, extra):
-		(hwndFrom, idFrom, code) = xxx_todo_changeme2
+	def OnTreeItemSelChanged(self, info, extra):
+		(hwndFrom, idFrom, code) = info
 		if idFrom != self.listBoxId: return None
 		action, itemOld, itemNew, pt = extra
 		itemHandle = itemNew[0]

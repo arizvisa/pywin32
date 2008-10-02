@@ -9,9 +9,8 @@ def SafeApply( fn, args, err_desc = "" ):
 	try:
 		fn(*args)
 		return 1
-	except win32api.error as xxx_todo_changeme:
-		(rc, fn, msg) = xxx_todo_changeme.args
-		msg = "Error " + err_desc + "\r\n\r\n" + msg
+	except win32api.error as exc:
+		msg = "Error " + err_desc + "\r\n\r\n" + exc.strerror
 		win32ui.MessageBox(msg)
 		return 0
 
@@ -41,8 +40,8 @@ class SplitterFrame(window.MDIChildWnd):
 
 		return 1
 
-	def OnItemDoubleClick(self, xxx_todo_changeme1, extra):
-		(hwndFrom, idFrom, code) = xxx_todo_changeme1
+	def OnItemDoubleClick(self, info, extra):
+		(hwndFrom, idFrom, code) = info
 		if idFrom==win32ui.AFX_IDW_PANE_FIRST:
 			# Tree control
 			return None
@@ -219,9 +218,8 @@ class RegistryValueView(docview.ListView):
 		if d.DoModal()==win32con.IDOK:
 			try:
 				self.SetItemsCurrentValue(item, keyVal, d.newvalue)
-			except win32api.error as xxx_todo_changeme2:
-				(rc, fn, desc) = xxx_todo_changeme2.args
-				win32ui.MessageBox("Error setting value\r\n\n%s" % desc)
+			except win32api.error as exc:
+				win32ui.MessageBox("Error setting value\r\n\n%s" % exc.strerror)
 			self.UpdateForRegItem(item)
 
 	def GetItemsCurrentValue(self, item, valueName):

@@ -18,12 +18,12 @@ def CenterPoint(rect):
 	height = rect[3]-rect[1]
 	return rect[0] + width//2, rect[1] + height//2
 
-def OffsetRect(rect, xxx_todo_changeme ):
-	(x, y) = xxx_todo_changeme
+def OffsetRect(rect, point):
+	(x, y) = point
 	return rect[0]+x, rect[1]+y, rect[2]+x, rect[3]+y
 
-def DeflateRect(rect, xxx_todo_changeme1 ):
-	(x,y) = xxx_todo_changeme1
+def DeflateRect(rect, point):
+	(x,y) = point
 	return rect[0]+x, rect[1]+y, rect[2]-x, rect[3]-y
 
 def PtInRect(rect, pt):
@@ -293,8 +293,8 @@ class DockingBar(window.Wnd):
 
 #	def OnBarStyleChange(self, old, new):
 
-	def OnNcCalcSize(self, bCalcValid, xxx_todo_changeme2):
-		(rc0, rc1, rc2, pos) = xxx_todo_changeme2
+	def OnNcCalcSize(self, bCalcValid, size_info):
+		(rc0, rc1, rc2, pos) = size_info
 		self.rectBorder = self.GetWindowRect()
 		self.rectBorder = OffsetRect( self.rectBorder, (-self.rectBorder[0], -self.rectBorder[1]) )
 

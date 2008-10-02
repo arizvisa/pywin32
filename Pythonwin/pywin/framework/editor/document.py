@@ -128,10 +128,9 @@ class EditorDocumentBase(ParentEditorDocument):
 			return
 		try:
 			newstat = os.stat(self.GetPathName())
-		except os.error as xxx_todo_changeme:
-			(code, msg) = xxx_todo_changeme.args
+		except os.error as exc:
 			if not self.bReportedFileNotFound:
-				print("The file '%s' is open for editing, but\nchecking it for changes caused the error: %s" % (self.GetPathName(), msg))
+				print("The file '%s' is open for editing, but\nchecking it for changes caused the error: %s" % (self.GetPathName(), exc.strerror))
 				self.bReportedFileNotFound = 1
 			return
 		if self.bReportedFileNotFound:
@@ -288,9 +287,8 @@ class FileWatchingThread(pywin.mfc.thread.WinThread):
 					 win32con.FILE_NOTIFY_CHANGE_LAST_WRITE
 			try:
 				self.watchEvent = win32api.FindFirstChangeNotification(path, 0, filter)
-			except win32api.error as xxx_todo_changeme1:
-				(rc, fn, msg) = xxx_todo_changeme1.args
-				print("Can not watch file", path, "for changes -", msg)
+			except win32api.error as exc:
+				print("Can not watch file", path, "for changes -", exc.strerror)
 	def SignalStop(self):
 		win32event.SetEvent(self.stopEvent)
 	def Run(self):
@@ -308,9 +306,8 @@ class FileWatchingThread(pywin.mfc.thread.WinThread):
 				try:
 					# If the directory has been removed underneath us, we get this error.
 					win32api.FindNextChangeNotification(self.watchEvent)
-				except win32api.error as xxx_todo_changeme2:
-					(rc, fn, msg) = xxx_todo_changeme2.args
-					print("Can not watch file", self.doc.GetPathName(), "for changes -", msg)
+				except win32api.error as exc:
+					print("Can not watch file", self.doc.GetPathName(), "for changes -", exc.strerror)
 					break
 
 		# close a circular reference
