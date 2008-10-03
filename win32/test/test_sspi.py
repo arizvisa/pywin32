@@ -102,7 +102,7 @@ class TestSSPI(unittest.TestCase):
 
     def testSequenceSign(self):
         # Only Kerberos supports sequence detection.
-        sspiclient, sspiserver = self._doAuth(b"Kerberos")
+        sspiclient, sspiserver = self._doAuth("Kerberos")
         key = sspiclient.sign(b"hello")
         sspiclient.sign(b"hello")
         self.assertRaisesHRESULT(sspicon.SEC_E_OUT_OF_SEQUENCE,
