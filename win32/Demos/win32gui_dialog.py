@@ -152,7 +152,7 @@ class DemoWindowBase:
         try:
             classAtom = win32gui.RegisterClass(wc)
         except win32gui.error as err_info:
-            if err_info.args[0]!=winerror.ERROR_CLASS_ALREADY_EXISTS:
+            if err_info.winerror!=winerror.ERROR_CLASS_ALREADY_EXISTS:
                 raise
         return className
 

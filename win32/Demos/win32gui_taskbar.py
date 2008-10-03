@@ -22,11 +22,11 @@ class MainWindow:
         wc.hbrBackground = win32con.COLOR_WINDOW
         wc.lpfnWndProc = message_map # could also specify a wndproc.
 
-        # Don't blow up if class aready registered to make testing easier
+        # Don't blow up if class already registered to make testing easier
         try:
             classAtom = win32gui.RegisterClass(wc)
         except win32gui.error as err_info:
-            if err_info.args[0]!=winerror.ERROR_CLASS_ALREADY_EXISTS:
+            if err_info.winerror!=winerror.ERROR_CLASS_ALREADY_EXISTS:
                 raise
 
         # Create the Window.

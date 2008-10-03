@@ -455,7 +455,7 @@ def _ResolveType(typerepr, itypeinfo):
 			try:
 				resultTypeInfo = itypeinfo.GetRefTypeInfo(subrepr)
 			except pythoncom.com_error as details:
-				if details.args[0] in [winerror.TYPE_E_CANTLOADLIBRARY, winerror.TYPE_E_LIBNOTREGISTERED]:
+				if details.hresult in [winerror.TYPE_E_CANTLOADLIBRARY, winerror.TYPE_E_LIBNOTREGISTERED]:
 					# an unregistered interface
 					return pythoncom.VT_UNKNOWN, None, None
 				raise

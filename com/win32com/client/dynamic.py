@@ -181,7 +181,7 @@ class CDispatch:
 		try:
 			return str(self.__call__())
 		except pythoncom.com_error as details:
-			if details.args[0] not in ERRORS_BAD_CONTEXT:
+			if details.hresult not in ERRORS_BAD_CONTEXT:
 				raise
 			return self.__repr__()
 
@@ -480,7 +480,7 @@ class CDispatch:
 			try:
 				ret = self._oleobj_.Invoke(retEntry.dispid,0,invoke_type,1)
 			except pythoncom.com_error as details:
-				if details.args[0] in ERRORS_BAD_CONTEXT:
+				if details.hresult in ERRORS_BAD_CONTEXT:
 					# May be a method.
 					self._olerepr_.mapFuncs[attr] = retEntry
 					return self._make_method_(attr)
