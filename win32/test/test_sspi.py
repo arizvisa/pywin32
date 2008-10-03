@@ -9,9 +9,9 @@ class TestSSPI(unittest.TestCase):
     def assertRaisesHRESULT(self, hr, func, *args):
         try:
             return func(*args)
-            raise RuntimeError, "expecting %s failure" % (hr,)
-        except win32security.error, (hr_got, func, msg):
-            self.failUnlessEqual(hr_got, hr)
+            raise RuntimeError("expecting %s failure" % (hr,))
+        except win32security.error as exc:
+            self.failUnlessEqual(exc.winerror, hr)
 
     def _doAuth(self, pkg_name):
         sspiclient=sspi.ClientAuth(pkg_name,targetspn=win32api.GetUserName())
@@ -41,7 +41,7 @@ class TestSSPI(unittest.TestCase):
         sspiclient, sspiserver = self._doAuth(pkg_name)
 
         pkg_size_info=sspiclient.ctxt.QueryContextAttributes(sspicon.SECPKG_ATTR_SIZES)
-        msg='some data to be encrypted ......'
+        msg=b'some data to be encrypted ......'
 
         trailersize=pkg_size_info['SecurityTrailer']
         encbuf=win32security.PySecBufferDescType()
@@ -52,11 +52,11 @@ class TestSSPI(unittest.TestCase):
         sspiserver.ctxt.DecryptMessage(encbuf,1)
         self.failUnlessEqual(msg, encbuf[0].Buffer)
         # and test the higher-level functions
-        data, sig = sspiclient.encrypt("hello")
-        self.assertEqual(sspiserver.decrypt(data, sig), "hello")
+        data, sig = sspiclient.encrypt(b"hello")
+        self.assertEqual(sspiserver.decrypt(data, sig), b"hello")
 
-        data, sig = sspiserver.encrypt("hello")
-        self.assertEqual(sspiclient.decrypt(data, sig), "hello")
+        data, sig = sspiserver.encrypt(b"hello")
+        self.assertEqual(sspiclient.decrypt(data, sig), b"hello")
 
     def testEncryptNTLM(self):
         self._doTestEncrypt("NTLM")
@@ -69,7 +69,7 @@ class TestSSPI(unittest.TestCase):
         sspiclient, sspiserver = self._doAuth(pkg_name)
 
         pkg_size_info=sspiclient.ctxt.QueryContextAttributes(sspicon.SECPKG_ATTR_SIZES)
-        msg='some data to be encrypted ......'
+        msg=b'some data to be encrypted ......'
         
         sigsize=pkg_size_info['MaxSignature']
         sigbuf=win32security.PySecBufferDescType()
@@ -81,18 +81,18 @@ class TestSSPI(unittest.TestCase):
         # and test the higher-level functions
         sspiclient.next_seq_num = 1
         sspiserver.next_seq_num = 1
-        key = sspiclient.sign("hello")
-        sspiserver.verify("hello", key)
-        key = sspiclient.sign("hello")
+        key = sspiclient.sign(b"hello")
+        sspiserver.verify(b"hello", key)
+        key = sspiclient.sign(b"hello")
         self.assertRaisesHRESULT(sspicon.SEC_E_MESSAGE_ALTERED,
-                                 sspiserver.verify, "hellox", key)
+                                 sspiserver.verify, b"hellox", key)
 
         # and the other way
-        key = sspiserver.sign("hello")
-        sspiclient.verify("hello", key)
-        key = sspiserver.sign("hello")
+        key = sspiserver.sign(b"hello")
+        sspiclient.verify(b"hello", key)
+        key = sspiserver.sign(b"hello")
         self.assertRaisesHRESULT(sspicon.SEC_E_MESSAGE_ALTERED,
-                                 sspiclient.verify, "hellox", key)
+                                 sspiclient.verify, b"hellox", key)
 
     def testSignNTLM(self):
         self._doTestSign("NTLM")
@@ -102,17 +102,17 @@ class TestSSPI(unittest.TestCase):
 
     def testSequenceSign(self):
         # Only Kerberos supports sequence detection.
-        sspiclient, sspiserver = self._doAuth("Kerberos")
-        key = sspiclient.sign("hello")
-        sspiclient.sign("hello")
+        sspiclient, sspiserver = self._doAuth(b"Kerberos")
+        key = sspiclient.sign(b"hello")
+        sspiclient.sign(b"hello")
         self.assertRaisesHRESULT(sspicon.SEC_E_OUT_OF_SEQUENCE,
-                                 sspiserver.verify, 'hello', key)
+                                 sspiserver.verify, b'hello', key)
 
     def testSequenceEncrypt(self):
         # Only Kerberos supports sequence detection.
         sspiclient, sspiserver = self._doAuth("Kerberos")
-        blob, key = sspiclient.encrypt("hello",)
-        blob, key = sspiclient.encrypt("hello")
+        blob, key = sspiclient.encrypt(b"hello",)
+        blob, key = sspiclient.encrypt(b"hello")
         self.assertRaisesHRESULT(sspicon.SEC_E_OUT_OF_SEQUENCE,
                                  sspiserver.decrypt, blob, key)
 
