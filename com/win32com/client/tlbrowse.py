@@ -6,7 +6,9 @@ import commctrl
 import pythoncom
 from pywin.mfc import dialog
 
-error = "TypeLib browser internal error"
+class TLBrowserException(Exception):
+	"TypeLib browser internal error"
+error = TLBrowserException
 
 FRAMEDLG_STD = win32con.WS_CAPTION | win32con.WS_SYSMENU
 SS_STD = win32con.WS_CHILD | win32con.WS_VISIBLE
