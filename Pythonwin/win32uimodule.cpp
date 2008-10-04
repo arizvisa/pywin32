@@ -2265,18 +2265,11 @@ PyObject *PyInit_win32ui(void)
   if (bInitialized)
 	  RETURN_MODULE;
 	
-	PyWinGlobals_Ensure();
+	if (PyWinGlobals_Ensure() == -1)
+		RETURN_ERROR;
 
 #if (PY_VERSION_HEX < 0x03000000)
 	module = Py_InitModule(uiModName, ui_functions);
-	if (!module)
-		return;
-	dict = PyModule_GetDict(module);
-	if (!dict)
-		return;
-	ui_module_error = PyErr_NewException("win32ui.error", NULL, NULL);
-	if (!ui_module_error)
-		return;
 #else
 
 	static PyModuleDef win32ui_def = {
@@ -2287,22 +2280,25 @@ PyObject *PyInit_win32ui(void)
 		ui_functions
 		};
 	module = PyModule_Create(&win32ui_def);
-	if (!module)
-		return NULL;
-	dict = PyModule_GetDict(module);
-	if (!dict)
-		return NULL;
-	ui_module_error = PyErr_NewException("win32ui.error", NULL, NULL);
-	if (!ui_module_error)
-		return NULL;
 #endif
 
-  PyDict_SetItemString(dict, "error", ui_module_error);
-  // drop email addy - too many ppl use it for support requests for other
-  // tools that simply embed Pythonwin...
-  PyObject *copyright = PyString_FromString("Copyright 1994-2008 Mark Hammond");
-  PyDict_SetItemString(dict, "copyright", copyright);
-  Py_XDECREF(copyright);
+	if (!module)
+		RETURN_ERROR;
+	dict = PyModule_GetDict(module);
+	if (!dict)
+		RETURN_ERROR;
+
+	ui_module_error = PyErr_NewException("win32ui.error", NULL, NULL);
+	if ((ui_module_error == NULL) || PyDict_SetItemString(dict, "error", ui_module_error) == -1)
+		RETURN_ERROR;
+
+	// drop email addy - too many ppl use it for support requests for other
+	// tools that simply embed Pythonwin...
+	PyObject *copyright = PyWinCoreString_FromString("Copyright 1994-2008 Mark Hammond");
+	if ((copyright == NULL) || PyDict_SetItemString(dict, "copyright", copyright) == -1)
+		RETURN_ERROR;
+	Py_XDECREF(copyright);
+
   PyObject *dllhandle = PyWinLong_FromHANDLE(hWin32uiDll);
   PyDict_SetItemString(dict, "dllhandle", dllhandle);
   Py_XDECREF(dllhandle);
