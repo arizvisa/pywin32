@@ -856,32 +856,40 @@ int PyWinGlobals_Ensure()
 		PyDict_SetItemString(d, "__name__", name);
 		Py_DECREF(name);
 		PyObject *bimod = PyImport_ImportModule(
-#if PY_VERSION_HEX > 0x2030300
+#if PY_VERSION_HEX >= 0x03000000
 							"builtins");
 #else
 							"__builtin__");
 #endif
-		if (bimod) {
-			PyDict_SetItemString(d, "__builtins__", bimod);
-			Py_DECREF(bimod);
-		}
+		if ((bimod == NULL)
+			||PyDict_SetItemString(d, "__builtins__", bimod) == -1){
+			Py_XDECREF(bimod);
+			return -1;
+			}			
+		Py_DECREF(bimod);
+
 		// Note using 'super()' doesn't work as expected on py23...
-		PyRun_String("class error(Exception):\n"
-			     "  def __init__(self, *args, **kw):\n"
-			     "    self.winerror, self.funcname, self.strerror = args[:3]\n"
-			     "    Exception.__init__(self, *args, **kw)\n"
-			     "class com_error(Exception):\n"
-			     "  def __init__(self, *args, **kw):\n"
-			     "    self.hresult = args[0]\n"
-			     "    if len(args)>1: self.strerror = args[1]\n"
-			     "    else: self.strerror = None\n"
-			     "    if len(args)>2: self.excepinfo = args[2]\n"
-			     "    else: self.excepinfo = None\n"
-			     "    if len(args)>3: self.argerror = args[3]\n"
-			     "    else: self.argerror = None\n"
-			     "    Exception.__init__(self, *args, **kw)\n"
-			     ,
-			     Py_file_input, d, d);
+		PyObject *res=PyRun_String(
+				"class error(Exception):\n"
+				"  def __init__(self, *args, **kw):\n"
+				"    self.winerror, self.funcname, self.strerror = args[:3]\n"
+				"    Exception.__init__(self, *args, **kw)\n"
+				"class com_error(Exception):\n"
+				"  def __init__(self, *args, **kw):\n"
+				"    self.hresult = args[0]\n"
+				"    if len(args)>1: self.strerror = args[1]\n"
+				"    else: self.strerror = None\n"
+				"    if len(args)>2: self.excepinfo = args[2]\n"
+				"    else: self.excepinfo = None\n"
+				"    if len(args)>3: self.argerror = args[3]\n"
+				"    else: self.argerror = None\n"
+				"    Exception.__init__(self, *args, **kw)\n"
+				,
+				Py_file_input, d, d);
+		if (res==NULL)
+			return -1;
+		Py_DECREF(res);
+
 		PyWinExc_ApiError = PyDict_GetItemString(d, "error");
 		Py_XINCREF(PyWinExc_ApiError);
 		PyWinExc_COMError = PyDict_GetItemString(d, "com_error");
