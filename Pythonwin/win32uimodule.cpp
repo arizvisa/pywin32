@@ -1959,20 +1959,6 @@ static struct PyMethodDef ui_functions[] = {
 	{NULL,			NULL}
 };
 
-static int AddConstant(PyObject *dict, char *key, long value)
-{
-	PyObject *okey = PyString_FromString(key);
-	PyObject *oval = PyInt_FromLong(value);
-	if (!okey || !oval) {
-		XDODECREF(okey);
-		XDODECREF(oval);
-		return 1;
-	}
-	int rc = PyDict_SetItem(dict,okey, oval);
-	DODECREF(okey);
-	DODECREF(oval);
-	return rc;
-}
 #define ADD_CONSTANT(tok) if (PyModule_AddIntConstant(module, #tok, tok) == -1) return -1;
 #define ADD_ENUM(parta, partb) if (PyModule_AddIntConstant(module, #parta "_" #partb, parta::partb) == -1) return -1;
 #define ADD_ENUM3(parta, partb, partc) if (PyModule_AddIntConstant(module, #parta "_" #partb "_" #partc, parta::partb::partc) == -1) return -1;
