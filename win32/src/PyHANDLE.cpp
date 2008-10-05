@@ -219,11 +219,11 @@ BOOL PyHANDLE::Close(void)
 	BOOL rc = TRUE;
 	if (m_handle) {
 		Py_BEGIN_ALLOW_THREADS
-#ifdef Py_DEBUG_xxx
+#ifdef Py_DEBUG
 		__try {
 #endif // Py_DEBUG
 			rc = CloseHandle(m_handle);
-#ifdef Py_DEBUG_xxx
+#ifdef Py_DEBUG
 		} __except(1) {
 			// according to the docs on CloseHandle(), this
 			// can happen when run under the debugger.  This is a
@@ -343,7 +343,7 @@ int PyHANDLE::print(FILE *fp, int flags)
 PyObject * PyHANDLE::asStr(void)
 {
 	WCHAR resBuf[160];
-	_snwprintf(resBuf, 160, L"<%s:%Id>", GetTypeName(), m_handle);
+	_snwprintf(resBuf, 160, L"<%hs:%Id>", GetTypeName(), m_handle);
 	return PyWinCoreString_FromString(resBuf);
 }
 
