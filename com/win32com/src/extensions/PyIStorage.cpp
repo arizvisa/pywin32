@@ -754,9 +754,9 @@ STDMETHODIMP PyGStorage::SetElementTimes(
 		/* [in] */ const FILETIME __RPC_FAR * pmtime)
 {
 	PY_GATEWAY_METHOD;
-	PyObject *obpctime = new PyTime(*pctime);
-	PyObject *obpatime = new PyTime(*patime);
-	PyObject *obpmtime = new PyTime(*pmtime);
+	PyObject *obpctime = PyWinObject_FromFILETIME(*pctime);
+	PyObject *obpatime = PyWinObject_FromFILETIME(*patime);
+	PyObject *obpmtime = PyWinObject_FromFILETIME(*pmtime);
 	PyObject *obName = PyWinObject_FromWCHAR(pwcsName);
 	HRESULT hr=InvokeViaPolicy("SetElementTimes", NULL, "OOOO", obName, obpctime, obpatime, obpmtime);
 	Py_XDECREF(obpctime);

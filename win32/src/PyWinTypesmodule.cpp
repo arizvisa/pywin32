@@ -428,7 +428,7 @@ static PyObject *PyWin_DosDateTimeToTime(PyObject *self, PyObject *args)
 	FILETIME fd;
 	if (!DosDateTimeToFileTime(wFatDate, wFatTime, &fd))
 		return PyWin_SetAPIError("DosDateTimeToFileTime");
-	return new PyTime(fd);
+	return PyWinObject_FromFILETIME(fd);
 }
 #endif /* MS_WINCE */
 

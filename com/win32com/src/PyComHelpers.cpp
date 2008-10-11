@@ -278,9 +278,9 @@ PyObject *PyCom_PyObjectFromSTATSTG(STATSTG *pStat)
 	PyObject *obatime = NULL;
 	PyObject *obCLSID = NULL;
 	obSize = PyWinObject_FromULARGE_INTEGER(pStat->cbSize);
-	obmtime = new PyTime(pStat->mtime);
-	obctime = new PyTime(pStat->ctime);
-	obatime = new PyTime(pStat->atime);
+	obmtime = PyWinObject_FromFILETIME(pStat->mtime);
+	obctime = PyWinObject_FromFILETIME(pStat->ctime);
+	obatime = PyWinObject_FromFILETIME(pStat->atime);
 	obCLSID = PyWinObject_FromIID(pStat->clsid);
 	
 	PyObject *obName = MakeOLECHARToObj(pStat->pwcsName);
