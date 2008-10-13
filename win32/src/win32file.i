@@ -645,8 +645,9 @@ DWORD GetFileAttributes(
 DWORD GetFileAttributesW(
     WCHAR *fileName); // @pyparm <o PyUnicode>|fileName||Name of the file to retrieve attributes for.
 
-// @pyswig int|GetFileTime|Determine a file access/modification times.
-DWORD GetFileTime(
+// @pyswig (<o PyTime>, <o PyTime>, <o PyTime>)|GetFileTime|Returns a file's creation, last access, and modification times.
+// @comm Times are returned in UTC time.
+BOOLAPI GetFileTime(
     HANDLE handle, // @pyparm <o PyHANDLE>|handle||Handle to the file.
 	FILETIME *OUTPUT, // @pyparm <o PyTime>|creationTime||
 	FILETIME *OUTPUT, // @pyparm <o PyTime>|accessTime||
