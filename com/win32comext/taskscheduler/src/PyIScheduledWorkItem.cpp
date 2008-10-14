@@ -155,7 +155,7 @@ PyObject *PyIScheduledWorkItem::GetRunTimes(PyObject *self, PyObject *args)
 
 	PyObject *ret=NULL, *run_time_obj=NULL;
 	PyObject *obstart_time=NULL, *obend_time=NULL;
-	if (!PyArg_ParseTuple(args, "l|OO:GetRunTimes", &wCount, &obstart_time, &obend_time))
+	if (!PyArg_ParseTuple(args, "h|OO:GetRunTimes", &wCount, &obstart_time, &obend_time))
 		return NULL;
 	if ((obstart_time==NULL)||(obstart_time==Py_None))
 		GetLocalTime(&start_time);
