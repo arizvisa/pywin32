@@ -31,9 +31,8 @@ def CheckPythonPaths(verbose):
 	if verbose: print("\tCore Path:", end=' ')
 	try:
 		appPath = win32api.RegQueryValue(regutil.GetRootKey(), regutil.BuildDefaultPythonKey() + "\\PythonPath")
-	except win32api.error as xxx_todo_changeme:
-		(code, fn, desc) = xxx_todo_changeme.args
-		print("** does not exist - ", desc)
+	except win32api.error as exc:
+		print("** does not exist - ", exc.strerror)
 	problem = CheckPathString(appPath)
 	if problem:
 		print(problem)
@@ -66,11 +65,10 @@ def CheckHelpFiles(verbose):
 	if verbose: print("Help Files:")
 	try:
 		key = win32api.RegOpenKey(regutil.GetRootKey(), regutil.BuildDefaultPythonKey() + "\\Help", 0, win32con.KEY_READ)
-	except win32api.error as xxx_todo_changeme1:
-		(code, fn, details) = xxx_todo_changeme1.args
+	except win32api.error as exc:
 		from . import winerror
-		if code!=winerror.ERROR_FILE_NOT_FOUND:
-			raise win32api.error(code, fn, details)
+		if exc.winerror!=winerror.ERROR_FILE_NOT_FOUND:
+			raise
 		return
 		
 	try:
@@ -87,11 +85,10 @@ def CheckHelpFiles(verbose):
 				except os.error:
 					print("** Help file %s does not exist" % helpFile)
 				keyNo = keyNo + 1
-			except win32api.error as xxx_todo_changeme2:
-				(code, fn, desc) = xxx_todo_changeme2.args
+			except win32api.error as exc:
 				from . import winerror
-				if code!=winerror.ERROR_NO_MORE_ITEMS:
-					raise win32api.error(code, fn, desc)
+				if exc.winerror!=winerror.ERROR_NO_MORE_ITEMS:
+					raise
 				break
 	finally:
 		win32api.RegCloseKey(key)
@@ -102,11 +99,10 @@ def CheckRegisteredModules(verbose):
 	try:
 		keyhandle = win32api.RegOpenKey(regutil.GetRootKey(), k)
 		print("WARNING: 'Modules' registry entry is deprectated and evil!")
-	except win32api.error as xxx_todo_changeme3:
-		(code, fn, details) = xxx_todo_changeme3.args
+	except win32api.error as exc:
 		from . import winerror
-		if code!=winerror.ERROR_FILE_NOT_FOUND:
-			raise win32api.error(code, fn, details)
+		if exc.strerror!=winerror.ERROR_FILE_NOT_FOUND:
+			raise
 		return
 
 def CheckRegistry(verbose=0):

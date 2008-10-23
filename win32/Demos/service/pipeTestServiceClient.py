@@ -37,13 +37,12 @@ def CallPipe(fn, args):
         retryCount = retryCount + 1
         try:
             return fn(*args)
-        except win32api.error as xxx_todo_changeme:
-            (rc, fnerr, msg) = xxx_todo_changeme.args
-            if rc==winerror.ERROR_PIPE_BUSY:
+        except win32api.error as exc:
+            if exc.winerror==winerror.ERROR_PIPE_BUSY:
                 win32api.Sleep(5000)
                 continue
             else:
-                raise win32api.error(rc, fnerr, msg)
+                raise
 
     raise RuntimeError("Could not make a connection to the server")
 
@@ -66,7 +65,7 @@ def testLargeMessage(server, size = 4096):
 def stressThread(server, numMessages, wait):
     try:
         try:
-            for i in range(numMessages):
+            for i in xrange(numMessages):
                 r = CallPipe(CallNamedPipe, ("\\\\%s\\pipe\\PyPipeTest" % server, "#" * 512, 1024, NMPWAIT_WAIT_FOREVER))
         except:
             traceback.print_exc()
@@ -77,7 +76,7 @@ def stressThread(server, numMessages, wait):
 def stressTestClient(server, numThreads, numMessages):
     import _thread
     thread_waits = []
-    for t_num in range(numThreads):
+    for t_num in xrange(numThreads):
         # Note I could just wait on thread handles (after calling DuplicateHandle)
         # See the service itself for an example of waiting for the clients...
         wait = CreateEvent(None, 0, 0, None)

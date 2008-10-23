@@ -12,7 +12,7 @@ def _CheckNeedGUI():
 		isInprocApp = win32ui.GetApp().IsInproc()
 	if isInprocApp:
 		# MAY Need it - may already have one
-		need = ("pywin.debugger.dbgpyapp" in sys.modules)==0
+		need = "pywin.debugger.dbgpyapp" not in sys.modules
 	else:
 		need = 0
 	if need:

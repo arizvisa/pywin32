@@ -230,8 +230,8 @@ class TestOverlapped(unittest.TestCase):
         port = win32file.CreateIoCompletionPort(-1, 0, 0, 0)
         win32file.CreateIoCompletionPort(handle, port, 1, 0)
 
-        thread = threading.Thread(target=self._IOCPServerThread, args=(handle,port, test_overlapped_death))
-        thread.start()
+        t = threading.Thread(target=self._IOCPServerThread, args=(handle,port, test_overlapped_death))
+        t.start()
         try:
             time.sleep(0.1) # let thread do its thing.
             try:
@@ -242,7 +242,7 @@ class TestOverlapped(unittest.TestCase):
                     raise
         finally:
             handle.Close()
-            thread.join()
+            t.join()
 
     def testCompletionPortsNonQueuedBadReference(self):
         self.testCompletionPortsNonQueued(True)

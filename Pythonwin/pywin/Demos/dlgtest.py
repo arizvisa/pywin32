@@ -21,13 +21,12 @@ from pywin.mfc import dialog
 class TestDialog(dialog.Dialog):
 	def __init__(self, modal=1):
 		dialog.Dialog.__init__(self, IDD_SET_TABSTOPS)
-
 		self.counter=0
 		if modal:
 			self.DoModal()
 		else:
 			self.CreateWindow()
-		
+
 	def OnInitDialog(self):
 		# Set the caption of the dialog itself.
 		self.SetWindowText("Used to be Tab Stops!")
