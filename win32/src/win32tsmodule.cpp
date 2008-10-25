@@ -816,7 +816,6 @@ PyObject *PyInit_win32ts(void)
 	if (h==NULL)
 		h=LoadLibrary(L"wtsapi32.dll");
 	if (h){
-		pfnWTSGetActiveConsoleSessionId=(WTSGetActiveConsoleSessionIdfunc)GetProcAddress(h, "WTSGetActiveConsoleSessionId");
 		pfnWTSQueryUserToken=(WTSQueryUserTokenfunc)GetProcAddress(h, "WTSQueryUserToken");
 		pfnWTSRegisterSessionNotification=(WTSRegisterSessionNotificationfunc)GetProcAddress(h, "WTSRegisterSessionNotification");
 		pfnWTSUnRegisterSessionNotification=(WTSUnRegisterSessionNotificationfunc)GetProcAddress(h, "WTSUnRegisterSessionNotification");
@@ -825,8 +824,10 @@ PyObject *PyInit_win32ts(void)
 	h=GetModuleHandle(L"kernel32.dll");
 	if (h==NULL)
 		h=LoadLibrary(L"kernel32.dll");
-	if (h)
+	if (h) {
 		pfnProcessIdToSessionId=(ProcessIdToSessionIdfunc)GetProcAddress(h, "ProcessIdToSessionId");
+		pfnWTSGetActiveConsoleSessionId=(WTSGetActiveConsoleSessionIdfunc)GetProcAddress(h, "WTSGetActiveConsoleSessionId");
+	}
 
 #if (PY_VERSION_HEX >= 0x03000000)
 	return module;
