@@ -8,6 +8,10 @@ However contributors are encouraged to add their own entries for their work.
 Since build 212:
 ----------------
 
+* win32com.axcontrol gets support for interfaces OleControlSite,
+  OleInPlaceActiveObject, OleInPlaceFrame and OleInPlaceUIWindow interfaces
+  and OleTranslateAccelerator function.
+
 * MAPI gets support for IMAPIAdviseSink
 
 * win32com.shell gets support for IContextMenu2 and IContextMenu3
