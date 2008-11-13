@@ -19,6 +19,14 @@ import unittest
 import time
 
 # $Log$
+
+# Revision 1.1.1.1.2.1  2008/09/20 19:54:59  rupole
+# Include latest changes from main branch
+# Updates for py3k (reviewed by adodbapi maintainer) -- Done -- V.Cole
+#
+# Revision 1.2  2008/10/01 14:44:53  mhammond
+# Move to 'new style' exception raising.
+#
 # Revision 1.1.1.1  2008/01/04 18:49:10  kf7xm
 # Import of the adodbapi package into pywin32.
 # Documentation is in readme.txt and the tests directory.

@@ -1,4 +1,6 @@
-""" Unit tests for adodbapi"""
+""" Unit tests for adodbapi version 2.2.3"""
+from __future__ import print_function
+from __future__ import unicode_literals
 """
     adodbapi - A python DB API 2.0 interface to Microsoft ADO
     
@@ -31,9 +33,8 @@ try:
 except ImportError:
     win32 = False
 
+import adodbapitestconfig #will find (parent?) adodbpai
 import adodbapi
-## from adodbapi.tests
-import adodbapitestconfig
 
 #adodbapi.adodbapi.verbose = 3
 
@@ -252,7 +253,7 @@ class CommonDBTests(unittest.TestCase):
 
     def testDataTypeChar(self):
         for sqlDataType in ("char(6)","nchar(6)"):
-            self.helpTestDataType(sqlDataType,'STRING','spam  ',allowedReturnValues=['spam','spam','spam  ','spam  '])
+            self.helpTestDataType(sqlDataType,'STRING','spam  ',allowedReturnValues=['spam','spam  '])
 
     def testDataTypeVarChar(self):
         stringKinds = ["varchar(10)","nvarchar(10)","text","ntext"]
@@ -263,7 +264,7 @@ class CommonDBTests(unittest.TestCase):
             
     def testDataTypeDate(self):
         #Does not work with pytonTimeConvertor        
-        #self.helpTestDataType("smalldatetime",'DATETIME',adodbapi.Timestamp(2002,10,28,12,15,00)) #Accuracy one minute
+        #self.helpTestDataType("smalldatetime",'DATETIME',adodbapi.Timestamp(2002,10,28,12,15,0)) #Accuracy one minute
 
         self.helpTestDataType("datetime",'DATETIME',adodbapi.Date(2002,10,28),compareAlmostEqual=True)
         if self.getEngine() != 'MySQL':
@@ -334,7 +335,7 @@ class CommonDBTests(unittest.TestCase):
         self.helpCreateAndPopulateTableTemp(crsr)
         crsr.execute("SELECT fldData FROM tblTemp")
         if crsr.rowcount == -1:
-            #print "provider does not support rowcount on select"
+            #print("provider does not support rowcount on select")
             pass
         else:
             self.assertEquals( crsr.rowcount,9)
@@ -436,17 +437,27 @@ class TestADOwithSQLServer(CommonDBTests):
                               allowedReturnValues=['3.45','3,45',decimal.Decimal('3.45')])
 
     def testUserDefinedConversionForExactNumericTypes(self):
+        # variantConversions is a dictionary of convertion functions
+        # held internally in adodbapi
+        
         # By default decimal and numbers are returned as decimals.
         # Instead, make them return as  floats
-        oldconverter=adodbapi.variantConversions[adodbapi.adNumeric]
-        adodbapi.variantConversions[adodbapi.adNumeric]=adodbapi.cvtFloat
+
+        oldconverter = adodbapi.variantConversions[adodbapi.adNumeric] #keep old function to restore later
+
+        adodbapi.variantConversions[adodbapi.adNumeric] = adodbapi.cvtFloat
         self.helpTestDataType("decimal(18,2)",'NUMBER',3.45,compareAlmostEqual=1)
         self.helpTestDataType("numeric(18,2)",'NUMBER',3.45,compareAlmostEqual=1)        
-        # now strings
-        adodbapi.variantConversions[adodbapi.adNumeric]=adodbapi.cvtString
+        # now return strings
+        adodbapi.variantConversions[adodbapi.adNumeric] = adodbapi.cvtString
         self.helpTestDataType("numeric(18,2)",'NUMBER','3.45')
-        # now the way they were
-        adodbapi.variantConversions[adodbapi.adNumeric]=oldconverter #Restore
+        # now a completly weird user defined convertion
+        adodbapi.variantConversions[adodbapi.adNumeric] = lambda x: '!!This function returns a funny unicode string %s!!'%x
+        self.helpTestDataType("numeric(18,2)",'NUMBER','3.45',
+                              allowedReturnValues=['!!This function returns a funny unicode string 3.45!!'])
+
+        # now reset the converter to its original function
+        adodbapi.variantConversions[adodbapi.adNumeric]=oldconverter #Restore the original convertion function
         self.helpTestDataType("numeric(18,2)",'NUMBER',decimal.Decimal('3.45'))
 
     def testVariableReturningStoredProcedure(self):
@@ -626,7 +637,7 @@ class TestMXDateTimeConverter(TimeConverterInterfaceTest):
     
     def testDateObjectFromCOMDate(self):
         cmd=self.tc.DateObjectFromCOMDate(37435.7604282)
-        t=mx.DateTime.DateTime(2002,6,28,18,15,00)
+        t=mx.DateTime.DateTime(2002,6,28,18,15,0)
         t2=mx.DateTime.DateTime(2002,6,28,18,15,2)
         assert t2>cmd>t
     
@@ -657,7 +668,7 @@ class TestPythonTimeConverter(TimeConverterInterfaceTest):
         cmd=self.tc.DateObjectFromCOMDate(37435.7604282)
         t1=time.gmtime(time.mktime((2002,6,28,12,14,1, 4,31+28+31+30+31+28,-1)))
         t2=time.gmtime(time.mktime((2002,6,28,12,16,1, 4,31+28+31+30+31+28,-1)))
-        assert t1<cmd<t2,repr(cmd)+' should be about 2002-6-28 12:15:01'
+        assert t1<cmd<t2, '"%s" should be about 2002-6-28 12:15:01'%repr(cmd)
     
     def testDate(self):
         t1=time.mktime((2002,6,28,18,15,1, 4,31+28+31+30+31+30,0))
@@ -726,10 +737,6 @@ suite=unittest.TestSuite(suites)
 if __name__ == '__main__':       
     defaultDateConverter=adodbapi.dateconverter
     print(__doc__)
-    try:
-        print(adodbapi.version) # show version
-    except:
-        print('"adodbapi.version()" not present or not working.')
     print("Default Date Converter is %s" %(defaultDateConverter,))
     unittest.TextTestRunner().run(suite)
     if adodbapitestconfig.iterateOverTimeTests:
