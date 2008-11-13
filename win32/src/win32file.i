@@ -326,7 +326,7 @@ BOOLAPI DefineDosDeviceW(
 BOOLAPI DeleteFile(TCHAR *fileName);
 // @pyparm <o PyUnicode>|fileName||The filename to delete
 
-/*
+
 %{
 // @pyswig str/buffer|DeviceIoControl|Sends a control code to a device or file system driver
 // @comm Accepts keyword args
@@ -428,8 +428,12 @@ PyObject *py_DeviceIoControl(PyObject *self, PyObject *args, PyObject *kwargs)
 	if (numRead < OutBufferSize){
 		if (bBuffer){
 			// Create a view of existing buffer with actual output size
-			// Reimplement by using ob->tp_as_buffer->getbuffer, but there's no way to specify an offset
-			PyObject *resized=PyBuffer_FromReadWriteObject(ret, 0, numRead);
+			// Memoryview object in py3k supports slicing
+			#if (PY_VERSION_HEX >= 0x03000000)
+				PyObject *resized=PySequence_GetSlice(ret, 0, numRead);
+			#else
+				PyObject *resized=PyBuffer_FromReadWriteObject(ret, 0, numRead);
+			#endif
 			Py_DECREF(ret);
 			ret=resized;
 			}
@@ -441,7 +445,7 @@ PyObject *py_DeviceIoControl(PyObject *self, PyObject *args, PyObject *kwargs)
 PyCFunction pfnpy_DeviceIoControl=(PyCFunction)py_DeviceIoControl;
 %}
 %native(DeviceIoControl) pfnpy_DeviceIoControl;
-*/
+
 
 %native (OVERLAPPED) PyWinMethod_NewOVERLAPPED;
 
@@ -649,9 +653,9 @@ DWORD GetFileAttributesW(
 // @comm Times are returned in UTC time.
 BOOLAPI GetFileTime(
     HANDLE handle, // @pyparm <o PyHANDLE>|handle||Handle to the file.
-	FILETIME *OUTPUT, // @pyparm <o PyTime>|creationTime||
-	FILETIME *OUTPUT, // @pyparm <o PyTime>|accessTime||
-	FILETIME *OUTPUT // @pyparm <o PyTime>|writeTime||
+	FILETIME *OUTPUT,
+	FILETIME *OUTPUT,
+	FILETIME *OUTPUT
 );
 
 
