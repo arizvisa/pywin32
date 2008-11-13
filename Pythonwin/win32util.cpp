@@ -774,6 +774,9 @@ PyObject *MakeHD_ITEMTuple(HD_ITEM *item)
 	return ret;
 }
 
+/**** NOT USED: No current callers of this - and when there are, we need to
+ * ensure we PyWinObject_FreeTCHAR() pItem->pszText - see '????' below
+ * 
 // *** When PyCHeaderCtrl is implemented, return the '@' to the next line _and_ the parm!
 // pymethod |PyCHeaderCtrl|HD_ITEM tuple|Describes a HD_ITEM tuple, used by the <o PyCHeaderCtrl> object.
 // A tuple of 6 items:
@@ -852,7 +855,7 @@ BOOL ParseHD_ITEMTuple( PyObject *args, HD_ITEM *pItem)
 	}
 	return !PyErr_Occurred();
 }
-
+*******************************************/
 
 /////////////////////////////////////////////////////////////////////
 //

@@ -108,15 +108,17 @@ PyObject *
 PyCDocTemplate::DoCreateDocHelper(PyObject *self, PyObject *args, CRuntimeClass *pClass, ui_type_CObject &pydoc_type)
 {
 	TCHAR *fileName = NULL;	// default, untitled document
+	PyObject *ret = NULL;
 	PyObject *obfileName=Py_None;
 	if (!PyArg_ParseTuple(args,"|O", &obfileName))
 		return NULL;
 	if (!PyWinObject_AsTCHAR(obfileName, &fileName, TRUE))
 		return NULL;
+	// must exit via 'done' from here...
 	CDocument *pDoc = NULL;
 	if (fileName) {
 		CProtectedWinApp *pApp = GetProtectedApp();
-		if (!pApp) return NULL;
+		if (!pApp) goto done;
 		// need to look for an open doc of same name, and return that object.
 		// Let MFC framework search for a filename for us.
 		pDoc=pApp->FindOpenDocument(fileName);
@@ -125,15 +127,19 @@ PyCDocTemplate::DoCreateDocHelper(PyObject *self, PyObject *args, CRuntimeClass 
 	if (pDoc==NULL) {
 		CPythonDocTemplate *pMFCTemplate = GetTemplate(self);
 		if (pMFCTemplate==NULL)
-			return NULL;
+			goto done;
 		CObject *pOb;
 		GUI_BGN_SAVE;
 		pOb = pClass->CreateObject();
 		GUI_END_SAVE;
-		if (pOb==NULL)
-			RETURN_MEM_ERR("error creating document object");
-		if (!pOb->IsKindOf( RUNTIME_CLASS(CDocument)))
-			RETURN_ERR("Internal error: Unknown created instead of a document");
+		if (pOb==NULL) {
+			PyErr_NoMemory();
+			goto done;
+		}
+		if (!pOb->IsKindOf( RUNTIME_CLASS(CDocument))) {
+			PyErr_SetString(ui_module_error, "Internal error: Unknown created instead of a document");
+			goto done;
+		}
 		pDoc = (CDocument *)pOb;
 		pMFCTemplate->AddDocument(pDoc);
 		ASSERT_VALID(pDoc);
@@ -146,9 +152,10 @@ PyCDocTemplate::DoCreateDocHelper(PyObject *self, PyObject *args, CRuntimeClass 
 //			pDoc->SetTitle(strDocName);
 //		}
 	}
-	// ??? Some of the error returns above need to free this also ???
+	ret = ui_assoc_object::make(pydoc_type, pDoc);
+done:
 	PyWinObject_FreeTCHAR(fileName);
-	return ui_assoc_object::make(pydoc_type, pDoc);
+	return ret;
 }
 
 // @pymethod <o PyCDocument>|PyCDocTemplate|DoCreateDoc|Creates an underlying document object.

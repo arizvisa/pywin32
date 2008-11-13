@@ -168,12 +168,11 @@ static struct PyMethodDef win32uiole_functions[] = {
 	{NULL,			NULL}
 };
 
-#define ADD_CONSTANT(tok) if (rc=PyModule_AddIntConstant(module, #tok, tok)) return rc
-#define ADD_ENUM(parta, partb) if (rc=PyModule_AddIntConstant(module, #parta "_" #partb, parta::partb)) return rc
+#define ADD_CONSTANT(tok) if (PyModule_AddIntConstant(module, #tok, tok)==-1) return -1
+#define ADD_ENUM(parta, partb) if (PyModule_AddIntConstant(module, #parta "_" #partb, parta::partb)==-1) return -1
 
 int AddConstants(PyObject *module)
 {
-  int rc;
   ADD_ENUM(COleClientItem, emptyState);// @const win32uiole|COleClientItem_emptyState|
   ADD_ENUM(COleClientItem, loadedState);// @const win32uiole|COleClientItem_loadedState|
   ADD_ENUM(COleClientItem, openState);// @const win32uiole|COleClientItem_openState|

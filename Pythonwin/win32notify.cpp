@@ -129,7 +129,8 @@ PyObject *PyNotifyMakeExtraTuple( NMHDR *ptr, char *fmt)
 void PyNotifyParseExtraTuple( NMHDR *ptr, PyObject *args,  char *fmt)
 {
 	char *pUse = (char *)(ptr+1);
-	BOOL bIgnore;
+	BOOL bIgnoreFormat;
+	BOOL bIgnoreValue;
 	int argNum = 0;
 	if (fmt==NULL){
 		PyErr_Format(PyExc_ValueError, "Notify code %d not expected to return data", ptr->code);
@@ -139,7 +140,10 @@ void PyNotifyParseExtraTuple( NMHDR *ptr, PyObject *args,  char *fmt)
 	while (*fmt) {
 		PyObject *ob = PyTuple_GetItem(args, argNum);
 		if (ob==NULL) return;
-		bIgnore = *fmt=='-';
+		bIgnoreFormat = *fmt=='-';
+		// The user can specify 'None' to say 'leave the value alone'
+		bIgnoreValue = (ob == Py_None);
+		BOOL bIgnore = bIgnoreFormat || bIgnoreValue;
 		if (bIgnore) ++fmt;
 		switch (*fmt) {
 		case 'i':
@@ -155,6 +159,14 @@ void PyNotifyParseExtraTuple( NMHDR *ptr, PyObject *args,  char *fmt)
 			}
 		case 'T': { // TV_ITEM
 			ASSERT(FALSE);
+			break;
+			}
+		case 'V':{// Pointer-sized number, also used for HANDLEs, LPARAMS, etc
+			if (!bIgnore) {
+				if (!PyWinLong_AsVoidPtr(ob, (void **)pUse))
+					return;
+			}
+			pUse += (sizeof(void *));
 			break;
 			}
 		case 'z': // string pointer
@@ -216,7 +228,7 @@ void PyNotifyParseExtraTuple( NMHDR *ptr, PyObject *args,  char *fmt)
 			MY_RET_ERR("Bad format char in internal WM_NOTIFY tuple conversion");
 		}
 		fmt++;
-		if (!bIgnore)
+		if (!bIgnoreFormat)
 			argNum ++;
 	}
 	return;
@@ -290,12 +302,12 @@ Python_OnNotify (CWnd *pFrom, WPARAM, LPARAM lParam, LRESULT *pResult)
 		fmt = "V";		//HWND
 	else if (code == TCN_KEYDOWN)
 		fmt = "ii";		// NMTCKEYDOWN - ??? First element is a WORD, may work due to alignment ???
+	else if (code == TTN_NEEDTEXTA)
+		fmt = "-zs80Vi";	// TOOLTIPTEXTA - ie, NMTTDISPINFOA
 	else if (code == TTN_NEEDTEXTW)
-		fmt = "-ZS80ii";	//TOOLTIPTEXT
+		fmt = "-ZS80Vi";	// TOOLTIPTEXTW - ie, NMTTDISPINFOW
 	else if (code == TTN_POP || code == TTN_SHOW)
 		fmt = NULL;		//NMHDR only
-	else if (code == TTN_NEEDTEXTA)
-		fmt = "-zs80Vi";	// NMTTDISPINFO - Third element is HINSTANCE
 	else if (code == TVN_ENDLABELEDITW || code == TVN_BEGINLABELEDITW || code == TVN_SETDISPINFOW
 			|| code == TVN_GETDISPINFOW || code == TVN_ENDLABELEDITA || code == TVN_BEGINLABELEDITA
 			|| code == TVN_SETDISPINFOA || code == TVN_GETDISPINFOA)
@@ -350,10 +362,8 @@ Python_OnNotify (CWnd *pFrom, WPARAM, LPARAM lParam, LRESULT *pResult)
 	BOOL bPassOn = FALSE;
 	PyObject *obOther;
 	PyObject *result = Python_do_callback(method, args);
-	if (result==NULL) {
+	if (result==NULL)
 		PyErr_Warn(PyExc_Warning, "Exception in OnNotify() handler");
-		gui_print_error();
-		}
 	else if (result==Py_None)	// allow for None "dont pass on", else result to windows
 		bPassOn = TRUE;
 	else if PyTuple_Check(result){

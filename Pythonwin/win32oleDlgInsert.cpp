@@ -6,6 +6,7 @@
 #include "pywintypes.h"
 // @doc
 
+// XXX - is this actually used?????????
 class OLEUIINSERTOBJECTHelper
 {
 public:
@@ -29,6 +30,10 @@ OLEUIINSERTOBJECTHelper::OLEUIINSERTOBJECTHelper( OLEUIINSERTOBJECT *pCon )
 }
 OLEUIINSERTOBJECTHelper::~OLEUIINSERTOBJECTHelper()
 {
+	if (pConv->lpszCaption)
+		PyWinObject_FreeTCHAR((TCHAR *)pConv->lpszCaption);
+	if (pConv->lpszTemplate)
+		PyWinObject_FreeTCHAR((TCHAR *)pConv->lpszTemplate);
 }
 
 BOOL OLEUIINSERTOBJECTHelper::ParseDict( PyObject *obDict )
@@ -62,8 +67,7 @@ BOOL OLEUIINSERTOBJECTHelper::ParseDict( PyObject *obDict )
 
 	ob = PyObject_GetAttrString(obDict, "Caption");
 	if (ob){
-		// ??? This needs to be freed somewhere ???
-		// Need cast since lpszCaption is const
+		// Need cast since lpszCaption is const.  Free'd in object dtor
 		if (!PyWinObject_AsTCHAR(ob, (TCHAR **)&pConv->lpszCaption, FALSE))
 			return FALSE;
 		}
@@ -82,7 +86,7 @@ BOOL OLEUIINSERTOBJECTHelper::ParseDict( PyObject *obDict )
 
 	ob = PyObject_GetAttrString(obDict, "Template");
 	if (ob){
-		// ??? This needs to be freed somewhere ???	
+		// Need cast since lpszTemplate is const.  Free'd in object dtor
 		if (!PyWinObject_AsTCHAR(ob, (TCHAR **)&pConv->lpszTemplate, FALSE))
 			return FALSE;
 		}

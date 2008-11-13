@@ -933,7 +933,7 @@ PyCToolBarCtrl::~PyCToolBarCtrl()
 
 	n = strlist->GetSize();
 	for (i = 0; i < n; i++)
-		delete strlist->GetAt (i);
+		PyWinObject_FreeMultipleString((TCHAR *)strlist->GetAt(i));
 	delete strlist;
 }
 
@@ -1037,22 +1037,15 @@ PyObject *PyCToolBarCtrl_AddStrings (PyObject *self, PyObject *args)
 	if (!PyWinObject_AsMultipleString(args, &strings, FALSE, &charcnt))
 		return NULL;
 
-	// ??? Need to change destructor to call FreeMultipleString ???
-	((PyCToolBarCtrl *) self)->strlist->Add (strings);
+	// Add string pointer to list of things to be cleaned up at the end.
+	// (XXX - is this really necessary?  It seems surprising the control
+	// doesn't take its own copy???)
+	((PyCToolBarCtrl *) self)->strlist->Add(strings);
 	
 	// @pyparm string...|strings||Strings to add. Can give more than one string.
-
-	/*
-	 * Okay, so this is REALLY ugly... Blame Microsoft in this case.
-	 * They actually require that you pass in a bunch of strings,
-	 * separated by NULL bytes, and terminated by TWO NULL bytes.
-	 * I'm going to go wash my hands now...
-	 */
-
 	GUI_BGN_SAVE;
-	int rc = pTBC->AddStrings (strings);
+	int rc = pTBC->AddStrings(strings);
 	GUI_END_SAVE;
-
 	return PyInt_FromLong(rc);
 }
 
