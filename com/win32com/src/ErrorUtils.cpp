@@ -183,10 +183,8 @@ BOOL PyCom_ExcepInfoFromPyObject(PyObject *v, EXCEPINFO *pExcepInfo, HRESULT *ph
 	// Explicit check for client.
 	// Note that with class based exceptions, a simple pointer check fails.
 	// Any class sub-classed from the client is considered a server error,
-	// so we need to check the class explicitely.
-	if (v==PyWinExc_COMError || // String exceptions
-			(PyObject_IsInstance(v, PyExc_Exception) && // Class exceptions
-			((PyObject *)v->ob_type==PyWinExc_COMError)))  {
+	// so we need to check the class explicitly.
+	if ((PyObject *)v->ob_type==PyWinExc_COMError) {
 		// Client side error
 		// Clear the state of the excep info.
 		// use abstract API to get at details.
@@ -495,15 +493,20 @@ static void _DoLogger(PyObject *logProvider, char *log_method, const char *fmt, 
 	Py_XDECREF(logger);
 }
 
-BOOL IsNonServerErrorCurrent() {
+// Is the current exception a "server" exception? - ie, one explicitly
+// thrown by Python code to indicate an error.  This is defined as
+// any exception whose type is a subclass of com_error (a plain
+// com_error probably means an unhandled exception from someone
+// calling an interface)
+BOOL IsServerErrorCurrent() {
 	BOOL rc = FALSE;
 	PyObject *exc_typ = NULL, *exc_val = NULL, *exc_tb = NULL;
 	PyErr_Fetch( &exc_typ, &exc_val, &exc_tb);
+	assert(exc_typ); // we should only be called with an exception current.
 	if (exc_typ) {
 		PyErr_NormalizeException( &exc_typ, &exc_val, &exc_tb);
-		rc = (!PyErr_GivenExceptionMatches(exc_val, PyWinExc_COMError) ||
-		     (PyObject_IsInstance(exc_val, PyExc_Exception) &&
-		      PyObject_IsSubclass((PyObject *)exc_val->ob_type, PyWinExc_COMError)));
+		// so it must "match" a com_error, but not be *exactly* a COM error.
+		rc = PyErr_GivenExceptionMatches(exc_val, PyWinExc_COMError) && exc_typ != PyWinExc_COMError;
 	}
 	PyErr_Restore(exc_typ, exc_val, exc_tb);
 	return rc;
@@ -526,7 +529,7 @@ PYCOM_EXPORT void PyCom_LoggerWarning(PyObject *logProvider, const char *fmt, ..
 PYCOM_EXPORT 
 void PyCom_LoggerNonServerException(PyObject *logProvider, const char *fmt, ...)
 {
-	if (!IsNonServerErrorCurrent())
+	if (IsServerErrorCurrent())
 		return;
 	va_list marker;
 	va_start(marker, fmt);
@@ -725,7 +728,9 @@ static PyObject *PyCom_PyObjectFromIErrorInfo(IErrorInfo *pEI, HRESULT errorhr)
 // Error string helpers - get SCODE, FACILITY etc strings
 //
 ////////////////////////////////////////////////////////////////////////
+#ifndef _countof
 #define _countof(array) (sizeof(array)/sizeof(array[0]))
+#endif
 
 void GetScodeString(HRESULT hr, LPTSTR buf, int bufSize)
 {

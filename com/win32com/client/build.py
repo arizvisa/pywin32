@@ -577,7 +577,7 @@ def BuildCallList(fdesc, names, defNamedOptArg, defNamedNotOptArg, defUnnamedArg
     numArgs = numArgs - 1
   else:
     firstOptArg = numArgs - numOptArgs
-  for arg in range(numArgs):
+  for arg in xrange(numArgs):
     try:
       argName = names[arg+1] 
       namedArg = argName is not None
@@ -603,7 +603,6 @@ def BuildCallList(fdesc, names, defNamedOptArg, defNamedNotOptArg, defUnnamedArg
           defArgVal = defUnnamedArg
 
     argName = MakePublicAttributeName(argName)
-
     # insanely long lines with an 'encoding' flag crashes python 2.4.0
     # keep 5 args per line
     # This may still fail if the arg names are insane, but that seems

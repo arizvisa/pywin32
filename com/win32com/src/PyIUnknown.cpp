@@ -208,7 +208,7 @@ PyObject *PyIUnknown::QueryInterface(PyObject *self, PyObject *args)
 	if (!PyWinObject_AsIID(obiid, &iid))
 		return NULL;
 
-	IID useIID;	/* used if obUseIID != NULL */
+	IID useIID;	/* used if obUseIID != Py_None */
 
 	// This used to allow an int, with 1 indicating IUnknown
 	// Doesn't seem to be used anywhere, so it has been removed
@@ -235,7 +235,9 @@ PyObject *PyIUnknown::QueryInterface(PyObject *self, PyObject *args)
 	PyObject *rc = PyCom_PyObjectFromIUnknown(punk, iid, TRUE);
 
 	/* we may have been asked to use a different interface */
-	/* ??? useIID will be ignored if interface successfully created ??? */
+	/* ??? useIID will be ignored if interface successfully created ???
+	  Apparently true and relies on a final QI somewhere? :()
+	*/
 	if ( rc == NULL && obUseIID != Py_None)
 	{
 		PyErr_Clear();

@@ -1,3 +1,4 @@
+# The MFCish window classes.
 from . import object
 import win32ui
 import win32con

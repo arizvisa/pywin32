@@ -336,7 +336,7 @@ CString ui_base_class::repr()
 	CString csRet;
 #if (PY_VERSION_HEX < 0x03000000)
 	USES_CONVERSION;
- 	csRet.Format(_T("object '%s'"), A2T(ob_type->tp_name));
+ 	csRet.Format(_T("object '%s'"), A2T((LPSTR)ob_type->tp_name));
 #else
  	csRet.Format(_T("object '%S'"), ob_type->tp_name);
 #endif

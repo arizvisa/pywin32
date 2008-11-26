@@ -44,4 +44,3 @@ app.AppBuilder = TestDialogApp
 if __name__=='__main__':
 	from . import demoutils
 	demoutils.NeedApp()
-	

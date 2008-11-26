@@ -22,7 +22,7 @@ import pythoncom
 from . import build
 
 error = "makepy.error"
-makepy_version = "0.4.97" # Written to generated file.
+makepy_version = "0.4.98" # Written to generated file.
 
 GEN_FULL="full"
 GEN_DEMAND_BASE = "demand(base)"
@@ -97,11 +97,17 @@ def WriteSinkEventMap(obj, stream):
 # MI is used to join my writable helpers, and the OLE
 # classes.
 class WritableItem:
+    # __cmp__ used for sorting in py2x...
     def __cmp__(self, other):
         "Compare for sorting"   
         ret = cmp(self.order, other.order)
         if ret==0 and self.doc: ret = cmp(self.doc[0], other.doc[0])
         return ret
+    # ... but not used in py3k - __lt__ minimum needed there
+    def __lt__(self, other): # py3k variant
+        if self.order == other.order:
+            return self.doc < other.doc
+        return self.order < other.order
     def __repr__(self):
         return "OleItem: doc=%s, order=%d" % (repr(self.doc), self.order)
 
@@ -127,7 +133,7 @@ class RecordItem(build.OleItem, WritableItem):
 # Given an enum, write all aliases for it.
 # (no longer necessary for new style code, but still used for old code.
 def WriteAliasesForItem(item, aliasItems, stream):
-  for alias in list(aliasItems.values()):
+  for alias in aliasItems.itervalues():
     if item.doc and alias.aliasDoc and (alias.aliasDoc[0]==item.doc[0]):
       alias.WriteAliasItem(aliasItems, stream)
       
@@ -204,8 +210,13 @@ class EnumerationItem(build.OleItem, WritableItem):
       vdesc = entry.desc
       if vdesc[4] == pythoncom.VAR_CONST:
         val = vdesc[1]
-        if isinstance(val, int):
-          use=val
+        if sys.version_info <= (2,4) and (isinstance(val, int) or isinstance(val, long)):
+          if val==0x80000000L: # special case
+            use = "0x80000000L" # 'L' for future warning
+          elif val > 0x80000000L or val < 0: # avoid a FutureWarning
+            use = long(val)
+          else:
+            use = hex(val)
         else:
           use = repr(str(val))
         print("\t%-30s=%-10s # from enum %s" % \
@@ -644,7 +655,7 @@ class Generator:
 
   def CollectOleItemInfosFromType(self):
     ret = []
-    for i in range(self.typelib.GetTypeInfoCount()):
+    for i in xrange(self.typelib.GetTypeInfoCount()):
       info = self.typelib.GetTypeInfo(i)
       infotype = self.typelib.GetTypeInfoType(i)
       doc = self.typelib.GetDocumentation(i)
@@ -755,6 +766,33 @@ class Generator:
   
     return oleItems, enumItems, recordItems, vtableItems
 
+  def open_writer(self, filename, encoding="mbcs"):
+    # A place to put code to open a file with the appropriate encoding.
+    # Does *not* set self.file - just opens and returns a file.
+    # Actually *deletes* the filename asked for and returns a handle to a
+    # temp file - finish_writer then puts everything back in place.  This
+    # is so errors don't leave a 1/2 generated file around causing bizarre
+    # errors later.
+    # Could be a classmethod one day...
+    try:
+      os.unlink(filename)
+    except os.error:
+      pass
+    filename = filename + ".temp"
+    if sys.version_info > (3,0):
+      ret = open(filename, "wt", encoding=encoding)
+    else:
+      import codecs # not available in py3k.
+      ret = codecs.open(filename, "wt", encoding)
+    return ret
+
+  def finish_writer(self, filename, f, worked):
+    f.close()
+    if worked:
+        os.rename(filename + ".temp", filename)
+    else:
+        os.unlink(filename + ".temp")
+
   def generate(self, file, is_for_demand = 0):
     if is_for_demand:
       self.generate_type = GEN_DEMAND_BASE
@@ -776,6 +814,11 @@ class Generator:
     self.bHaveWrittenDispatchBaseClass = 0
     self.bHaveWrittenCoClassBaseClass = 0
     self.bHaveWrittenEventBaseClass = 0
+    # You must provide a file correctly configured for writing unicode.
+    # We assert this is it may indicate somewhere in pywin32 that needs
+    # upgrading.
+    assert self.file.encoding, self.file
+    encoding = self.file.encoding # or "mbcs"
 
     print('# -*- coding: mbcs -*-', file=self.file) # Is this always correct?
     print('# Created by makepy.py version %s' % (makepy_version,), file=self.file)
@@ -830,21 +873,21 @@ class Generator:
     if enumItems:
         print("class constants:", file=stream)
         values = list(enumItems.values())
-        ## values.sort()
+        values.sort()
         for oleitem in values:
             oleitem.WriteEnumerationItems(stream)
             self.progress.Tick()
         print(file=stream)
 
     if self.generate_type == GEN_FULL:
-      values = [v for v in oleItems.values() if v is not None]
-      ## values.sort()
+      values = [v for v in oleItems.itervalues() if v is not None]
+      values.sort()
       for oleitem in values:
         self.progress.Tick()
         oleitem.WriteClass(self)
 
       values = list(vtableItems.values())
-      ## values.sort()
+      values.sort()
       for oleitem in values:
         self.progress.Tick()
         oleitem.WriteClass(self)
@@ -852,8 +895,7 @@ class Generator:
         self.progress.Tick(len(oleItems)+len(vtableItems))
 
     print('RecordMap = {', file=stream)
-    values = list(recordItems.values())
-    for record in values:
+    for record in recordItems.itervalues():
         if str(record.clsid) == pythoncom.IID_NULL:
             print("\t###%s: %s, # Typedef disabled because it doesn't have a non-null GUID" % (repr(record.doc[0]), repr(str(record.clsid))), file=stream)
         else:
@@ -864,7 +906,7 @@ class Generator:
     # Write out _all_ my generated CLSID's in the map
     if self.generate_type == GEN_FULL:
       print('CLSIDToClassMap = {', file=stream)
-      for item in list(oleItems.values()):
+      for item in oleItems.itervalues():
           if item is not None and item.bWritten:
               print("\t'%s' : %s," % (str(item.clsid), item.python_name), file=stream)
       print('}', file=stream)
@@ -872,7 +914,7 @@ class Generator:
       print('win32com.client.CLSIDToClass.RegisterCLSIDsFromDict( CLSIDToClassMap )', file=stream)
       print("VTablesToPackageMap = {}", file=stream)
       print("VTablesToClassMap = {", file=stream)
-      for item in list(vtableItems.values()):
+      for item in vtableItems.itervalues():
         print("\t'%s' : '%s'," % (item.clsid,item.python_name), file=stream)
       print('}', file=stream)
       print(file=stream)
@@ -880,13 +922,13 @@ class Generator:
     else:
       print('CLSIDToClassMap = {}', file=stream)
       print('CLSIDToPackageMap = {', file=stream)
-      for item in list(oleItems.values()):
+      for item in oleItems.itervalues():
         if item is not None:
           print("\t'%s' : %s," % (str(item.clsid), repr(item.python_name)), file=stream)
       print('}', file=stream)
       print("VTablesToClassMap = {}", file=stream)
       print("VTablesToPackageMap = {", file=stream)
-      for item in list(vtableItems.values()):
+      for item in vtableItems.itervalues():
         print("\t'%s' : '%s'," % (item.clsid,item.python_name), file=stream)
       print('}', file=stream)
       print(file=stream)
@@ -894,14 +936,14 @@ class Generator:
     print(file=stream)
     # Bit of a hack - build a temp map of iteItems + vtableItems - coClasses
     map = {}
-    for item in list(oleItems.values()):
+    for item in oleItems.itervalues():
         if item is not None and not isinstance(item, CoClassItem):
             map[item.python_name] = item.clsid
-    for item in list(vtableItems.values()): # No nones or CoClasses in this map
+    for item in vtableItems.itervalues(): # No nones or CoClasses in this map
         map[item.python_name] = item.clsid
             
     print("NamesToIIDMap = {", file=stream)
-    for name, iid in list(map.items()):
+    for name, iid in map.iteritems():
         print("\t'%s' : '%s'," % (name, iid), file=stream)
     print('}', file=stream)
     print(file=stream)
@@ -959,9 +1001,9 @@ class Generator:
       assert found, "Cant find the '%s' interface in the CoClasses, or the interfaces" % (child,)
       # Make a map of iid: dispitem, vtableitem)
       items = {}
-      for key, value in list(oleItems.items()):
+      for key, value in oleItems.iteritems():
           items[key] = (value,None)
-      for key, value in list(vtableItems.items()):
+      for key, value in vtableItems.iteritems():
           existing = items.get(key, None)
           if existing is not None:
               new_val = existing[0], value
@@ -970,18 +1012,23 @@ class Generator:
           items[key] = new_val
 
       self.progress.SetDescription("Generating...", len(items))
-      for oleitem, vtableitem in list(items.values()):
+      for oleitem, vtableitem in items.itervalues():
         an_item = oleitem or vtableitem
         assert not self.file, "already have a file?"
-        self.file = open(os.path.join(dir, an_item.python_name) + ".py", "w")
+        # like makepy.py, we gen to a .temp file so failure doesn't
+        # leave a 1/2 generated mess.
+        out_name = os.path.join(dir, an_item.python_name) + ".py"
+        worked = False
+        self.file = self.open_writer(out_name)
         try:
           if oleitem is not None:
             self.do_gen_child_item(oleitem)
           if vtableitem is not None:
             self.do_gen_child_item(vtableitem)
           self.progress.Tick()
+          worked = True
         finally:
-          self.file.close()
+          self.finish_writer(out_name, self.file, worked)
           self.file = None
     finally:
       self.progress.Finished()

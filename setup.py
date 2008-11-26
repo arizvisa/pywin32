@@ -1,4 +1,4 @@
-build_id="212.1" # may optionally include a ".{patchno}" suffix.
+build_id="212.5" # may optionally include a ".{patchno}" suffix.
 # Putting buildno at the top prevents automatic __doc__ assignment, and
 # I *want* the build number at the top :)
 __doc__="""This is a distutils setup-script for the pywin32 extensions
@@ -72,6 +72,7 @@ import types, glob
 import re
 import _winreg
 
+is_py3k = sys.version_info > (3,) # get this out of the way early on...
 
 # The rest of our imports.
 from distutils.core import setup, Extension, Command
@@ -267,6 +268,7 @@ class WinExt (Extension):
         # MSVC based builds.  Always define DISTUTILS_BUILD so they can tell.
         define_macros = define_macros or []
         define_macros.append(("DISTUTILS_BUILD", None))
+        define_macros.append(("_CRT_SECURE_NO_WARNINGS", None))
         self.pch_header = pch_header
         self.extra_swig_commands = extra_swig_commands or []
         self.windows_h_version = windows_h_version
@@ -305,17 +307,28 @@ class WinExt (Extension):
         if dsp is None:
             return result
         dsp_path = os.path.dirname(dsp)
+        seen_swigs = []
         for line in open(dsp, "r"):
             fields = line.strip().split("=", 2)
             if fields[0]=="SOURCE":
-                if os.path.splitext(fields[1])[1].lower() in ['.cpp', '.c', '.i', '.rc', '.mc']:
+                ext = os.path.splitext(fields[1])[1].lower()
+                if ext in ['.cpp', '.c', '.i', '.rc', '.mc']:
                     pathname = os.path.normpath(os.path.join(dsp_path, fields[1]))
                     result.append(pathname)
+                    if ext == '.i':
+                        seen_swigs.append(pathname)
 
+        # ack - .dsp files may have references to the generated 'foomodule.cpp'
+        # from 'foo.i' - but we now do things differently...
+        for ss in seen_swigs:
+            base, ext = os.path.splitext(ss)
+            nuke = base + "module.cpp"
+            try:
+                result.remove(nuke)
+            except ValueError:
+                pass
         # Sort the sources so that (for example) the .mc file is processed first,
         # building this may create files included by other source files.
-        # Note that this requires a patch to distutils' ccompiler classes so that
-        # they build the sources in the order given.
         build_order = ".i .mc .rc .cpp".split()
         decorated = [(build_order.index(os.path.splitext(fname)[-1].lower()), fname)
                      for fname in result]
@@ -390,7 +403,7 @@ class WinExt (Extension):
             # for py3k, false for py2
             unicode_mode = self.unicode_mode
             if unicode_mode is None:
-                unicode_mode = sys.version_info > (3,)
+                unicode_mode = is_py3k
             if unicode_mode:
                 self.extra_compile_args.append("/DUNICODE")
                 self.extra_compile_args.append("/D_UNICODE")
@@ -483,11 +496,18 @@ class WinExt_system32(WinExt):
 # Extensions to the distutils commands.
 
 # Start with 2to3 related stuff for py3k.
-is_py3k = sys.version_info > (3,)
-if is_py3k:
+do_2to3 = False and is_py3k # XXX - py3k branch - syntax is already py3k!
+if do_2to3:
+    # hack into the import fixer to remove the Tk fixers - they cause trouble
+    # for some of our things with the same name.
+    from lib2to3.fixes import fix_imports
+    # 'Dialog' fixer causes pywin/mfc/dialog.py's DlgSimpleImport to subclass
+    # a Tk dialog instead of a pywin one!
+    del fix_imports.MAPPING["Dialog"]
     def refactor_filenames(filenames):
         from lib2to3.refactor import RefactoringTool, get_fixers_from_package
         fixers = get_fixers_from_package('lib2to3.fixes')
+
         options = dict(doctests_only=False, fix=[], list_fixes=[], 
                        print_function=False, verbose=False,
                        write=True)
@@ -508,7 +528,7 @@ else:
         pass
 
 # 'build_py' command
-if is_py3k:
+if do_2to3:
     # Force 2to3 to be run for py3k versions.
     class my_build_py(build_py):
         def run(self):
@@ -537,7 +557,7 @@ else:
     my_build_py = build_py # default version.
 
 # 'build_scripts' command
-if is_py3k:
+if do_2to3:
     class my_build_scripts(build_scripts):
         def copy_file(self, src, dest):
             dest, copied = build_scripts.copy_file(self, src, dest)
@@ -1089,8 +1109,12 @@ class my_build_ext(build_ext):
             return ext.export_symbols
         return build_ext.get_export_symbols(self, ext)
 
-    def find_swig (self):
-        if "SWIG" in os.environ:
+    def find_swig(self):
+        if is_py3k and "SWIG_PY3" in os.environ:
+            swig = os.environ["SWIG_PY3"]
+        elif not is_py3k and "SWIG_PY2" in os.environ:
+            swig = os.environ["SWIG_PY2"]
+        elif "SWIG" in os.environ:
             swig = os.environ["SWIG"]
         else:
             # We know where our swig is
@@ -1099,7 +1123,7 @@ class my_build_ext(build_ext):
         os.environ["SWIG_LIB"] = lib
         return swig
 
-    def swig_sources (self, sources, ext=None):
+    def swig_sources(self, sources, ext=None):
         new_sources = []
         swig_sources = []
         swig_targets = {}
@@ -1107,10 +1131,8 @@ class my_build_ext(build_ext):
         # is fine for developers who want to distribute the generated
         # source -- but there should be an option to put SWIG output in
         # the temp dir.
-        # XXX - Note that swig_wince_modules no longer #include the real
-        # generated .cpp file (well, they do, but are avoided via the
-        # pre-processor.)  So this is no longer a reason we can't generate
-        # directly to the temp directory.
+        # Adding py3k to the mix means we *really* need to move to generating
+        # to the temp dir...
         target_ext = '.cpp'
         for source in sources:
             (base, ext) = os.path.splitext(source)
@@ -1118,26 +1140,23 @@ class my_build_ext(build_ext):
                 if os.path.split(base)[1] in swig_include_files:
                     continue
                 swig_sources.append(source)
-                # Patch up the filenames for SWIG modules that also build
-                # under WinCE - see defn of swig_wince_modules for details
+                # Patch up the filenames for various special cases...
                 if os.path.basename(base) in swig_interface_parents:
                     swig_targets[source] = base + target_ext
                 elif self.current_extension.name == "winxpgui" and \
                      os.path.basename(base)=="win32gui":
                     # More vile hacks.  winxpmodule is built from win32gui.i -
                     # just different #defines are setup for windows.h.
+                    pyver = sys.version_info[0] # 2 or 3!
                     new_target = os.path.join(os.path.dirname(base),
-                                              "winxpguimodule") + target_ext
-                    swig_targets[source] = new_target
-                    new_sources.append(new_target)
-                elif os.path.basename(base) in swig_wince_modules:
-                    # We need to add this .cpp to the sources, so it
-                    # will be built.
-                    new_target = base + 'module_win32' + target_ext
+                                              "winxpgui_py%d_swig%s" % (pyver, target_ext))
                     swig_targets[source] = new_target
                     new_sources.append(new_target)
                 else:
-                    swig_targets[source] = base + 'module' + target_ext
+                    pyver = sys.version_info[0] # 2 or 3!
+                    new_target = '%s_py%d_swig%s' % (base, pyver, target_ext)
+                    new_sources.append(new_target)
+                    swig_targets[source] = new_target
             else:
                 new_sources.append(source)
 
@@ -1171,10 +1190,12 @@ class my_build_ext(build_ext):
             # *always* regenerate the .cpp files, meaning every future
             # build for any platform sees these as dirty.
             # This could probably go once we generate .cpp into the temp dir.
-            if self.force or newer(os.path.abspath(source), os.path.abspath(target)):
-                swig_cmd.extend(["-o",
-                                 os.path.abspath(target),
-                                 os.path.abspath(source)])
+            fqsource = os.path.abspath(source)
+            fqtarget = os.path.abspath(target)
+            rebuild = self.force or newer(fqsource, fqtarget)
+            log.debug("should swig %s->%s=%s", source, target, rebuild)
+            if rebuild:
+                swig_cmd.extend(["-o", fqtarget, fqsource])
                 log.info("swigging %s to %s", source, target)
                 out_dir = os.path.dirname(source)
                 cwd = os.getcwd()
@@ -1291,6 +1312,8 @@ class my_compiler(base_compiler):
                 ok = True
             except ImportError:
                 ok = False
+            # XXX - verstamp still broken on py3k
+            ok = False
             if ok:
                 stamp_script = os.path.join(sys.prefix, "Lib", "site-packages",
                                             "win32", "lib", "win32verstamp.py")
@@ -1351,7 +1374,7 @@ class my_install_data(install_data):
         install_data.finalize_options(self)
 
     def copy_file(self, src, dest):
-        dest, copied = build_scripts.copy_file(self, src, dest)
+        dest, copied = install_data.copy_file(self, src, dest)
         # 2to3
         if not self.dry_run and copied:
             refactor_filenames([dest])
@@ -1385,13 +1408,13 @@ for info in (
         ("win2kras", "rasapi32", None, 0x0500),
         ("win32api", "user32 advapi32 shell32 version", None, 0x0500, 'win32/src/win32apimodule.cpp win32/src/win32api_display.cpp'),
         ("win32cred", "AdvAPI32 credui", True, 0x0501, 'win32/src/win32credmodule.cpp'),
-        ("win32crypt", "Crypt32", None, 0x0500, 'win32/src/win32crypt.i win32/src/win32cryptmodule.cpp'),
+        ("win32crypt", "Crypt32", None, 0x0500, 'win32/src/win32crypt.i'),
         ("win32file", "oleaut32", None, 0x0500),
         ("win32event", "user32", None),
         ("win32clipboard", "gdi32 user32 shell32", None),
         ("win32evtlog", "advapi32 oleaut32", None),
         # win32gui handled below
-        ("win32job", "user32", None, 0x0500, 'win32/src/win32job.i win32/src/win32jobmodule.cpp'),
+        ("win32job", "user32", True, 0x0500, 'win32/src/win32job.i'),
         ("win32lz", "lz32", None),
         ("win32net", "netapi32 advapi32", True, None, """
               win32/src/win32net/win32netfile.cpp    win32/src/win32net/win32netgroup.cpp
@@ -1406,14 +1429,14 @@ for info in (
         ("win32profile", "Userenv", True, None, 'win32/src/win32profilemodule.cpp'),
         ("win32ras", "rasapi32 user32", None),
         ("win32security", "advapi32 user32 netapi32", True, 0x0500, """
-            win32/src/win32security.i       win32/src/win32securitymodule.cpp
+            win32/src/win32security.i
             win32/src/win32security_sspi.cpp win32/src/win32security_ds.cpp
             """),
         ("win32service", "advapi32 oleaut32 user32", True, 0x0501),
         ("win32trace", "advapi32", None),
         ("win32wnet", "netapi32 mpr", None),
         ("win32inet", "wininet", None, 0x500, """
-            win32/src/win32inet.i           win32/src/win32inetmodule.cpp
+            win32/src/win32inet.i
             win32/src/win32inet_winhttp.cpp"""
                         ),
         ("win32console", "kernel32", True, 0x0501, "win32/src/win32consolemodule.cpp"),
@@ -1465,7 +1488,7 @@ win32_extensions += [
         ),
     # winxptheme
     WinExt_win32("_winxptheme",
-           sources = ["win32/src/_winxptheme.i", "win32/src/_winxpthememodule.cpp"],
+           sources = ["win32/src/_winxptheme.i"],
            libraries="gdi32 user32 comdlg32 comctl32 shell32 Uxtheme",
            windows_h_version=0x0500,
         ),
@@ -1770,10 +1793,6 @@ swig_interface_parents = {
     'PyIADs':   'IDispatch',
 }
 
-# A list of modules that can also be built for Windows CE.  These generate
-# their .i to _win32.cpp or _wince.cpp.
-swig_wince_modules = "win32event win32file win32gui win32process".split()
-
 # .i files that are #included, and hence are not part of the build.  Our .dsp
 # parser isn't smart enough to differentiate these.
 swig_include_files = "mapilib adsilib".split()
@@ -1892,10 +1911,10 @@ else:
 ext_modules = win32_extensions + com_extensions + pythonwin_extensions + \
                     other_extensions
 
-if sys.version_info > (3,):
+if is_py3k:
     py3k_skip_modules = \
         """odbc win32evtlog win32print win32security win32inet adsi internet
-           mapi shell bits ifilter isapi PyISAPI_loader
+           mapi bits ifilter isapi PyISAPI_loader
         """.split()
     ext_modules = [e for e in ext_modules if e.name not in py3k_skip_modules]
 

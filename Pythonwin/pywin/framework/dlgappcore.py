@@ -1,3 +1,7 @@
+# dlgappcore.
+#
+# base classes for dialog based apps.
+
 from . import app
 import win32ui
 import win32con

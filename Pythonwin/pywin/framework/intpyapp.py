@@ -129,7 +129,6 @@ class InteractivePythonApp(app.CApp):
 		try:
 			from . import intpydde
 		except ImportError:
-			traceback.print_exc()
 			# No dde support!
 			return None
 		conv = intpydde.CreateConversation(self.ddeServer)
@@ -177,6 +176,8 @@ class InteractivePythonApp(app.CApp):
 
 		# Allow Pythonwin to host OCX controls.
 		win32ui.EnableControlContainer()
+
+		# Display the interactive window if the user wants it.
 		from . import interact
 		interact.CreateInteractiveWindowUserPreference()
 
@@ -276,12 +277,12 @@ class InteractivePythonApp(app.CApp):
 
 
 	def LoadSystemModules(self):
-		self.DoLoadModules("editor,stdin")
+		self.DoLoadModules("pywin.framework.editor,pywin.framework.stdin")
 
 	def LoadUserModules(self, moduleNames = None):
 		# Load the users modules.
 		if moduleNames is None:
-			default = "sgrepmdi,mdi_pychecker"
+			default = "pywin.framework.sgrepmdi,pywin.framework.mdi_pychecker"
 			moduleNames=win32ui.GetProfileVal('Python','Startup Modules',default)
 		self.DoLoadModules(moduleNames)
 
@@ -290,7 +291,7 @@ class InteractivePythonApp(app.CApp):
 		modules = moduleNames.split(",")
 		for module in modules:
 			try:
-				exec("from . import "+module)
+				exec("import "+module)
 			except: # Catch em all, else the app itself dies! 'ImportError:
 				traceback.print_exc()
 				msg = 'Startup import of user module "%s" failed' % module

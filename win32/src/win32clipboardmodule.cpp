@@ -312,6 +312,7 @@ py_get_clipboard_data(PyObject* self, PyObject* args)
 
   // @pyparm int|format|CF_TEXT|Specifies a clipboard format. For a description of
   // the standard clipboard formats, see Standard Clipboard Formats.
+  // In Unicode builds (ie, python 3k), the default is CF_UNICODETEXT.
 #ifdef UNICODE
   int format = CF_UNICODETEXT;
 #else
@@ -893,12 +894,9 @@ py_set_clipboard_data(PyObject* self, PyObject* args)
 		Py_ssize_t bufSize = 0;
 		// In py3k, unicode no longer supports buffer interface
 		if (PyUnicode_Check(obhandle)){
-			wchar_t *wchar_buf=PyUnicode_AS_UNICODE(obhandle);
-			// ??? WTF None of the of Python Api functions return the correct size ???
-			bufSize = (wcslen(wchar_buf)+1) * sizeof(wchar_buf[0]);
-			buf=(void *)wchar_buf;
-			}
-		else{
+			bufSize = PyUnicode_GET_DATA_SIZE(obhandle) + sizeof(Py_UNICODE);
+			buf=(void *)PyUnicode_AS_UNICODE(obhandle);
+		} else {
 			if (PyObject_AsReadBuffer(obhandle,&buf,&bufSize)==-1)
 				return NULL;
 			if (PyString_Check(obhandle))
@@ -945,34 +943,50 @@ py_set_clipboard_data(PyObject* self, PyObject* args)
 //
 // @pymethod int|win32clipboard|SetClipboardText|Convienience function to
 // call SetClipboardData with text.
-
+// @comm You may pass a Unicode or string/bytes object to this function,
+// but depending on the value of the 'format' param, it may be converted
+// to the appropriate type for that param.
+// @comm Many applications will want to call this function twice, with the
+// same string specified but CF_UNICODETEXT specified the second.
 static PyObject *
 py_set_clipboard_text(PyObject* self, PyObject* args)
 {
-#ifdef UNICODE
-	int format = CF_UNICODETEXT;
-#else
 	int format = CF_TEXT;
-#endif
-	TCHAR *text;
 	PyObject *obtext, *ret=NULL;
-	DWORD size;
-	if (!PyArg_ParseTuple(args, "O:SetClipboardText",
-		&obtext))		// @pyparm str/unicode|text||The text to place on the clipboard.
+	if (!PyArg_ParseTuple(args, "O|i:SetClipboardText",
+		&obtext,		// @pyparm str/unicode|text||The text to place on the clipboard.
+		&format))		// @pyparm int|format|CF_TEXT|The clipboard format to use - must be CF_TEXT or CF_UNICODETEXT
 		return NULL;
 
-	if (!PyWinObject_AsTCHAR(obtext, &text, FALSE, &size))
-		return NULL;
+	const void *src = 0;
+	DWORD cb = 0; // number of bytes *excluding* NULL
+	size_t size_null = 0;
+	if (format == CF_TEXT) {
+		if (!PyWinObject_AsString(obtext, (char **)&src, FALSE, &cb))
+			return NULL;
+		size_null = sizeof(char);
+	} else if (format == CF_UNICODETEXT) {
+		DWORD cchars;
+		if (!PyWinObject_AsWCHAR(obtext, (WCHAR **)&src, FALSE, &cchars))
+			return NULL;
+		cb = cchars * sizeof(WCHAR);
+		size_null = sizeof(WCHAR);
+	} else {
+		return PyErr_Format(PyExc_ValueError, "Format arg must be one of CF_TEXT (%d) or CF_UNICODETEXT (%d) - got %d",
+				    CF_TEXT, CF_UNICODETEXT, format);
+	}
+
 	HGLOBAL    hMem;
-	LPTSTR     pszDst=NULL;
+	BYTE *dest=NULL;
 
-	hMem = GlobalAlloc(GHND, (size+1) * sizeof(TCHAR));
+	hMem = GlobalAlloc(GHND, cb + size_null);
 	if (hMem == NULL)
 		PyWin_SetAPIError("GlobalAlloc");
 	else{
-		pszDst = (TCHAR *)GlobalLock(hMem);
-		_tcscpy(pszDst, text);
-		pszDst[size] = 0;
+		dest = (BYTE *)GlobalLock(hMem);
+		memcpy(dest, src, cb);
+		// whack the terminator on.
+		memset(dest+cb, 0, size_null);
 		GlobalUnlock(hMem);
 		HANDLE data;
 		Py_BEGIN_ALLOW_THREADS;
@@ -983,7 +997,10 @@ py_set_clipboard_text(PyObject* self, PyObject* args)
 		else
 			ret = PyWinLong_FromHANDLE(data);
 		}
-	PyWinObject_FreeTCHAR(text);
+	if (format == CF_TEXT)
+		PyWinObject_FreeString((char *)src);
+	else
+		PyWinObject_FreeWCHAR((WCHAR *)src);
 	return ret;
 	// @pyseeapi SetClipboardData
 
@@ -1178,6 +1195,13 @@ void initwin32clipboard(void)
 
 	AddConstants(module);
 	PyDict_SetItemString(dict, "error", PyWinExc_ApiError);
+	PyDict_SetItemString(dict,"UNICODE",
+#ifdef UNICODE
+			Py_True
+#else
+			Py_False
+#endif
+	);
 }
 
 #else
@@ -1202,6 +1226,13 @@ PyObject *PyInit_win32clipboard(void)
 		return NULL;
 	if (PyDict_SetItemString(dict, "error", PyWinExc_ApiError)==-1)
 		return NULL;
+	PyDict_SetItemString(dict,"UNICODE",
+#ifdef UNICODE
+			Py_True
+#else
+			Py_False
+#endif
+	);
 	return module;
 }
 #endif

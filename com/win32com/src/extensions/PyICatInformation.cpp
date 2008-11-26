@@ -134,6 +134,7 @@ PyObject *PyICatInformation::GetCategoryDesc(PyObject *self, PyObject *args)
 	if (S_OK!=hr) // S_OK only acceptable
 		return PyCom_BuildPyException(hr, pMy, IID_ICatInformation);
 	PyObject *rc = PyWinObject_FromWCHAR(pResult);
+	// @comm The return type is a unicode object.
 	CoTaskMemFree(pResult);
 	return rc;
 }

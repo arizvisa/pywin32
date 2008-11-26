@@ -479,12 +479,15 @@ class IndentSearcher:
 
     def readline(self):
         if self.finished:
-            return ""
-        i = self.i = self.i + 1
-        mark = repr(i) + ".0"
-        if self.text.compare(mark, ">=", "end"):
-            return b""
-        return self.text.get(mark, mark + " lineend+1c").encode(default_scintilla_encoding)
+            val = ""
+        else:
+            i = self.i = self.i + 1
+            mark = repr(i) + ".0"
+            if self.text.compare(mark, ">=", "end"):
+                val = ""
+            else:
+                val = self.text.get(mark, mark + " lineend+1c")
+        return val.encode(default_scintilla_encoding)
 
     def run(self):
         OPENERS=('class', 'def', 'for', 'if', 'try', 'while')

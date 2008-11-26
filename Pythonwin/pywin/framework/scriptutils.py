@@ -262,9 +262,8 @@ def RunScript(defName=None, defArgs=None, bShowDialog = 1, debuggingType=None):
 
 	try:
 		f = open(script)
-	except IOError as xxx_todo_changeme:
-		(code, msg) = xxx_todo_changeme.args
-		win32ui.MessageBox("The file could not be opened - %s (%d)" % (msg, code))
+	except IOError as exc:
+		win32ui.MessageBox("The file could not be opened - %s (%d)" % (exc.strerror, exc.errno))
 		return
 
 	# Remember and hack sys.argv for the script.
@@ -381,7 +380,7 @@ def ImportFile():
 	path, modName = os.path.split(pathName)
 	modName, modExt = os.path.splitext(modName)
 	newPath = None
-	for key, mod in list(sys.modules.items()):
+	for key, mod in sys.modules.iteritems():
 		if hasattr(mod, '__file__'):
 			fname = mod.__file__
 			base, ext = os.path.splitext(fname)
@@ -459,7 +458,10 @@ def CheckFile():
 	win32ui.DoWaitCursor(0)
 
 def RunTabNanny(filename):
-	import io
+	try:
+		import cStringIO as io
+	except ImportError:
+		import io
 	tabnanny = FindTabNanny()
 	if tabnanny is None:
 		win32ui.MessageBox("The TabNanny is not around, so the children can run amok!" )

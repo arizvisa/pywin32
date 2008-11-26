@@ -59,7 +59,7 @@ PyObject *PyIDispatch::GetIDsOfNames(PyObject *self, PyObject *args)
 	if ( argc < 1 )
 		return PyErr_Format(PyExc_TypeError, "At least one argument must be supplied");
 
-	LCID lcid;
+	LCID lcid = LOCALE_SYSTEM_DEFAULT;
 	UINT offset = 0;
 	if ( argc > 1 ){
 		PyObject *ob = PyTuple_GET_ITEM(args, 0);

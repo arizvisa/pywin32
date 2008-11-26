@@ -48,6 +48,11 @@ is_readonly = hasattr(win32com, "__loader__")
 # Keyed by usual clsid, lcid, major, minor
 demandGeneratedTypeLibraries = {}
 
+try:
+	import cPickle as pickle
+except ImportError:
+	import pickle
+
 def __init__():
 	# Initialize the module.  Called once explicitly at module import below.
 	try:
@@ -60,7 +65,6 @@ def _SaveDicts():
 	if is_readonly:
 		raise RuntimeError("Trying to write to a readonly gencache ('%s')!" \
 		                    % win32com.__gen_path__)
-	import pickle
 	f = open(os.path.join(GetGeneratePath(), "dicts.dat"), "wb")
 	try:
 		p = pickle.Pickler(f)
@@ -70,10 +74,12 @@ def _SaveDicts():
 		f.close()
 
 def _LoadDicts():
-	import pickle
 	# Load the dictionary from a .zip file if that is where we live.
 	if hasattr(win32com, "__loader__"):
-		import io
+		try:
+			import cStringIO as io
+		except ImportError:
+			import io
 		loader = win32com.__loader__
 		arc_path = loader.archive
 		dicts_path = os.path.join(win32com.__gen_path__, "dicts.dat")
@@ -535,6 +541,7 @@ def EnsureDispatch(prog_id, bForDemand = 1): # New fn, so we default the new dem
 			tla = tlb.GetLibAttr()
 			mod = EnsureModule(tla[0], tla[1], tla[3], tla[4], bForDemand=bForDemand)
 			GetModuleForCLSID(disp_clsid)
+			# Get the class from the module.
 			from . import CLSIDToClass
 			disp_class = CLSIDToClass.GetClass(str(disp_clsid))
 			disp = disp_class(disp._oleobj_)
@@ -552,19 +559,19 @@ def AddModuleToCache(typelibclsid, lcid, major, minor, verbose = 1, bFlushNow = 
 	mod._in_gencache_ = 1
 	dict = mod.CLSIDToClassMap
 	info = str(typelibclsid), lcid, major, minor
-	for clsid, cls in list(dict.items()):
+	for clsid, cls in dict.iteritems():
 		clsidToTypelib[clsid] = info
 
 	dict = mod.CLSIDToPackageMap
-	for clsid, name in list(dict.items()):
+	for clsid, name in dict.iteritems():
 		clsidToTypelib[clsid] = info
 
 	dict = mod.VTablesToClassMap
-	for clsid, cls in list(dict.items()):
+	for clsid, cls in dict.iteritems():
 		clsidToTypelib[clsid] = info
 
 	dict = mod.VTablesToPackageMap
-	for clsid, cls in list(dict.items()):
+	for clsid, cls in dict.iteritems():
 		clsidToTypelib[clsid] = info
 
 	# If this lib was previously redirected, drop it
@@ -651,9 +658,9 @@ def _Dump():
 	print("Cache is in directory", win32com.__gen_path__)
 	# Build a unique dir
 	d = {}
-	for clsid, (typelibCLSID, lcid, major, minor) in list(clsidToTypelib.items()):
+	for clsid, (typelibCLSID, lcid, major, minor) in clsidToTypelib.iteritems():
 		d[typelibCLSID, lcid, major, minor] = None
-	for typelibCLSID, lcid, major, minor in list(d.keys()):
+	for typelibCLSID, lcid, major, minor in d.iterkeys():
 		mod = GetModuleForTypelib(typelibCLSID, lcid, major, minor)
 		print("%s - %s" % (mod.__doc__, typelibCLSID))
 

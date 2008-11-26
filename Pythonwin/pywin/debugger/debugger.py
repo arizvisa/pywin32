@@ -311,7 +311,7 @@ class DebuggerBreakpointsWindow(DebuggerListViewWindow):
 		item_id = self.GetItem(item[0])[6]
 
 		from bdb import Breakpoint
-		for bplist in list(Breakpoint.bplist.values()):
+		for bplist in Breakpoint.bplist.itervalues():
 			for bp in bplist:
 				if id(bp)==item_id:
 					if text.strip().lower()=="none":
@@ -325,7 +325,7 @@ class DebuggerBreakpointsWindow(DebuggerListViewWindow):
 			num = self.GetNextItem(-1, commctrl.LVNI_SELECTED)
 			item_id = self.GetItem(num)[6]
 			from bdb import Breakpoint
-			for bplist in list(Breakpoint.bplist.values()):
+			for bplist in Breakpoint.bplist.itervalues():
 				for bp in bplist:
 					if id(bp)==item_id:
 						self.debugger.clear_break(bp.file, bp.line)
@@ -339,7 +339,7 @@ class DebuggerBreakpointsWindow(DebuggerListViewWindow):
 		l.DeleteAllItems()
 		index = -1
 		from bdb import Breakpoint
-		for bplist in list(Breakpoint.bplist.values()):
+		for bplist in Breakpoint.bplist.itervalues():
 			for bp in bplist:
 				baseName = os.path.split(bp.file)[1]
 				cond = bp.cond
@@ -599,11 +599,9 @@ class Debugger(debugger_parent):
 			self.set_continue()
 			return 0
 		if frame is self.botframe and self.skipBotFrame == SKIP_RUN:
-			print ('skip SKIP_RUN')
 			self.set_continue()
 			return 0
 		if frame is self.botframe and self.skipBotFrame == SKIP_STEP:
-			print ('skip SKIP_STEP')
 			self.set_step()
 			return 0
 		return debugger_parent.stop_here(self, frame)

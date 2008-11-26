@@ -23,7 +23,7 @@ def OffsetRect(rect, point):
 	return rect[0]+x, rect[1]+y, rect[2]+x, rect[3]+y
 
 def DeflateRect(rect, point):
-	(x,y) = point
+	(x, y) = point
 	return rect[0]+x, rect[1]+y, rect[2]-x, rect[3]-y
 
 def PtInRect(rect, pt):

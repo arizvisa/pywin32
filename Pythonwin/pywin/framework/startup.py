@@ -37,14 +37,15 @@ moduleName = "intpyapp"
 sys.appargvoffset = 0
 sys.appargv = sys.argv[:]
 # Must check for /app param here.
-if len(sys.argv)>=2 and sys.argv[0].lower()=='/app': 
+if len(sys.argv)>=2 and sys.argv[0].lower()=='/app':
 	from . import cmdline
 	moduleName = cmdline.FixArgFileName(sys.argv[1])
 	sys.appargvoffset = 2
 	newargv=sys.argv[sys.appargvoffset:]
 #	newargv.insert(0, sys.argv[0])
 	sys.argv = newargv
-	
+
+# Import the module that runs our interactive app.
 from . import intpyapp
 
 try:

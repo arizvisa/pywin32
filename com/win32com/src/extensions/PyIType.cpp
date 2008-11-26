@@ -411,7 +411,7 @@ static PyObject *typeinfo_getidsofnames(PyObject *self, PyObject *args)
 		PyErr_SetString(PyExc_TypeError, "At least one argument must be supplied");
 		return NULL;
 	}
-	LCID lcid;
+	LCID lcid = LOCALE_SYSTEM_DEFAULT;
 	UINT offset = 0;
 	if ( argc > 1 )
 	{
