@@ -9,9 +9,11 @@ servicemanager (PythonService.cpp) - Py_SetProgram and PySys_SetArgv don't work 
 
 Pythonwin -
 	xxx LVITEM and TVITEM conversions use PyWinobject_AsTCHAR, result needs to be freed
-	xxx LV_COLUMN conversion - same as above
+	 LV_COLUMN conversion - same as above
 
 	xxx win32uimodule - Python_callback has 64-bit issues with HWND, WPARAM, LPARAM
+
+[markh - the above pythonwin issues all seem done?]
 
 	xxx win32util.cpp - GetReprText needs fixes for Py3k unicode repr
 
