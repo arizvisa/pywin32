@@ -35,9 +35,9 @@ class PyScriptRExec(pyscript.PyScript):
 		       axscript.INTERFACESAFE_FOR_UNTRUSTED_CALLER
 
 if __name__=='__main__':
-	print "WARNING: By registering this engine, you are giving remote HTML code"
-	print "the ability to execute *any* code on your system."
-	print
-	print "You almost certainly do NOT want to do this."
-	print "You have been warned, and are doing this at your own (significant) risk"
+	print("WARNING: By registering this engine, you are giving remote HTML code")
+	print("the ability to execute *any* code on your system.")
+	print()
+	print("You almost certainly do NOT want to do this.")
+	print("You have been warned, and are doing this at your own (significant) risk")
 	pyscript.Register(PyScriptRExec)

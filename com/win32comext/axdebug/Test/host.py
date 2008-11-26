@@ -47,7 +47,7 @@ class PySourceModuleDebugDocumentHost(gateways.DebugDocumentHost):
 		if self.codeContainer is None:
 			try:
 				codeText = open(self.module.__file__, "rt").read()
-			except IOError, details:
+			except IOError as details:
 				codeText = "# Exception opening file\n# %s" % (details)
 			from win32com.axdebug import codecontainer
 			self.codeContainer = codecontainer.SourceCodeContainer(codeText,self.module.__file__)
@@ -113,7 +113,7 @@ def TestSmartHelper():
 	ttest.test()
 
 	pdm.RemoveApplication(cookie)
-	print "Done"
+	print("Done")
 
 def testdumb():
 	pdm=pythoncom.CoCreateInstance(axdebug.CLSID_ProcessDebugManager,None,pythoncom.CLSCTX_ALL, axdebug.IID_IProcessDebugManager)
@@ -126,7 +126,7 @@ def testdumb():
 	parentNode = None	
 	all_real_nodes = {}
 	raw_input("Waiting...")
-	print "Done"
+	print("Done")
 
 def TestSmartProvider():
 	from win32com.axdebug import debugger
@@ -139,7 +139,7 @@ def TestSmartProvider():
 	raw_input("Waiting...")
 	ttest.test()
 	d.Close()
-	print "Done"
+	print("Done")
 	
 def test():
 	try:
@@ -157,4 +157,4 @@ if __name__=='__main__':
 	import win32com.axdebug.util
 	
 	win32com.axdebug.util._dump_wrapped()
-	print " %d/%d com objects still alive" % (pythoncom._GetInterfaceCount(), pythoncom._GetGatewayCount())
+	print(" %d/%d com objects still alive" % (pythoncom._GetInterfaceCount(), pythoncom._GetGatewayCount()))

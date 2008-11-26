@@ -21,8 +21,8 @@ from win32com.client import gencache
 try:
     gencache.EnsureModule('{6BCDCB60-5605-11D0-AE5F-CADD4C000000}', 0, 1, 1)
 except pythoncom.com_error:
-    print "The PyCOMTest module can not be located or generated."
-    print importMsg
+    print("The PyCOMTest module can not be located or generated.")
+    print(importMsg)
     raise RuntimeError, importMsg
 
 # We had a bg where RegisterInterfaces would fail if gencache had 
@@ -35,8 +35,8 @@ verbose = 0
 def progress(*args):
     if verbose:
         for arg in args:
-            print arg,
-        print
+            print(arg, end=' ')
+        print()
 
 def TestApplyResult(fn, args, result):
     try:
@@ -82,7 +82,7 @@ class RandomEventHandler:
 
     def _DumpFireds(self):
         if not self.fireds:
-            print "ERROR: Nothing was received!"
+            print("ERROR: Nothing was received!")
         for firedId, no in self.fireds.items():
             progress("ID %d fired %d times" % (firedId, no))
 
@@ -98,19 +98,19 @@ def TestDynamic():
     progress("Checking default args")
     rc = o.TestOptionals()
     if  rc[:-1] != ("def", 0, 1) or abs(rc[-1]-3.14)>.01:
-        print rc
+        print(rc)
         raise error, "Did not get the optional values correctly"
     rc = o.TestOptionals("Hi", 2, 3, 1.1)
     if  rc[:-1] != ("Hi", 2, 3) or abs(rc[-1]-1.1)>.01:
-        print rc
+        print(rc)
         raise error, "Did not get the specified optional values correctly"
     rc = o.TestOptionals2(0)
     if  rc != (0, "", 1):
-        print rc
+        print(rc)
         raise error, "Did not get the optional2 values correctly"
     rc = o.TestOptionals2(1.1, "Hi", 2)
     if  rc[1:] != ("Hi", 2) or abs(rc[0]-1.1)>.01:
-        print rc
+        print(rc)
         raise error, "Did not get the specified optional2 values correctly"
 
 #       if verbose: print "Testing structs"
@@ -189,19 +189,19 @@ def TestGenerated():
     progress("Checking default args")
     rc = o.TestOptionals()
     if  rc[:-1] != ("def", 0, 1) or abs(rc[-1]-3.14)>.01:
-        print rc
+        print(rc)
         raise error, "Did not get the optional values correctly"
     rc = o.TestOptionals("Hi", 2, 3, 1.1)
     if  rc[:-1] != ("Hi", 2, 3) or abs(rc[-1]-1.1)>.01:
-        print rc
+        print(rc)
         raise error, "Did not get the specified optional values correctly"
     rc = o.TestOptionals2(0)
     if  rc != (0, "", 1):
-        print rc
+        print(rc)
         raise error, "Did not get the optional2 values correctly"
     rc = o.TestOptionals2(1.1, "Hi", 2)
     if  rc[1:] != ("Hi", 2) or abs(rc[0]-1.1)>.01:
-        print rc
+        print(rc)
         raise error, "Did not get the specified optional2 values correctly"
 
     progress("Checking var args")
@@ -377,7 +377,7 @@ def TestCounter(counter, bIsGenerated):
     counter.LBound=1
     counter.UBound=10
     if counter.LBound <> 1 or counter.UBound<>10:
-        print "** Error - counter did not keep its properties"
+        print("** Error - counter did not keep its properties")
 
     if bIsGenerated:
         bounds = counter.GetBounds()
@@ -421,7 +421,7 @@ def TestVTable(clsctx=pythoncom.CLSCTX_ALL):
     # check we fail gracefully with None passed.
     try:
         tester.TestMyInterface(None)
-    except pythoncom.com_error, details:
+    except pythoncom.com_error as details:
         pass
     # and a real object.
     tester.TestMyInterface(testee)

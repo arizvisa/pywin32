@@ -24,7 +24,7 @@ def CreateTestAccessDatabase(dbname = None):
     try:
         os.unlink(dbname)
     except os.error:
-        print "WARNING - Unable to delete old test database - expect a COM exception RSN!"
+        print("WARNING - Unable to delete old test database - expect a COM exception RSN!")
 
     newdb = workspace.CreateDatabase( dbname, constants.dbLangGeneral, constants.dbEncrypt )
 
@@ -87,14 +87,14 @@ def CreateTestAccessDatabase(dbname = None):
     # But first check the test is actually doing something!
     tab1.MoveLast()
     if tab1.Fields("First Name").Value != "Second":
-        raise RuntimeError, "Unexpected record is last - makes bookmark test pointless!"
+        raise RuntimeError("Unexpected record is last - makes bookmark test pointless!")
 
     tab1.Bookmark = bk
     if tab1.Bookmark != bk:
-        raise RuntimeError, "The bookmark data is not the same"
+        raise RuntimeError("The bookmark data is not the same")
 
     if tab1.Fields("First Name").Value != "Mark":
-        raise RuntimeError, "The bookmark did not reset the record pointer correctly"
+        raise RuntimeError("The bookmark did not reset the record pointer correctly")
 
     return dbname
 
@@ -105,17 +105,17 @@ def DoDumpAccessInfo(dbname):
     try:
         sys.stderr.write("Creating Access Application...\n")
         a=Dispatch("Access.Application")
-        print "Opening database %s" % dbname
+        print("Opening database %s" % dbname)
         a.OpenCurrentDatabase(dbname)
         db = a.CurrentDb()
         daodump.DumpDB(db,1)
         forms = a.Forms
-        print "There are %d forms open." % (len(forms))
+        print("There are %d forms open." % (len(forms)))
 # Uncommenting these lines means Access remains open.
 #               for form in forms:
 #                       print " %s" % form.Name
         reports = a.Reports
-        print "There are %d reports open" % (len(reports))
+        print("There are %d reports open" % (len(reports)))
     finally:
         if not a is None:
             sys.stderr.write("Closing database\n")
@@ -150,10 +150,10 @@ def test(dbname = None):
         try:
             GenerateSupport()
         except pythoncom.com_error:
-            print "*** Can not import the MSAccess type libraries - tests skipped"
+            print("*** Can not import the MSAccess type libraries - tests skipped")
             return
         dbname = CreateTestAccessDatabase()
-        print "A test database at '%s' was created" % dbname
+        print("A test database at '%s' was created" % dbname)
 
     DumpAccessInfo(dbname)
 

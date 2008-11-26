@@ -19,7 +19,7 @@ def MakeTestDictionary():
 def TestDictAgainst(dict,check):
     for key, value in check.items():
         if dict(key) != value:
-            raise error, "Indexing for '%s' gave the incorrect value - %s/%s" % (`key`, `dict[key]`, `check[key]`)
+            raise error("Indexing for '%s' gave the incorrect value - %s/%s" % (`key`, `dict[key]`, `check[key]`))
 
 # Ensure we have the correct version registered.
 def Register(quiet):
@@ -32,7 +32,7 @@ def TestDict(quiet=None):
         quiet = not "-v" in sys.argv
     Register(quiet)
 
-    if not quiet: print "Simple enum test"
+    if not quiet: print("Simple enum test")
     dict = MakeTestDictionary()
     checkDict = {}
     TestDictAgainst(dict, checkDict)
@@ -46,30 +46,33 @@ def TestDict(quiet=None):
     TestDictAgainst(dict, checkDict)
 
     if not quiet:
-        print "Failure tests"
+        print("Failure tests")
     try:
         dict()
-        raise error, "default method with no args worked when it shouldnt have!"
-    except pythoncom.com_error, (hr, desc, exc, argErr):
+        raise error("default method with no args worked when it shouldnt have!")
+    except pythoncom.com_error as xxx_todo_changeme:
+        (hr, desc, exc, argErr) = xxx_todo_changeme.args
         if hr != winerror.DISP_E_BADPARAMCOUNT:
-            raise error, "Expected DISP_E_BADPARAMCOUNT - got %d (%s)" % (hr, desc)
+            raise error("Expected DISP_E_BADPARAMCOUNT - got %d (%s)" % (hr, desc))
 
     try:
         dict("hi", "there")
-        raise error, "multiple args worked when it shouldnt have!"
-    except pythoncom.com_error, (hr, desc, exc, argErr):
+        raise error("multiple args worked when it shouldnt have!")
+    except pythoncom.com_error as xxx_todo_changeme1:
+        (hr, desc, exc, argErr) = xxx_todo_changeme1.args
         if hr != winerror.DISP_E_BADPARAMCOUNT:
-            raise error, "Expected DISP_E_BADPARAMCOUNT - got %d (%s)" % (hr, desc)
+            raise error("Expected DISP_E_BADPARAMCOUNT - got %d (%s)" % (hr, desc))
 
     try:
         dict(0)
-        raise error, "int key worked when it shouldnt have!"
-    except pythoncom.com_error, (hr, desc, exc, argErr):
+        raise error("int key worked when it shouldnt have!")
+    except pythoncom.com_error as xxx_todo_changeme2:
+        (hr, desc, exc, argErr) = xxx_todo_changeme2.args
         if hr != winerror.DISP_E_TYPEMISMATCH:
-            raise error, "Expected DISP_E_TYPEMISMATCH - got %d (%s)" % (hr, desc)
+            raise error("Expected DISP_E_TYPEMISMATCH - got %d (%s)" % (hr, desc))
 
     if not quiet:
-        print "Python.Dictionary tests complete."
+        print("Python.Dictionary tests complete.")
 
 class TestCase(win32com.test.util.TestCase):
     def testDict(self):

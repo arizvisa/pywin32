@@ -11,19 +11,19 @@ version = "0.0.1"
 class MySite(axsite.AXSite):
 
   def OnScriptError(self, error):
-    print "An error occurred in the Script Code"
+    print("An error occurred in the Script Code")
     exc = error.GetExceptionInfo()
     try:
       text = error.GetSourceLineText()
     except:
       text = "<unknown>"
     context, line, char = error.GetSourcePosition()
-    print "Exception: %s (line %d)\n%s\n%s^\n%s" % (exc[1], line, text, " " * (char-1), exc[2])
+    print("Exception: %s (line %d)\n%s\n%s^\n%s" % (exc[1], line, text, " " * (char-1), exc[2]))
 
 class ObjectModel:
   _public_methods_ = [ 'echo', 'msgbox' ]
   def echo(self, *args):
-    print string.join(map(str, args))
+    print(string.join(map(str, args)))
   def msgbox(self, *args):
     msg = string.join(map(str, args))
     win32ui.MessageBox(msg)
@@ -54,8 +54,8 @@ def TestEngine():
  #   forthEngine.Start()
     pyEngine.Start() # Actually run the Python code
     vbEngine.Start() # Actually run the VB code
-  except pythoncom.com_error, details:
-    print "Script failed: %s (0x%x)" % (details[1], details[0])
+  except pythoncom.com_error as details:
+    print("Script failed: %s (0x%x)" % (details[1], details[0]))
   # Now run the code expected to fail!
 #  try:
 #    pyEngine2.Start() # Actually run the Python code that fails!
@@ -73,4 +73,4 @@ if __name__ == '__main__':
     traceback.print_exc()
   win32com.axdebug.util._dump_wrapped()
   sys.exc_type = sys.exc_value = sys.exc_traceback = None
-  print pythoncom._GetInterfaceCount(),"com objects still alive"
+  print(pythoncom._GetInterfaceCount(),"com objects still alive")

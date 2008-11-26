@@ -23,7 +23,7 @@ class MySite(axsite.AXSite):
     context, line, char = error.GetSourcePosition()
     if not verbose:
       return
-    print " >Exception:", exc[1]
+    print(" >Exception:", exc[1])
     try:
       st = error.GetSourceLineText()
     except pythoncom.com_error:
@@ -31,7 +31,7 @@ class MySite(axsite.AXSite):
     if st is None: st = ""
     text = st + "\n" + (" " * (char-1)) + "^" + "\n" + exc[2]
     for line in text.splitlines():
-      print "  >" + line
+      print("  >" + line)
 
 class MyCollection(util.Collection):
   def _NewEnum(self):
@@ -51,14 +51,14 @@ class Test:
     self.last = "".join([str(s) for s in args])
     if self.verbose:
       for arg in args:
-        print arg,
-      print
+        print(arg, end=' ')
+      print()
 
   def fail(self, *args):
-    print "**** fail() called ***"
+    print("**** fail() called ***")
     for arg in args:
-      print arg,
-    print
+      print(arg, end=' ')
+    print()
     self.fail_called = 1
 #    self._connect_server_.Broadcast(last)
 

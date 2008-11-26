@@ -115,7 +115,7 @@ class Adb(bdb.Bdb,gateways.RemoteDebugApplicationEvents):
         elif self.breakFlags==axdebug.APPBREAKFLAG_STEP:
             self.breakReason = axdebug.BREAKREASON_STEP
         else:
-            print "Calling base 'break_here' with", self.breaks
+            print("Calling base 'break_here' with", self.breaks)
             if bdb.Bdb.break_here(self, frame):
                 self.breakReason = axdebug.BREAKREASON_BREAKPOINT
         return self.breakReason is not None
@@ -203,9 +203,9 @@ class Adb(bdb.Bdb,gateways.RemoteDebugApplicationEvents):
 #               traceenter("user_return",_dumpf(frame),return_value)
         bdb.Bdb.user_return(self, frame, return_value)
 
-    def user_exception(self, frame, (exc_type, exc_value, exc_traceback)):
+    def user_exception(self, frame, exc_info):
 #               traceenter("user_exception")
-        bdb.Bdb.user_exception(self, frame, (exc_type, exc_value, exc_traceback))
+        bdb.Bdb.user_exception(self, frame, exc_info)
 
 
     def _HandleBreakPoint(self, frame, tb, reason):
@@ -214,7 +214,7 @@ class Adb(bdb.Bdb,gateways.RemoteDebugApplicationEvents):
         try:
             resumeAction = self.debugApplication.HandleBreakPoint(reason)
             tracev("HandleBreakPoint returned with ", resumeAction)
-        except pythoncom.com_error, details:
+        except pythoncom.com_error as details:
             # Eeek - the debugger is dead, or something serious is happening.
             # Assume we should continue
             resumeAction = axdebug.BREAKRESUMEACTION_CONTINUE
@@ -402,7 +402,7 @@ class Adb(bdb.Bdb,gateways.RemoteDebugApplicationEvents):
         if bps==axdebug.BREAKPOINT_ENABLED:
             problem = self.set_break(key, lineNo)
             if problem:
-                print "*** set_break failed -", problem
+                print("*** set_break failed -", problem)
             trace("_OnSetBreakPoint just set BP and has breaks", self.breaks)
         else:
             self.clear_break(key, lineNo)

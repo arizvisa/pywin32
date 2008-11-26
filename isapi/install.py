@@ -102,7 +102,7 @@ class ISAPIParameters:
 verbose = 1 # The level - 0 is quiet.
 def log(level, what):
     if verbose >= level:
-        print what
+        print(what)
 
 # Convert an ADSI COM exception to the Win32 error code embedded in it.
 def _GetWin32ErrorCode(com_exc):
@@ -150,23 +150,23 @@ def FindWebServer(options, server_desc):
                 server = sub.AdsPath
                 break
         else:
-            raise ItemNotFound, \
-                  "No web sites match the description '%s'" % (server_desc,)
+            raise ItemNotFound(
+                  "No web sites match the description '%s'" % (server_desc,))
     # Check it is good.
     try:
         GetObject(server)
-    except pythoncom.com_error, details:
+    except pythoncom.com_error as details:
         hr, msg, exc, arg_err = details
         if exc and exc[2]:
             msg = exc[2]
-        raise ItemNotFound, \
-              "WebServer %s: %s" % (server, msg)
+        raise ItemNotFound(
+              "WebServer %s: %s" % (server, msg))
     return server
 
 def CreateDirectory(params, options):
     _CallHook(params, "PreInstall", options)
     if not params.Name:
-        raise ConfigurationError, "No Name param"
+        raise ConfigurationError("No Name param")
     slash = params.Name.rfind("/")
     if slash >= 0:
         parent = params.Name[:slash]
@@ -237,8 +237,8 @@ def CreateDirectory(params, options):
             if item not in newDir.ScriptMaps:
                 newDir.ScriptMaps = (item,) + newDir.ScriptMaps
     else:
-        raise ConfigurationError, \
-              "Unknown ScriptMapUpdate option '%s'" % (params.ScriptMapUpdate,)
+        raise ConfigurationError(
+              "Unknown ScriptMapUpdate option '%s'" % (params.ScriptMapUpdate,))
     newDir.SetInfo()
     _CallHook(params, "PostInstall", options, newDir)
     log(1, "Configured Virtual Directory: %s" % (params.Name,))
@@ -249,7 +249,10 @@ def CreateISAPIFilter(filterParams, options):
     _CallHook(filterParams, "PreInstall", options)
     try:
         filters = GetObject(server+"/Filters")
-    except pythoncom.com_error, (hr, msg, exc, arg):
+    except pythoncom.com_error as xxx_todo_changeme:
+        # Brand new sites don't have the '/Filters' collection - create it.
+        # Any errors other than 'not found' we shouldn't ignore.
+        (hr, msg, exc, arg) = xxx_todo_changeme.args
         # Brand new sites don't have the '/Filters' collection - create it.
         # Any errors other than 'not found' we shouldn't ignore.
         if winerror.HRESULT_FACILITY(hr) != winerror.FACILITY_WIN32 or \
@@ -287,7 +290,7 @@ def DeleteISAPIFilter(filterParams, options):
     ob_path = server+"/Filters"
     try:
         filters = GetObject(ob_path)
-    except pythoncom.com_error, details:
+    except pythoncom.com_error as details:
         # failure to open the filters just means a totally clean IIS install
         # (IIS5 at least has no 'Filters' key when freshly installed).
         log(2, "ISAPI filter path '%s' did not exist." % (ob_path,))
@@ -295,7 +298,7 @@ def DeleteISAPIFilter(filterParams, options):
     try:
         filters.Delete(_IIS_FILTER, filterParams.Name)
         log(2, "Deleted ISAPI filter '%s'" % (filterParams.Name,))
-    except pythoncom.com_error, details:
+    except pythoncom.com_error as details:
         rc = _GetWin32ErrorCode(details)
         if rc != winerror.ERROR_PATH_NOT_FOUND:
             raise
@@ -320,7 +323,7 @@ def _AddExtensionFile(module, def_groupid, def_desc, params, options):
                             params.AddExtensionFile_CanDelete,
                             desc)
         log(2, "Added extension file '%s' (%s)" % (module, desc))
-    except (pythoncom.com_error, AttributeError), details:
+    except (pythoncom.com_error, AttributeError) as details:
         # IIS5 always fails.  Probably should upgrade this to
         # complain more loudly if IIS6 fails.
         log(2, "Failed to add extension file '%s': %s" % (module, details))
@@ -347,7 +350,7 @@ def _DeleteExtensionFileRecord(module, options):
         ob = GetObject(_IIS_OBJECT)
         ob.DeleteExtensionFileRecord(module)
         log(2, "Deleted extension file record for '%s'" % module)
-    except (pythoncom.com_error, AttributeError), details:
+    except (pythoncom.com_error, AttributeError) as details:
         log(2, "Failed to remove extension file '%s': %s" % (module, details))
 
 def DeleteExtensionFileRecords(params, options):
@@ -369,8 +372,8 @@ def CheckLoaderModule(dll_name):
     template = os.path.join(this_dir,
                             "PyISAPI_loader" + suffix + ".dll")
     if not os.path.isfile(template):
-        raise ConfigurationError, \
-              "Template loader '%s' does not exist" % (template,)
+        raise ConfigurationError(
+              "Template loader '%s' does not exist" % (template,))
     # We can't do a simple "is newer" check, as the DLL is specific to the
     # Python version.  So we check the date-time and size are identical,
     # and skip the copy in that case.
@@ -416,7 +419,7 @@ def Uninstall(params, options):
         _CallHook(vd, "PreRemove", options)
         try:
             directory = GetObject(FindPath(options, vd.Server, vd.Name))
-        except pythoncom.com_error, details:
+        except pythoncom.com_error as details:
             rc = _GetWin32ErrorCode(details)
             if rc != winerror.ERROR_PATH_NOT_FOUND:
                 raise
@@ -449,7 +452,7 @@ def Uninstall(params, options):
 def _PatchParamsModule(params, dll_name, file_must_exist = True):
     if file_must_exist:
         if not os.path.isfile(dll_name):
-            raise ConfigurationError, "%s does not exist" % (dll_name,)
+            raise ConfigurationError("%s does not exist" % (dll_name,))
 
     # Patch up all references to the DLL.
     for f in params.Filters:
@@ -487,7 +490,7 @@ def InstallModule(conf_module_name, params, options):
     if not hasattr(sys, "frozen"):
         conf_module_name = os.path.abspath(conf_module_name)
         if not os.path.isfile(conf_module_name):
-            raise ConfigurationError, "%s does not exist" % (conf_module_name,)
+            raise ConfigurationError("%s does not exist" % (conf_module_name,))
 
     loader_dll = GetLoaderModuleName(conf_module_name)
     _PatchParamsModule(params, loader_dll)
@@ -579,7 +582,7 @@ def HandleCommandLine(params, argv=None, conf_module_name = None,
                 if handler is None:
                     parser.error("Invalid arg '%s'" % (arg,))
                 handler(options, log, arg)
-    except (ItemNotFound, InstallationError), details:
+    except (ItemNotFound, InstallationError) as details:
         if options.verbose > 1:
             traceback.print_exc()
-        print "%s: %s" % (details.__class__.__name__, details)
+        print("%s: %s" % (details.__class__.__name__, details))

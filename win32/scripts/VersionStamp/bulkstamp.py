@@ -64,10 +64,11 @@ def walk(arg, dirname, names):
           try:
             verstamp.stamp(vars, pathname, desc, is_dll=is_dll)
             numStamped = numStamped + 1
-          except win32api.error, (hr, func, desc):
-            print "Could not stamp", pathname, "Error", hr, "-", desc
+          except win32api.error as xxx_todo_changeme:
+            (hr, func, desc) = xxx_todo_changeme.args
+            print("Could not stamp", pathname, "Error", hr, "-", desc)
         else:
-          print 'WARNING: description not provided for:', name
+          print('WARNING: description not provided for:', name)
           # skip branding this - assume already branded or handled elsewhere
 #        print "Stamped", pathname
 
@@ -85,7 +86,7 @@ def load_descriptions(fname, vars):
       if idx1 == -1 or idx2 < idx1:
         idx1 = idx2
       if idx1 == -1:
-        print 'ERROR: bad syntax in description file at line %d.' % (i+1)
+        print('ERROR: bad syntax in description file at line %d.' % (i+1))
         sys.exit(1)
 
       key = line[:idx1]
@@ -96,13 +97,13 @@ def load_descriptions(fname, vars):
         descriptions[key] = val
 
   if not retvars.has_key('product'):
-    print 'ERROR: description file is missing the product name.'
+    print('ERROR: description file is missing the product name.')
     sys.exit(1)
   if not retvars.has_key('major'):
-    print 'ERROR: description file is missing the major version number.'
+    print('ERROR: description file is missing the major version number.')
     sys.exit(1)
   if not retvars.has_key('minor'):
-    print 'ERROR: description file is missing the minor version number.'
+    print('ERROR: description file is missing the minor version number.')
     sys.exit(1)
 
   return retvars, descriptions
@@ -113,7 +114,7 @@ def scan(build, root, desc, **custom_vars ):
   try:
     build = string.atoi(build)
   except ValueError:
-    print 'ERROR: build number is not a number: %s' % build
+    print('ERROR: build number is not a number: %s' % build)
     sys.exit(1)
 
   debug = 0	### maybe fix this one day
@@ -127,11 +128,11 @@ def scan(build, root, desc, **custom_vars ):
   arg = vars, debug, descriptions
   os.path.walk(root, walk, arg)
 
-  print "Stamped %d files." % (numStamped)
+  print("Stamped %d files." % (numStamped))
 
 if __name__ == '__main__':
   if len(sys.argv) != 4:
-    print "ERROR: incorrect invocation. See script's header comments."
+    print("ERROR: incorrect invocation. See script's header comments.")
     sys.exit(1)
 
   apply(scan, tuple(sys.argv[1:]))

@@ -37,7 +37,7 @@ class IActiveScriptError:
 	_com_interfaces_ = [axscript.IID_IActiveScriptError]
 	_public_methods_ = ["GetSourceLineText","GetSourcePosition","GetExceptionInfo"]
 	def _query_interface_(self, iid):
-		print "IActiveScriptError QI - unknown IID", iid
+		print("IActiveScriptError QI - unknown IID", iid)
 		return 0
 	def _SetExceptionInfo(self, exc):
 		self.exception = exc
@@ -181,7 +181,7 @@ class AXScriptException(win32com.server.exception.COMException):
 			#assert type(bits[i]) is str, type(bits[i])
 				bits[i] = bits[i].decode('utf8')
 
-		self.description = ExpandTabs(u''.join(bits))
+		self.description = ExpandTabs(''.join(bits))
 		# Clear tracebacks etc.
 		tb = tb_top = tb_look = None
 
@@ -228,10 +228,10 @@ def ProcessAXScriptException(scriptingSite, debugManager, exceptionInstance):
 		
 	try:
 		result = scriptingSite.OnScriptError(gateway)
-	except pythoncom.com_error, details:
-		print "**OnScriptError failed:", details
-		print "Exception description:'%s'" % (`exceptionInstance.description`)
-		print "Exception text:'%s'" % (`exceptionInstance.linetext`)
+	except pythoncom.com_error as details:
+		print("**OnScriptError failed:", details)
+		print("Exception description:'%s'" % (`exceptionInstance.description`))
+		print("Exception text:'%s'" % (`exceptionInstance.linetext`))
 		result = winerror.S_FALSE
 
 	if result==winerror.S_OK:

@@ -19,7 +19,7 @@ ico_files = glob.glob(os.path.join(sys.prefix, "*.ico"))
 if not ico_files:
     ico_files = glob.glob(os.path.join(sys.prefix, "PC", "*.ico"))
 if not ico_files:
-    print "WARNING: Can't find any icon files"
+    print("WARNING: Can't find any icon files")
     
 # Our shell extension.
 IExtractIcon_Methods = "Extract GetIconLocation".split()
@@ -50,18 +50,18 @@ def DllRegisterServer():
                             "Python.File\\shellex")
     subkey = _winreg.CreateKey(key, "IconHandler")
     _winreg.SetValueEx(subkey, None, 0, _winreg.REG_SZ, ShellExtension._reg_clsid_)
-    print ShellExtension._reg_desc_, "registration complete."
+    print(ShellExtension._reg_desc_, "registration complete.")
 
 def DllUnregisterServer():
     import _winreg
     try:
         key = _winreg.DeleteKey(_winreg.HKEY_CLASSES_ROOT,
                                 "Python.File\\shellex\\IconHandler")
-    except WindowsError, details:
+    except WindowsError as details:
         import errno
         if details.errno != errno.ENOENT:
             raise
-    print ShellExtension._reg_desc_, "unregistration complete."
+    print(ShellExtension._reg_desc_, "unregistration complete.")
 
 if __name__=='__main__':
     from win32com.server import register

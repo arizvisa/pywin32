@@ -56,10 +56,10 @@ class ConnectableServer:
 		for interface in self.connections.values():
 			try:
 				apply(broadcaster, (interface,)+extraArgs)
-			except pythoncom.com_error, details:
+			except pythoncom.com_error as details:
 				self._OnNotifyFail(interface, details)
 
 	def _OnNotifyFail(self, interface, details):
-		print "Ignoring COM error to connection - %s" % (`details`)
+		print("Ignoring COM error to connection - %s" % (`details`))
 		
 

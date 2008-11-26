@@ -78,7 +78,7 @@ def MakeValidSysOuts():
 		def noOp(a,b):
 			# it would be nice to get to the bottom of this, so a warning to
 			# the debug console can't hurt.
-			print "WARNING: Ignoring keyboard interrupt from ActiveScripting engine"
+			print("WARNING: Ignoring keyboard interrupt from ActiveScripting engine")
 		# If someone else has already redirected, then assume they know what they are doing!
 		if signal.getsignal(signal.SIGINT) == signal.default_int_handler:
 			try:
@@ -91,14 +91,14 @@ def trace(*args):
 	"""A function used instead of "print" for debugging output.
 	"""
 	for arg in args:
-		print arg,
-	print
+		print(arg, end=' ')
+	print()
 
 def RaiseAssert(scode, desc):
 	"""A debugging function that raises an exception considered an "Assertion".
 	"""
-	print "**************** ASSERTION FAILED *******************"
-	print desc
+	print("**************** ASSERTION FAILED *******************")
+	print(desc)
 	raise Exception(scode, desc)
 
 class AXScriptCodeBlock:
@@ -269,7 +269,7 @@ class ScriptItem:
 			flagDescs.append("EVENT SINK")
 		if self.flags is not None and self.flags & axscript.SCRIPTITEM_CODEONLY:
 			flagDescs.append("CODE ONLY")
-		print " " * level, "Name=", self.name, ", flags=", "/".join(flagDescs), self
+		print(" " * level, "Name=", self.name, ", flags=", "/".join(flagDescs), self)
 		for subItem in self.subItems.values():
 			subItem._dump_(level+1)
 
@@ -828,7 +828,8 @@ class COMScript:
 			self.scriptState = state
 			try:
 				if self.scriptSite: self.scriptSite.OnStateChange(state)
-			except pythoncom.com_error, (hr, desc, exc, arg):
+			except pythoncom.com_error as xxx_todo_changeme:
+				(hr, desc, exc, arg) = xxx_todo_changeme.args
 				pass # Ignore all errors here - E_NOTIMPL likely from scriptlets.
 		finally:
 			self.EnableInterrupts()
@@ -992,13 +993,13 @@ class COMScript:
 			self.debugManager.AddScriptBlock(codeBlock)
 
 if __name__=='__main__':
-	print "This is a framework class - please use pyscript.py etc"
+	print("This is a framework class - please use pyscript.py etc")
 
 def dumptypeinfo(typeinfo):
 		return
 		attr = typeinfo.GetTypeAttr()
 		# Loop over all methods
-		print "Methods"
+		print("Methods")
 		for j in xrange(attr[6]):
 			fdesc = list(typeinfo.GetFuncDesc(j))
 			id = fdesc[0]
@@ -1008,11 +1009,11 @@ def dumptypeinfo(typeinfo):
 				names = None
 			doc = typeinfo.GetDocumentation(id)
 
-			print " ", names, "has attr", fdesc
+			print(" ", names, "has attr", fdesc)
 
 		# Loop over all variables (ie, properties)
-		print "Variables"
+		print("Variables")
 		for j in xrange(attr[7]):
 			fdesc = list(typeinfo.GetVarDesc(j))
 			names = typeinfo.GetNames(id)
-			print " ", names, "has attr", fdesc
+			print(" ", names, "has attr", fdesc)

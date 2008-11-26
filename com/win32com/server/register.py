@@ -44,9 +44,10 @@ def _remove_key(path, base=win32con.HKEY_CLASSES_ROOT):
 
   try:
     win32api.RegDeleteKey(base, path)
-  except win32api.error, (code, fn, msg):
+  except win32api.error as xxx_todo_changeme:
+    (code, fn, msg) = xxx_todo_changeme.args
     if code != winerror.ERROR_FILE_NOT_FOUND:
-      raise win32api.error, (code, fn, msg)
+      raise win32api.error(code, fn, msg)
 
 def recurse_delete_key(path, base=win32con.HKEY_CLASSES_ROOT):
   """Recursively delete registry keys.
@@ -55,9 +56,10 @@ def recurse_delete_key(path, base=win32con.HKEY_CLASSES_ROOT):
   """
   try:
     h = win32api.RegOpenKey(base, path)
-  except win32api.error, (code, fn, msg):
+  except win32api.error as xxx_todo_changeme2:
+    (code, fn, msg) = xxx_todo_changeme2.args
     if code != winerror.ERROR_FILE_NOT_FOUND:
-      raise win32api.error, (code, fn, msg)
+      raise win32api.error(code, fn, msg)
   else:
     # parent key found and opened successfully. do some work, making sure
     # to always close the thing (error or no).
@@ -66,9 +68,10 @@ def recurse_delete_key(path, base=win32con.HKEY_CLASSES_ROOT):
       while 1:
         try:
           subkeyname = win32api.RegEnumKey(h, 0)
-        except win32api.error, (code, fn, msg):
+        except win32api.error as xxx_todo_changeme1:
+          (code, fn, msg) = xxx_todo_changeme1.args
           if code != winerror.ERROR_NO_MORE_ITEMS:
-            raise win32api.error, (code, fn, msg)
+            raise win32api.error(code, fn, msg)
           break
         recurse_delete_key(path + '\\' + subkeyname, base)
 
@@ -110,7 +113,7 @@ def _find_localserver_exe(mustfind):
       pass
   if not os.path.exists(exeName):
     if mustfind:
-      raise RuntimeError, "Can not locate the program '%s'" % exeBaseName
+      raise RuntimeError("Can not locate the program '%s'" % exeBaseName)
     return None
   return exeName
 
@@ -131,7 +134,7 @@ def _find_localserver_module():
     try:
       os.stat(pyfile)
     except os.error:
-      raise RuntimeError, "Can not locate the Python module 'win32com.server.%s'" % baseName
+      raise RuntimeError("Can not locate the Python module 'win32com.server.%s'" % baseName)
   return pyfile
 
 def RegisterServer(clsid, 
@@ -175,7 +178,7 @@ def RegisterServer(clsid,
   ### backwards-compat check
   ### Certain policies do not require a "class name", just the policy itself.
   if not pythonInstString and not policy:
-    raise TypeError, 'You must specify either the Python Class or Python Policy which implement the COM object.'
+    raise TypeError('You must specify either the Python Class or Python Policy which implement the COM object.')
 
   keyNameRoot = "CLSID\\%s" % str(clsid)
   _set_string(keyNameRoot, desc)
@@ -204,7 +207,7 @@ def RegisterServer(clsid,
       if hasattr(sys, "frozendllhandle"):
         dllName = win32api.GetModuleFileName(sys.frozendllhandle)
       else:
-        raise RuntimeError, "We appear to have a frozen DLL, but I don't know the DLL to use"
+        raise RuntimeError("We appear to have a frozen DLL, but I don't know the DLL to use")
     else:
       # Normal case - running from .py file, so register pythoncom's DLL.
       dllName = os.path.basename(pythoncom.__file__)
@@ -401,7 +404,7 @@ def RegisterClasses(*classes, **flags):
           moduleName = os.path.splitext(win32api.FindFiles(sys.argv[0])[0][8])[0]
         except (IndexError, win32api.error):
           # Can't find the script file - the user must explicitely set the _reg_... attribute.
-          raise TypeError, "Can't locate the script hosting the COM object - please set _reg_class_spec_ in your object"
+          raise TypeError("Can't locate the script hosting the COM object - please set _reg_class_spec_ in your object")
 
       spec = moduleName + "." + cls.__name__
       # Frozen apps don't need their directory on sys.path
@@ -414,14 +417,14 @@ def RegisterClasses(*classes, **flags):
                    threadingModel, policySpec, catids, options,
                    addPyComCat, dispatcherSpec, clsctx, addnPath)
     if not quiet:
-      print 'Registered:', progID or spec, debuggingDesc
+      print('Registered:', progID or spec, debuggingDesc)
     # Register the typelibrary
     if tlb_filename:
       tlb_filename = os.path.abspath(tlb_filename)
       typelib = pythoncom.LoadTypeLib(tlb_filename)
       pythoncom.RegisterTypeLib(typelib, tlb_filename)
       if not quiet:
-        print 'Registered type library:', tlb_filename
+        print('Registered type library:', tlb_filename)
   extra = flags.get('finalize_register')
   if extra:
     extra()
@@ -437,19 +440,19 @@ def UnregisterClasses(*classes, **flags):
 
     UnregisterServer(clsid, progID, verProgID, customKeys)
     if not quiet:
-      print 'Unregistered:', progID or str(clsid)
+      print('Unregistered:', progID or str(clsid))
     if unregister_typelib:
       tlb_guid = _get(cls, "_typelib_guid_")
       if tlb_guid is None:
         # I guess I could load the typelib, but they need the GUID anyway.
-        print "Have typelib filename, but no GUID - can't unregister"
+        print("Have typelib filename, but no GUID - can't unregister")
       else:
         major, minor = _get(cls, "_typelib_version_", (1,0))
         lcid = _get(cls, "_typelib_lcid_", 0)
         try:
           pythoncom.UnRegisterTypeLib(tlb_guid, major, minor, lcid)
           if not quiet:
-            print 'Unregistered type library'
+            print('Unregistered type library')
         except pythoncom.com_error:
           pass
 
@@ -485,7 +488,7 @@ def UseCommandLine(*classes, **flags):
       UnregisterClasses(*classes, **flags)
     else:
       RegisterClasses(*classes, **flags)
-  except win32api.error, exc:
+  except win32api.error as exc:
     # If we are on xp+ and have "access denied", retry using
     # ShellExecuteEx with 'runas' verb to force elevation (vista) and/or
     # admin login dialog (vista/xp)
@@ -498,7 +501,7 @@ def UseCommandLine(*classes, **flags):
     import winxpgui # we've already checked we are running XP above
 
     if not flags['quiet']:
-      print "Requesting elevation and retrying..."
+      print("Requesting elevation and retrying...")
     new_params = " ".join(['"' + a + '"' for a in sys.argv])
     # specifying the parent means the dialog is centered over our window,
     # which is a good usability clue.
@@ -523,12 +526,12 @@ def UseCommandLine(*classes, **flags):
     exit_code = win32process.GetExitCodeProcess(hproc)
     if exit_code:
       # Even if quiet you get to see this error.
-      print "Error: registration failed (exit code %s)." % exit_code
-      print "Please re-execute this command from an elevated command-prompt"
-      print "to see details about the error."
+      print("Error: registration failed (exit code %s)." % exit_code)
+      print("Please re-execute this command from an elevated command-prompt")
+      print("to see details about the error.")
     else:
       if not flags['quiet']:
-        print "Elevated process succeeded."
+        print("Elevated process succeeded.")
 
 def RegisterPyComCategory():
   """ Register the Python COM Server component category.

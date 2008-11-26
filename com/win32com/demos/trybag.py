@@ -12,7 +12,7 @@ class Bag:
     self.data = { }
 
   def Read(self, propName, varType, errorLog):
-    print "read: name=", propName, "type=", varType
+    print("read: name=", propName, "type=", varType)
     if not self.data.has_key(propName):
       if errorLog:
         hr = 0x80070057
@@ -21,7 +21,7 @@ class Bag:
     return self.data[propName]
 
   def Write(self, propName, value):
-    print "write: name=", propName, "value=", value
+    print("write: name=", propName, "value=", value)
     self.data[propName] = value
 
 
@@ -37,10 +37,10 @@ class Target:
     pass
 
   def Load(self, bag, log):
-    print bag.Read('prop1', VT_EMPTY, log)
-    print bag.Read('prop2', VT_EMPTY, log)
+    print(bag.Read('prop1', VT_EMPTY, log))
+    print(bag.Read('prop2', VT_EMPTY, log))
     try:
-      print bag.Read('prop3', VT_EMPTY, log)
+      print(bag.Read('prop3', VT_EMPTY, log))
     except exception.Exception:
       pass
 
@@ -53,7 +53,7 @@ class Log:
   _com_interfaces_ = [ pythoncom.IID_IErrorLog ]
 
   def AddError(self, propName, excepInfo):
-    print "error: propName=", propName, "error=", excepInfo
+    print("error: propName=", propName, "error=", excepInfo)
 
 def test():
   bag = Bag()

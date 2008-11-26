@@ -79,7 +79,7 @@ class ExcelAddin:
         self.appHostApp = None    
     
     def OnConnection(self, application, connectMode, addin, custom):
-        print "OnConnection", application, connectMode, addin, custom
+        print("OnConnection", application, connectMode, addin, custom)
         try:
             self.appHostApp = application
             cbcMyBar = self.appHostApp.CommandBars.Add(Name="PythonBar", Position=constants.msoBarTop, MenuBar=constants.msoBarTypeNormal, Temporary=True)
@@ -91,27 +91,28 @@ class ExcelAddin:
             btnMyButton.TooltipText = "Python rules the World"
             btnMyButton.Width = "34"
             cbcMyBar.Visible = True
-        except pythoncom.com_error, (hr, msg, exc, arg):
-            print "The Excel call failed with code %d: %s" % (hr, msg)
+        except pythoncom.com_error as xxx_todo_changeme:
+            (hr, msg, exc, arg) = xxx_todo_changeme.args
+            print("The Excel call failed with code %d: %s" % (hr, msg))
             if exc is None:
-                print "There is no extended error information"
+                print("There is no extended error information")
             else:
                 wcode, source, text, helpFile, helpId, scode = exc
-                print "The source of the error is", source
-                print "The error message is", text
-                print "More info can be found in %s (id=%d)" % (helpFile, helpId)
+                print("The source of the error is", source)
+                print("The error message is", text)
+                print("More info can be found in %s (id=%d)" % (helpFile, helpId))
 
     def OnDisconnection(self, mode, custom):
-        print "OnDisconnection"
+        print("OnDisconnection")
         self.appHostApp.CommandBars("PythonBar").Delete
         self.appHostApp=None
         
     def OnAddInsUpdate(self, custom):
-        print "OnAddInsUpdate", custom
+        print("OnAddInsUpdate", custom)
     def OnStartupComplete(self, custom):
-        print "OnStartupComplete", custom
+        print("OnStartupComplete", custom)
     def OnBeginShutdown(self, custom):
-        print "OnBeginShutdown", custom
+        print("OnBeginShutdown", custom)
 
 def RegisterAddin(klass):
     import _winreg

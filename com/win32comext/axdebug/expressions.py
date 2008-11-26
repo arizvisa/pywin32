@@ -42,7 +42,7 @@ class Expression(gateways.DebugExpression):
                 try:
                     self.result = eval(self.code, self.frame.f_globals, self.frame.f_locals)
                 except SyntaxError:
-                    exec self.code in self.frame.f_globals, self.frame.f_locals
+                    exec(self.code, self.frame.f_globals, self.frame.f_locals)
                     self.result = ""
                 self.hresult = 0
             except:
@@ -54,7 +54,7 @@ class Expression(gateways.DebugExpression):
             self.isComplete = 1
             callback.onComplete()
     def Abort(self):
-        print "** ABORT **"
+        print("** ABORT **")
 
     def QueryIsComplete(self):
         return self.isComplete

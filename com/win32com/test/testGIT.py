@@ -28,14 +28,14 @@ import pythoncom
 
 def TestInterp(interp):
     if interp.Eval("1+1") <> 2:
-        raise ValueError, "The interpreter returned the wrong result."
+        raise ValueError("The interpreter returned the wrong result.")
     try:
         interp.Eval(1+1)
-        raise ValueError, "The interpreter did not raise an exception"
-    except pythoncom.com_error, details:
+        raise ValueError("The interpreter did not raise an exception")
+    except pythoncom.com_error as details:
         import winerror
         if details[0]!=winerror.DISP_E_TYPEMISMATCH:
-            raise ValueError, "The interpreter exception was not winerror.DISP_E_TYPEMISMATCH."
+            raise ValueError("The interpreter exception was not winerror.DISP_E_TYPEMISMATCH.")
 
 
 def TestInterpInThread(stopEvent, cookie):
@@ -61,7 +61,7 @@ def DoTestInterpInThread(cookie):
 
             TestInterp(interp)
             interp.Exec("import win32api")
-            print "The test thread id is %d, Python.Interpreter's thread ID is %d" % (myThread, interp.Eval("win32api.GetCurrentThreadId()"))
+            print("The test thread id is %d, Python.Interpreter's thread ID is %d" % (myThread, interp.Eval("win32api.GetCurrentThreadId()")))
             interp = None
             pythoncom.CoUninitialize()
         except:
@@ -83,7 +83,7 @@ def BeginThreadsSimpleMarshal(numThreads, cookie):
 
 
 def test(fn):
-    print "The main thread is %d" % (win32api.GetCurrentThreadId())
+    print("The main thread is %d" % (win32api.GetCurrentThreadId()))
     GIT    = CreateGIT()
     interp = win32com.client.Dispatch("Python.Interpreter")
     cookie = GIT.RegisterInterfaceInGlobal(interp._oleobj_, pythoncom.IID_IDispatch)
@@ -101,7 +101,7 @@ def test(fn):
                 # This is critical - whole apartment model demo will hang.
                 pythoncom.PumpWaitingMessages()
             else: # Timeout
-                print "Waiting for thread to stop with interfaces=%d, gateways=%d" % (pythoncom._GetInterfaceCount(), pythoncom._GetGatewayCount())
+                print("Waiting for thread to stop with interfaces=%d, gateways=%d" % (pythoncom._GetInterfaceCount(), pythoncom._GetGatewayCount()))
         except KeyboardInterrupt:
             break
     GIT.RevokeInterfaceFromGlobal(cookie)
@@ -114,6 +114,6 @@ if __name__=='__main__':
     # Doing CoUninit here stop Pythoncom.dll hanging when DLLMain shuts-down the process
     pythoncom.CoUninitialize()
     if pythoncom._GetInterfaceCount()!=0 or pythoncom._GetGatewayCount()!=0:
-        print "Done with interfaces=%d, gateways=%d" % (pythoncom._GetInterfaceCount(), pythoncom._GetGatewayCount())
+        print("Done with interfaces=%d, gateways=%d" % (pythoncom._GetInterfaceCount(), pythoncom._GetGatewayCount()))
     else:
-        print "Done."
+        print("Done.")

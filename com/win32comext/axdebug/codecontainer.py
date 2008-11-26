@@ -105,7 +105,9 @@ class SourceCodeContainer:
             self.lineOffsets.append(pos)
             line, pos = self._buildline(pos)
 
-    def _ProcessToken(self, type, token, (srow, scol), (erow, ecol), line):
+    def _ProcessToken(self, type, token, spos, epos, line):
+        srow, scol = spos
+        erow, ecol = epos
         self.GetText() # Prime us.
         linenum = srow - 1 # Lines zero based for us too.
         realCharPos = self.lineOffsets[linenum] + scol
@@ -202,7 +204,7 @@ class SourceModuleContainer(SourceCodeContainer):
             if fname:
                 try:
                     self.text = open(fname, "r").read()
-                except IOError, details:
+                except IOError as details:
                     self.text = "# Exception opening file\n# %s" % (`details`)
             else:
                 self.text = "# No file available for module '%s'" % (self.module)
@@ -243,10 +245,10 @@ if __name__=='__main__':
             attrlen = attrlen + 1
     text = sc.GetText()
     if attrlen!=len(text):
-        print "Lengths dont match!!! (%d/%d)" % (attrlen, len(text))
+        print("Lengths dont match!!! (%d/%d)" % (attrlen, len(text)))
 
 #       print "Attributes:"
 #       print attrs
-    print "GetLineOfPos=", sc.GetLineOfPosition(0)
-    print "GetLineOfPos=", sc.GetLineOfPosition(4)
-    print "GetLineOfPos=", sc.GetLineOfPosition(10)
+    print("GetLineOfPos=", sc.GetLineOfPosition(0))
+    print("GetLineOfPos=", sc.GetLineOfPosition(4))
+    print("GetLineOfPos=", sc.GetLineOfPosition(10))

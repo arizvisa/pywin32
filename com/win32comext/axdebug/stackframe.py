@@ -138,7 +138,7 @@ class StackFrameDebugProperty:
         RaiseNotImpl("DebugProperty::SetValueAsString")
 
     def EnumMembers(self, dwFieldSpec, nRadix, iid):
-        print "EnumMembers", dwFieldSpec, nRadix, iid
+        print("EnumMembers", dwFieldSpec, nRadix, iid)
         import expressions
         return expressions.MakeEnumDebugProperty(self.frame.f_locals, dwFieldSpec, nRadix, iid, self.frame)
 

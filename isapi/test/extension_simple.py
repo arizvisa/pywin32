@@ -26,7 +26,7 @@ except win32api.error:
 class Extension(threaded_extension.ThreadPoolExtension):
     "Python ISAPI Tester"
     def Dispatch(self, ecb):
-        print 'Tester dispatching "%s"' % (ecb.GetServerVariable("URL"),)
+        print('Tester dispatching "%s"' % (ecb.GetServerVariable("URL"),))
         url = ecb.GetServerVariable("URL")
         test_name = url.split("/")[-1]
         meth = getattr(self, test_name, None)
@@ -38,18 +38,18 @@ class Extension(threaded_extension.ThreadPoolExtension):
             return
         ecb.SendResponseHeaders("200 OK", "Content-type: text/html\r\n\r\n", 
                                 False)
-        print >> ecb, "<HTML><BODY>Finished running test <i>", test_name, "</i>"
-        print >> ecb, "<pre>"
-        print >> ecb, result
-        print >> ecb, "</pre>"
-        print >> ecb, "</BODY></HTML>"
+        print("<HTML><BODY>Finished running test <i>", test_name, "</i>", file=ecb)
+        print("<pre>", file=ecb)
+        print(result, file=ecb)
+        print("</pre>", file=ecb)
+        print("</BODY></HTML>", file=ecb)
         ecb.DoneWithSession()
 
     def test1(self, ecb):
         try:
             ecb.GetServerVariable("foo bar")
             raise RuntimeError, "should have failed!"
-        except ExtensionError, err:
+        except ExtensionError as err:
             assert err.errno == winerror.ERROR_INVALID_INDEX, err
         return "worked!"
 

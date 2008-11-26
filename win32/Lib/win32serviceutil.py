@@ -9,7 +9,7 @@
 import win32service, win32api, win32con, winerror
 import sys, string, pywintypes, os
 
-error = "Python Service Utility Error"
+error = RuntimeError
 
 def LocatePythonServiceExe(exeName = None):
     if not exeName and hasattr(sys, "frozen"):
@@ -31,9 +31,9 @@ def LocatePythonServiceExe(exeName = None):
                                          "Software\\Python\\%s\\%s" % (baseName, sys.winver))
         if os.path.isfile(exeName):
             return exeName
-        raise RuntimeError, "The executable '%s' is registered as the Python " \
-                            "service exe, but it does not exist as specified" \
-                            % exeName
+        raise RuntimeError("The executable '%s' is registered as the Python " \
+                           "service exe, but it does not exist as specified" \
+                           % exeName)
     except win32api.error:
         # OK - not there - lets go a-searchin'
         for path in [sys.prefix] + sys.path:
@@ -45,7 +45,7 @@ def LocatePythonServiceExe(exeName = None):
             return win32api.SearchPath(None, exeName)[0]
         except win32api.error:
             msg = "%s is not correctly registered\nPlease locate and run %s, and it will self-register\nThen run this service registration process again." % (exeName, exeName)
-            raise error, msg
+            raise error(msg)
 
 def _GetServiceShortName(longName):
     # looks up a services name
@@ -74,7 +74,7 @@ def _GetServiceShortName(longName):
 def SmartOpenService(hscm, name, access):
     try:
         return win32service.OpenService(hscm, name, access)
-    except win32api.error, details:
+    except win32api.error as details:
         if details[0] not in [winerror.ERROR_SERVICE_DOES_NOT_EXIST,
                               winerror.ERROR_INVALID_NAME]:
             raise
@@ -104,7 +104,7 @@ def InstallPerfmonForService(serviceName, iniName, dllName = None):
             # Frozen app? - anyway, can't find it!
             pass
     if not dllName:
-        raise ValueError, "The name of the performance DLL must be available"
+        raise ValueError("The name of the performance DLL must be available")
     dllName = win32api.GetFullPathName(dllName)
     # Now setup all the required "Performance" entries.
     hkey = win32api.RegOpenKey(win32con.HKEY_LOCAL_MACHINE, "SYSTEM\\CurrentControlSet\\Services\\%s" % (serviceName), 0, win32con.KEY_ALL_ACCESS)
@@ -131,9 +131,9 @@ def InstallPerfmonForService(serviceName, iniName, dllName = None):
             perfmon.LoadPerfCounterTextStrings("python.exe " + fname)
         finally:
             os.chdir(oldPath)
-    except win32api.error, details:
-        print "The service was installed OK, but the performance monitor"
-        print "data could not be loaded.", details
+    except win32api.error as details:
+        print("The service was installed OK, but the performance monitor")
+        print("data could not be loaded.", details)
 
 def _GetCommandLine(exeName, exeArgs):
     if exeArgs is not None:
@@ -348,21 +348,22 @@ def WaitForServiceStatus(serviceName, status, waitSecs, machine=None):
             break
         win32api.Sleep(250)
     else:
-        raise pywintypes.error, (winerror.ERROR_SERVICE_REQUEST_TIMEOUT, "QueryServiceStatus", win32api.FormatMessage(winerror.ERROR_SERVICE_REQUEST_TIMEOUT)[:-2])
+        raise pywintypes.error(winerror.ERROR_SERVICE_REQUEST_TIMEOUT, "QueryServiceStatus", win32api.FormatMessage(winerror.ERROR_SERVICE_REQUEST_TIMEOUT)[:-2])
     
 def __StopServiceWithTimeout(hs, waitSecs = 30):
     try:
         status = win32service.ControlService(hs, win32service.SERVICE_CONTROL_STOP)
-    except pywintypes.error, (hr, name, msg):
+    except pywintypes.error as xxx_todo_changeme:
+        (hr, name, msg) = xxx_todo_changeme.args
         if hr!=winerror.ERROR_SERVICE_NOT_ACTIVE:
-            raise win32service.error, (hr, name, msg)
+            raise win32service.error(hr, name, msg)
     for i in range(waitSecs):
         status = win32service.QueryServiceStatus(hs)
         if status[1] == win32service.SERVICE_STOPPED:
             break
         win32api.Sleep(1000)
     else:
-        raise pywintypes.error, (winerror.ERROR_SERVICE_REQUEST_TIMEOUT, "ControlService", win32api.FormatMessage(winerror.ERROR_SERVICE_REQUEST_TIMEOUT)[:-2])
+        raise pywintypes.error(winerror.ERROR_SERVICE_REQUEST_TIMEOUT, "ControlService", win32api.FormatMessage(winerror.ERROR_SERVICE_REQUEST_TIMEOUT)[:-2])
 
 
 def StopServiceWithDeps(serviceName, machine = None, waitSecs = 30):
@@ -406,26 +407,29 @@ def RestartService(serviceName, args = None, waitSeconds = 30, machine = None):
     "Stop the service, and then start it again (with some tolerance for allowing it to stop.)"
     try:
         StopService(serviceName, machine)
-    except pywintypes.error, (hr, name, msg):
+    except pywintypes.error as xxx_todo_changeme1:
+        # Allow only "service not running" error
+        (hr, name, msg) = xxx_todo_changeme1.args
         # Allow only "service not running" error
         if hr!=winerror.ERROR_SERVICE_NOT_ACTIVE:
-            raise win32service.error, (hr, name, msg)
+            raise win32service.error(hr, name, msg)
     # Give it a few goes, as the service may take time to stop
     for i in range(waitSeconds):
         try:
             StartService(serviceName, args, machine)
             break
-        except pywintypes.error, (hr, name, msg):
+        except pywintypes.error as xxx_todo_changeme2:
+            (hr, name, msg) = xxx_todo_changeme2.args
             if hr!=winerror.ERROR_SERVICE_ALREADY_RUNNING:
                 raise
             win32api.Sleep(1000)
     else:
-        print "Gave up waiting for the old service to stop!"
+        print("Gave up waiting for the old service to stop!")
 
 def _DebugCtrlHandler(evt):
     if evt in (win32con.CTRL_C_EVENT, win32con.CTRL_BREAK_EVENT):
         assert g_debugService
-        print "Stopping debug service."
+        print("Stopping debug service.")
         g_debugService.SvcStop()
         return True
     return False
@@ -439,7 +443,7 @@ def DebugService(cls, argv = []):
     import servicemanager
     global g_debugService
 
-    print "Debugging service %s - press Ctrl+C to stop." % (cls._svc_name_,)
+    print("Debugging service %s - press Ctrl+C to stop." % (cls._svc_name_,))
     servicemanager.Debugging(True)
     servicemanager.PrepareToHostSingle(cls)
     g_debugService = cls(argv)
@@ -466,7 +470,7 @@ def GetServiceClassString(cls, argv = None):
             # Get the long name
             fname = os.path.join(path, win32api.FindFiles(fname)[0][8])
         except win32api.error:
-            raise error, "Could not resolve the path name '%s' to a full path" % (argv[0])
+            raise error("Could not resolve the path name '%s' to a full path" % (argv[0]))
         modName = os.path.splitext(fname)[0]
     return modName + "." + cls.__name__
 
@@ -488,20 +492,20 @@ def usage():
         fname = os.path.split(sys.argv[0])[1]
     except:
         fname = sys.argv[0]
-    print "Usage: '%s [options] install|update|remove|start [...]|stop|restart [...]|debug [...]'" % fname
-    print "Options for 'install' and 'update' commands only:"
-    print " --username domain\\username : The Username the service is to run under"
-    print " --password password : The password for the username"
-    print " --startup [manual|auto|disabled] : How the service starts, default = manual"
-    print " --interactive : Allow the service to interact with the desktop."
-    print " --perfmonini file: .ini file to use for registering performance monitor data"
-    print " --perfmondll file: .dll file to use when querying the service for"
-    print "   performance data, default = perfmondata.dll"
-    print "Options for 'start' and 'stop' commands only:"
-    print " --wait seconds: Wait for the service to actually start or stop."
-    print "                 If you specify --wait with the 'stop' option, the service"
-    print "                 and all dependent services will be stopped, each waiting"
-    print "                 the specified period."
+    print("Usage: '%s [options] install|update|remove|start [...]|stop|restart [...]|debug [...]'" % fname)
+    print("Options for 'install' and 'update' commands only:")
+    print(" --username domain\\username : The Username the service is to run under")
+    print(" --password password : The password for the username")
+    print(" --startup [manual|auto|disabled] : How the service starts, default = manual")
+    print(" --interactive : Allow the service to interact with the desktop.")
+    print(" --perfmonini file: .ini file to use for registering performance monitor data")
+    print(" --perfmondll file: .dll file to use when querying the service for")
+    print("   performance data, default = perfmondata.dll")
+    print("Options for 'start' and 'stop' commands only:")
+    print(" --wait seconds: Wait for the service to actually start or stop.")
+    print("                 If you specify --wait with the 'stop' option, the service")
+    print("                 and all dependent services will be stopped, each waiting")
+    print("                 the specified period.")
     sys.exit(1)
 
 def HandleCommandLine(cls, serviceClassString = None, argv = None, customInstallOptions = "", customOptionHandler = None):
@@ -529,8 +533,8 @@ def HandleCommandLine(cls, serviceClassString = None, argv = None, customInstall
     import getopt
     try:
         opts, args = getopt.getopt(argv[1:], customInstallOptions,["password=","username=","startup=","perfmonini=", "perfmondll=", "interactive", "wait="])
-    except getopt.error, details:
-        print details
+    except getopt.error as details:
+        print(details)
         usage()
     userName = None
     password = None
@@ -554,12 +558,12 @@ def HandleCommandLine(cls, serviceClassString = None, argv = None, customInstall
             try:
                 startup = map[string.lower(val)]
             except KeyError:
-                print "'%s' is not a valid startup option" % val
+                print("'%s' is not a valid startup option" % val)
         elif opt=='--wait':
             try:
                 waitSecs = int(val)
             except ValueError:
-                print "--wait must specify an integer number of seconds."
+                print("--wait must specify an integer number of seconds.")
                 usage()
 
     arg=args[0]
@@ -567,17 +571,18 @@ def HandleCommandLine(cls, serviceClassString = None, argv = None, customInstall
     # First we process all arguments which pass additional args on
     if arg=="start":
         knownArg = 1
-        print "Starting service %s" % (serviceName)
+        print("Starting service %s" % (serviceName))
         try:
             StartService(serviceName, args[1:])
             if waitSecs:
                 WaitForServiceStatus(serviceName, win32service.SERVICE_RUNNING, waitSecs)
-        except win32service.error, (hr, fn, msg):
-            print "Error starting service: %s" % msg
+        except win32service.error as xxx_todo_changeme3:
+            (hr, fn, msg) = xxx_todo_changeme3.args
+            print("Error starting service: %s" % msg)
 
     elif arg=="restart":
         knownArg = 1
-        print "Restarting service %s" % (serviceName)
+        print("Restarting service %s" % (serviceName))
         RestartService(serviceName, args[1:])
         if waitSecs:
             WaitForServiceStatus(serviceName, win32service.SERVICE_RUNNING, waitSecs)
@@ -590,10 +595,10 @@ def HandleCommandLine(cls, serviceClassString = None, argv = None, customInstall
             svcArgs = string.join(args[1:])
             try:
                 exeName = LocateSpecificServiceExe(serviceName)
-            except win32api.error, exc:
+            except win32api.error as exc:
                 if exc[0] == winerror.ERROR_FILE_NOT_FOUND:
-                    print "The service does not appear to be installed."
-                    print "Please install the service before debugging it."
+                    print("The service does not appear to be installed.")
+                    print("Please install the service before debugging it.")
                     sys.exit(1)
                 raise
             try:
@@ -628,7 +633,7 @@ def HandleCommandLine(cls, serviceClassString = None, argv = None, customInstall
             description = cls._svc_description_
         except AttributeError:
             description = None
-        print "Installing service %s" % (serviceName,)
+        print("Installing service %s" % (serviceName,))
         # Note that we install the service before calling the custom option
         # handler, so if the custom handler fails, we have an installed service (from NT's POV)
         # but is unlikely to work, as the Python code controlling it failed.  Therefore
@@ -637,15 +642,16 @@ def HandleCommandLine(cls, serviceClassString = None, argv = None, customInstall
             InstallService(serviceClassString, serviceName, serviceDisplayName, serviceDeps = serviceDeps, startType=startup, bRunInteractive=interactive, userName=userName,password=password, exeName=exeName, perfMonIni=perfMonIni,perfMonDll=perfMonDll,exeArgs=exeArgs,description=description)
             if customOptionHandler:
                 apply( customOptionHandler, (opts,) )
-            print "Service installed"
-        except win32service.error, (hr, fn, msg):
+            print("Service installed")
+        except win32service.error as xxx_todo_changeme4:
+            (hr, fn, msg) = xxx_todo_changeme4.args
             if hr==winerror.ERROR_SERVICE_EXISTS:
                 arg = "update" # Fall through to the "update" param!
             else:
-                print "Error installing service: %s (%d)" % (msg, hr)
+                print("Error installing service: %s (%d)" % (msg, hr))
                 err = hr
-        except ValueError, msg: # Can be raised by custom option handler.
-            print "Error installing service: %s" % str(msg)
+        except ValueError as msg: # Can be raised by custom option handler.
+            print("Error installing service: %s" % str(msg))
             err = -1
             # xxx - maybe I should remove after _any_ failed install - however,
             # xxx - it may be useful to help debug to leave the service as it failed.
@@ -655,7 +661,7 @@ def HandleCommandLine(cls, serviceClassString = None, argv = None, customInstall
             try:
                 RemoveService(serviceName)
             except win32api.error:
-                print "Warning - could not remove the partially installed service."
+                print("Warning - could not remove the partially installed service.")
 
     if arg == "update":
         knownArg = 1
@@ -675,39 +681,42 @@ def HandleCommandLine(cls, serviceClassString = None, argv = None, customInstall
             description=cls._svc_description_
         except AttributeError:
             description=None
-        print "Changing service configuration"
+        print("Changing service configuration")
         try:
             ChangeServiceConfig(serviceClassString, serviceName, serviceDeps = serviceDeps, startType=startup, bRunInteractive=interactive, userName=userName,password=password, exeName=exeName, displayName = serviceDisplayName, perfMonIni=perfMonIni,perfMonDll=perfMonDll,exeArgs=exeArgs,description=description)
             if customOptionHandler:
                 apply( customOptionHandler, (opts,) )
-            print "Service updated"
-        except win32service.error, (hr, fn, msg):
-            print "Error changing service configuration: %s (%d)" % (msg,hr)
+            print("Service updated")
+        except win32service.error as xxx_todo_changeme5:
+            (hr, fn, msg) = xxx_todo_changeme5.args
+            print("Error changing service configuration: %s (%d)" % (msg,hr))
             err = hr
 
     elif arg=="remove":
         knownArg = 1
-        print "Removing service %s" % (serviceName)
+        print("Removing service %s" % (serviceName))
         try:
             RemoveService(serviceName)
-            print "Service removed"
-        except win32service.error, (hr, fn, msg):
-            print "Error removing service: %s (%d)" % (msg,hr)
+            print("Service removed")
+        except win32service.error as xxx_todo_changeme6:
+            (hr, fn, msg) = xxx_todo_changeme6.args
+            print("Error removing service: %s (%d)" % (msg,hr))
             err = hr
     elif arg=="stop":
         knownArg = 1
-        print "Stopping service %s" % (serviceName)
+        print("Stopping service %s" % (serviceName))
         try:
             if waitSecs:
                 StopServiceWithDeps(serviceName, waitSecs = waitSecs)
             else:
                 StopService(serviceName)
-        except win32service.error, (hr, fn, msg):
-            print "Error stopping service: %s (%d)" % (msg,hr)
+        except win32service.error as xxx_todo_changeme7:
+            (hr, fn, msg) = xxx_todo_changeme7.args
+            print("Error stopping service: %s (%d)" % (msg,hr))
             err = hr
     if not knownArg:
         err = -1
-        print "Unknown command - '%s'" % arg
+        print("Unknown command - '%s'" % arg)
         usage()
     return err
 
@@ -772,7 +781,7 @@ class ServiceFramework:
 
     def SvcOther(self, control):
         try:
-            print "Unknown control status - %d" % control
+            print("Unknown control status - %d" % control)
         except IOError:
             # services may not have a valid stdout!
             pass

@@ -33,7 +33,7 @@ class TestRunner:
         rc = ferr.close()
         if rc:
             base = os.path.basename(self.argv[1])
-            raise AssertionError, "%s failed with exit code %s.  Output is:\n%s" % (base, rc, output)
+            raise AssertionError("%s failed with exit code %s.  Output is:\n%s" % (base, rc, output))
 
 def get_demo_tests():
     import win32api
@@ -45,7 +45,7 @@ def get_demo_tests():
         if ext != ".py" or base in ui_demos or base in bad_demos:
             continue
         if base in ok_exceptions:
-            print "Ack - can't handle test %s - can't catch specific exceptions" % (base,)
+            print("Ack - can't handle test %s - can't catch specific exceptions" % (base,))
             continue
         argv = (sys.executable, os.path.join(demo_dir, base+".py")) + \
                argvs.get(base, ())
@@ -72,7 +72,7 @@ def import_all():
             try:
                 __import__(base)
             except ImportError:
-                print "FAILED to import", name
+                print("FAILED to import", name)
                 raise
             num += 1
 
@@ -91,9 +91,9 @@ def suite():
         if ext=='.py' and os.path.basename(me) != file:
             try:
                 mod = __import__(base)
-            except ImportError, why:
-                print "FAILED to import test module"
-                print why
+            except ImportError as why:
+                print("FAILED to import test module")
+                print(why)
                 continue
             if hasattr(mod, "suite"):
                 test = mod.suite()

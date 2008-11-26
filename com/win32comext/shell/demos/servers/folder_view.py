@@ -218,7 +218,7 @@ class ExplorerCommand:
         if self.cmd.callback:
             self.cmd.callback(items, bind_ctx)
         else:
-            print "No callback for command ", LoadString(self.cmd.ids)
+            print("No callback for command ", LoadString(self.cmd.ids))
     def EnumSubCommands(self):
         if not self.cmd.children:
             return None
@@ -678,7 +678,7 @@ def get_schema_fname():
 def DllRegisterServer():
     import _winreg
     if sys.getwindowsversion()[0] < 6:
-        print "This sample only works on Vista"
+        print("This sample only works on Vista")
         sys.exit(1)
 
     key = _winreg.CreateKey(_winreg.HKEY_LOCAL_MACHINE,
@@ -700,7 +700,7 @@ def DllRegisterServer():
     key = _winreg.CreateKey(_winreg.HKEY_CLASSES_ROOT, keypath)
     _winreg.SetValueEx(key, None, 0, _winreg.REG_SZ, ContextMenu._reg_clsid_)
     propsys.PSRegisterPropertySchema(get_schema_fname())
-    print ShellFolder._reg_desc_, "registration complete."
+    print(ShellFolder._reg_desc_, "registration complete.")
 
 def DllUnregisterServer():
     import _winreg
@@ -711,13 +711,13 @@ def DllUnregisterServer():
     for path in paths:
         try:
             _winreg.DeleteKey(_winreg.HKEY_LOCAL_MACHINE, path)
-        except WindowsError, details:
+        except WindowsError as details:
             import errno
             if details.errno != errno.ENOENT:
-                print "FAILED to remove %s: %s" % (path, details)
+                print("FAILED to remove %s: %s" % (path, details))
 
     propsys.PSUnregisterPropertySchema(get_schema_fname())
-    print ShellFolder._reg_desc_, "unregistration complete."
+    print(ShellFolder._reg_desc_, "unregistration complete.")
 
 if __name__=='__main__':
     from win32com.server import register

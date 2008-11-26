@@ -20,10 +20,10 @@ def CheckClean():
         pass # py3k
     c = _GetInterfaceCount()
     if c:
-        print "Warning - %d com interface objects still alive" % c
+        print("Warning - %d com interface objects still alive" % c)
     c = _GetGatewayCount()
     if c:
-        print "Warning - %d com gateway objects still alive" % c
+        print("Warning - %d com gateway objects still alive" % c)
 
 def RegisterPythonServer(filename, progids=None, verbose=0):
     if progids:
@@ -57,7 +57,7 @@ def RegisterPythonServer(filename, progids=None, verbose=0):
     try:
         from win32com.shell.shell import IsUserAnAdmin
     except ImportError:
-        print "Can't import win32com.shell - no idea if you are an admin or not?"
+        print("Can't import win32com.shell - no idea if you are an admin or not?")
         is_admin = False
     else:
         try:
@@ -75,13 +75,13 @@ def RegisterPythonServer(filename, progids=None, verbose=0):
     # so theoretically we are able to register it.
     cmd = '%s "%s" --unattended > nul 2>&1' % (win32api.GetModuleFileName(0), filename)
     if verbose:
-        print "Registering engine", filename
+        print("Registering engine", filename)
 #       print cmd
     rc = os.system(cmd)
     if rc:
-        print "Registration command was:"
-        print cmd
-        raise RuntimeError, "Registration of engine '%s' failed" % filename
+        print("Registration command was:")
+        print(cmd)
+        raise RuntimeError("Registration of engine '%s' failed" % filename)
 
 def ExecuteShellCommand(cmd, testcase,
                         expected_output = None, # Set to '' to check for nothing
@@ -94,26 +94,25 @@ def ExecuteShellCommand(cmd, testcase,
     class Failed(Exception): pass
     try:
         if rc:
-            raise Failed, "exit code was " + str(rc)
+            raise Failed("exit code was " + str(rc))
         if expected_output is not None and output != expected_output:
-            raise Failed, \
-                  "Expected output %r (got %r)" % (expected_output, output)
+            raise Failed("Expected output %r (got %r)" % (expected_output, output))
         if not tracebacks_ok and \
            output.find("Traceback (most recent call last)")>=0:
-            raise Failed, "traceback in program output"
+            raise Failed("traceback in program output")
         return output
-    except Failed, why:
-        print "Failed to exec command '%r'" % cmd
-        print "Failed as", why
-        print "** start of program output **"
-        print output
-        print "** end of program output **"
+    except Failed as why:
+        print("Failed to exec command '%r'" % cmd)
+        print("Failed as", why)
+        print("** start of program output **")
+        print(output)
+        print("** end of program output **")
         testcase.fail("Executing '%s' failed as %s" % (cmd, why))
 
 def assertRaisesCOM_HRESULT(testcase, hresult, func, *args, **kw):
     try:
         func(*args, **kw)
-    except pythoncom.com_error, details:
+    except pythoncom.com_error as details:
         if details.hresult==hresult:
             return
     testcase.fail("Excepected COM exception with HRESULT 0x%x" % hresult)
@@ -208,7 +207,7 @@ class TestLoader(unittest.TestLoader):
     def _getTestWrapper(self, test):
         no_leak_tests = getattr(test, "no_leak_tests", False)
         if no_leak_tests:
-            print "Test says it doesn't want leak tests!"
+            print("Test says it doesn't want leak tests!")
             return test
         return LeakTestCase(test)
     def loadTestsFromModule(self, mod):
@@ -223,7 +222,7 @@ class TestLoader(unittest.TestLoader):
         elif isinstance(test, unittest.TestCase):
             test = self._getTestWrapper(test)
         else:
-            print "XXX - what is", test
+            print("XXX - what is", test)
         return test
 
 class TestResult(unittest._TextTestResult):
@@ -301,7 +300,7 @@ class _CapturingFunctionTestCase(unittest.FunctionTestCase):#, TestCaseMixin):
         output = writer.get_captured()
         self.checkOutput(output, result)
         if result.showAll:
-            print output
+            print(output)
     def checkOutput(self, output, result):
         if output.find("Traceback")>=0:
             msg = "Test output contained a traceback\n---\n%s\n---" % output

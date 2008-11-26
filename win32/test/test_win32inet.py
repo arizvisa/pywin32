@@ -46,7 +46,7 @@ class TestNetwork(unittest.TestCase):
             try:
                 hftp = FtpCommand(hcon, True, FTP_TRANSFER_TYPE_ASCII, 'NLST', 0)
             except error:
-                print "Error info is", InternetGetLastResponseInfo()
+                print("Error info is", InternetGetLastResponseInfo())
             InternetReadFile(hftp, 2048)
             hftp.Close()
         finally:

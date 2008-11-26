@@ -70,7 +70,7 @@ class Stub:
         self.name = name
         
     def __call__(self,*args):
-        print 'STUB: ',self.name,args
+        print('STUB: ',self.name,args)
         
 class IEButton:
     """
@@ -88,7 +88,7 @@ class IEButton:
         # put stubs for non-implemented methods
         for method in self._public_methods_:
             if not hasattr(self,method):
-                print 'providing default stub for %s' % method
+                print('providing default stub for %s' % method)
                 setattr(self,method,Stub(method))
                 
     def QueryStatus (self, pguidCmdGroup, prgCmds, cmdtextf):
@@ -109,8 +109,8 @@ class IEButton:
         return result, cmdtext
 
     def Exec(self, pguidCmdGroup, nCmdID, nCmdExecOpt, pvaIn):
-        print pguidCmdGroup, nCmdID, nCmdExecOpt, pvaIn
-        print "IOleCommandTarget::Exec called."
+        print(pguidCmdGroup, nCmdID, nCmdExecOpt, pvaIn)
+        print("IOleCommandTarget::Exec called.")
         #self.webbrowser.ShowBrowserBar(GUID_IETOOLBAR, not is_ietoolbar_visible())
 
     def SetSite(self,unknown):
@@ -141,9 +141,9 @@ def register(classobj):
         _winreg.SetValueEx( hKey, "Icon", 0, _winreg.REG_SZ, classobj._icon_)
         _winreg.SetValueEx( hKey, "HotIcon", 0, _winreg.REG_SZ, classobj._hot_icon_)
     except WindowsError:
-        print "Couldn't set standard toolbar reg keys."
+        print("Couldn't set standard toolbar reg keys.")
     else:
-        print "Set standard toolbar reg keys."
+        print("Set standard toolbar reg keys.")
 
 def unregister(classobj):
     import _winreg
@@ -159,9 +159,9 @@ def unregister(classobj):
         _winreg.DeleteValue( hKey, "HotIcon" )
         _winreg.DeleteKey( _winreg.HKEY_LOCAL_MACHINE, subKeyCLSID )
     except WindowsError:
-        print "Couldn't delete Standard toolbar regkey."
+        print("Couldn't delete Standard toolbar regkey.")
     else:
-        print "Deleted Standard toolbar regkey."
+        print("Deleted Standard toolbar regkey.")
 
 #
 # test implementation

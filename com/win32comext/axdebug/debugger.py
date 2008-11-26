@@ -82,7 +82,7 @@ class CodeContainerProvider(documents.CodeContainerProvider):
     def Close(self):
         documents.CodeContainerProvider.Close(self)
         self.axdebugger = None
-        print "Closing %d nodes" % (len(self.nodes))
+        print("Closing %d nodes" % (len(self.nodes)))
         for node in self.nodes.values():
             node.Close()
         self.nodes = {}
@@ -195,9 +195,9 @@ def test():
     Break()
     raw_input("Waiting...")
     dosomething()
-    print "Done"
+    print("Done")
 
 if __name__=='__main__':
-    print "About to test the debugging interfaces!"
+    print("About to test the debugging interfaces!")
     test()
-    print " %d/%d com objects still alive" % (pythoncom._GetInterfaceCount(), pythoncom._GetGatewayCount())
+    print(" %d/%d com objects still alive" % (pythoncom._GetInterfaceCount(), pythoncom._GetGatewayCount()))

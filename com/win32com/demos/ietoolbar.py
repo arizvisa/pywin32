@@ -75,7 +75,7 @@ class WIN32STRUCT:
 
     def __setattr__(self, attr, val):
         if not attr.startswith("_") and not self.__dict__.has_key(attr):
-            raise AttributeError, attr
+            raise AttributeError(attr)
         self.__dict__[attr] = val
 
     def toparam(self):
@@ -123,7 +123,7 @@ class Stub:
         self.name = name
         
     def __call__(self,*args):
-        print 'STUB: ',self.name,args
+        print('STUB: ',self.name,args)
 
 class IEToolbarCtrl:
     """
@@ -177,7 +177,7 @@ class IEToolbar:
         # put stubs for non-implemented methods
         for method in self._public_methods_:
             if not hasattr(self,method):
-                print 'providing default stub for %s' % method
+                print('providing default stub for %s' % method)
                 setattr(self,method,Stub(method))
 
     def GetWindow(self):
@@ -201,14 +201,14 @@ class IEToolbar:
             self.toolbar.ShowWindow(win32con.SW_HIDE)
 
     def on_first_button(self):
-        print "first!"
+        print("first!")
         self.webbrowser.Navigate2('http://starship.python.net/crew/mhammond/')
 
     def on_second_button(self):
-        print "second!"
+        print("second!")
 
     def on_third_button(self):
-        print "third!"
+        print("third!")
 
     def toolbar_command_handler(self,args):
         hwnd,message,wparam,lparam,time,point = args
@@ -282,13 +282,13 @@ def DllRegisterServer():
 
     # register toolbar with IE
     try:
-        print "Trying to register Toolbar.\n"
+        print("Trying to register Toolbar.\n")
         hkey = _winreg.CreateKey( _winreg.HKEY_LOCAL_MACHINE, "SOFTWARE\\Microsoft\\Internet Explorer\\Toolbar" )
         subKey = _winreg.SetValueEx( hkey, comclass._reg_clsid_, 0, _winreg.REG_BINARY, "\0" )
     except WindowsError:
-        print "Couldn't set registry value.\nhkey: %d\tCLSID: %s\n" % ( hkey, comclass._reg_clsid_ )
+        print("Couldn't set registry value.\nhkey: %d\tCLSID: %s\n" % ( hkey, comclass._reg_clsid_ ))
     else:
-        print "Set registry value.\nhkey: %d\tCLSID: %s\n" % ( hkey, comclass._reg_clsid_ )
+        print("Set registry value.\nhkey: %d\tCLSID: %s\n" % ( hkey, comclass._reg_clsid_ ))
     # TODO: implement reg settings for standard toolbar button
 
 # unregister plugin
@@ -297,13 +297,13 @@ def DllUnregisterServer():
 
     # unregister toolbar from internet explorer
     try:
-        print "Trying to unregister Toolbar.\n"
+        print("Trying to unregister Toolbar.\n")
         hkey = _winreg.CreateKey( _winreg.HKEY_LOCAL_MACHINE, "SOFTWARE\\Microsoft\\Internet Explorer\\Toolbar" )
         _winreg.DeleteValue( hkey, comclass._reg_clsid_ )
     except WindowsError:
-        print "Couldn't delete registry value.\nhkey: %d\tCLSID: %s\n" % ( hkey, comclass._reg_clsid_ )
+        print("Couldn't delete registry value.\nhkey: %d\tCLSID: %s\n" % ( hkey, comclass._reg_clsid_ ))
     else:
-        print "Deleting reg key succeeded.\n"
+        print("Deleting reg key succeeded.\n")
 
 # entry point
 if __name__ == '__main__':

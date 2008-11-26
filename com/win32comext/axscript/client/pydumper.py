@@ -47,7 +47,7 @@ def Register():
 	lcid = 0x0409 # // english
 	policy = None # "win32com.axscript.client.axspolicy.AXScriptPolicy"
 
-	print "Registering COM server%s..." % debug_desc
+	print("Registering COM server%s..." % debug_desc)
 	from win32com.server.register import RegisterServer
 
 	languageName = "PyDump"
@@ -62,7 +62,7 @@ def Register():
 	# Basic Registration for wsh.
 	win32com.server.register._set_string(".pysDump", "pysDumpFile")
 	win32com.server.register._set_string("pysDumpFile\\ScriptEngine", languageName)
-	print "Dumping Server registered."
+	print("Dumping Server registered.")
 	
 if __name__=='__main__':
 	Register()

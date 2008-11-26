@@ -276,10 +276,11 @@ def TestArrays(vbtest, bUseGenerated):
     
     # byref safearray results with incorrect size.
     callback_ob = wrap(TestObject(), useDispatcher = useDispatcher)
-    print "** Expecting a 'ValueError' exception to be printed next:"
+    print("** Expecting a 'ValueError' exception to be printed next:")
     try:
         vbtest.DoCallbackSafeArraySizeFail(callback_ob)
-    except pythoncom.com_error, (hr, msg, exc, arg):
+    except pythoncom.com_error as xxx_todo_changeme:
+        (hr, msg, exc, arg) = xxx_todo_changeme.args
         assert exc[1] == "Python COM Server Internal Error", "Didnt get the correct exception - '%s'" % (exc,)
         
     if bUseGenerated:
@@ -313,13 +314,14 @@ def TestArrays(vbtest, bUseGenerated):
         resultData, byRefParam = vbtest.PassSAFEARRAYVariant(testData)
         assert testData == list(byRefParam)
         assert testData == list(resultData)
-    print "Array tests passed"
+    print("Array tests passed")
 
 def TestStructs(vbtest):
     try:
         vbtest.IntProperty = "One"
         raise error("Should have failed by now")
-    except pythoncom.com_error, (hr, desc, exc, argErr):
+    except pythoncom.com_error as xxx_todo_changeme1:
+        (hr, desc, exc, argErr) = xxx_todo_changeme1.args
         if hr != winerror.DISP_E_TYPEMISMATCH:
             raise error("Expected DISP_E_TYPEMISMATCH")
 
@@ -336,21 +338,21 @@ def TestStructs(vbtest):
     sub = s.sub_val
     sub.int_val = 22
     if sub.int_val != 22:
-        print sub.int_val
+        print(sub.int_val)
         raise error("The sub-struct value didnt persist!")
 
     if s.sub_val.int_val != 22:
-        print s.sub_val.int_val
+        print(s.sub_val.int_val)
         raise error("The sub-struct value (re-fetched) didnt persist!")
 
     if s.sub_val.array_val[0].int_val != 0 or str(s.sub_val.array_val[0].str_val) != "zero":
-        print s.sub_val.array_val[0].int_val
+        print(s.sub_val.array_val[0].int_val)
         raise error("The array element wasnt correct")
     s.sub_val.array_val[0].int_val = 99
     s.sub_val.array_val[1].int_val = 66
     if s.sub_val.array_val[0].int_val != 99 or \
        s.sub_val.array_val[1].int_val != 66:
-        print s.sub_val.array_val[0].int_val
+        print(s.sub_val.array_val[0].int_val)
         raise error("The array element didnt persist.")
     # Now pass the struct back to VB
     vbtest.StructProperty = s
@@ -404,7 +406,7 @@ def TestStructs(vbtest):
     assert m[0]=="int_val" and m[1]=="str_val" and m[2]=="ob_val" and m[3]=="sub_val"
 
     # NOTE - a COM error is _not_ acceptable here!
-    print "Struct/Record tests passed"
+    print("Struct/Record tests passed")
 
 def TestVBInterface(ob):
     t = ob.GetInterfaceTester(2)
@@ -430,10 +432,10 @@ def TestAll():
         raise RuntimeError("This must be run in debug mode - we use assert!")
     try:
         DoTestAll()
-        print "All tests appear to have worked!"
+        print("All tests appear to have worked!")
     except:
         # ?????
-        print "TestAll() failed!!"
+        print("TestAll() failed!!")
         traceback.print_exc()
         raise
 

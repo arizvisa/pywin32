@@ -145,7 +145,7 @@ class Collection:
 
     try:
       return self.data[args[0]]
-    except IndexError, desc:
+    except IndexError as desc:
       raise COMException(scode=winerror.DISP_E_BADINDEX, desc=str(desc))
 
     
@@ -160,7 +160,7 @@ class Collection:
   def Remove(self, index):
     try:
       del self.data[index]
-    except IndexError, desc:
+    except IndexError as desc:
       raise COMException(scode=winerror.DISP_E_BADINDEX, desc=str(desc))
 
   def Insert(self, index, value):

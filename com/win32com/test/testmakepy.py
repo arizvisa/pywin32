@@ -18,23 +18,23 @@ def TestBuildAll(verbose = 1):
     tlbInfos = selecttlb.EnumTlbs()
     for info in tlbInfos:
         if verbose:
-            print "%s (%s)" % (info.desc, info.dll)
+            print("%s (%s)" % (info.desc, info.dll))
         try:
             makepy.GenerateFromTypeLibSpec(info)
 #          sys.stderr.write("Attr typeflags for coclass referenced object %s=%d (%d), typekind=%d\n" % (name, refAttr.wTypeFlags, refAttr.wTypeFlags & pythoncom.TYPEFLAG_FDUAL,refAttr.typekind))
             num += 1
-        except pythoncom.com_error, details:
+        except pythoncom.com_error as details:
             # Ignore these 2 errors, as the are very common and can obscure
             # useful warnings.
             if details[0] not in [winerror.TYPE_E_CANTLOADLIBRARY,
                               winerror.TYPE_E_LIBNOTREGISTERED]:
-                print "** COM error on", info.desc
-                print details
+                print("** COM error on", info.desc)
+                print(details)
         except KeyboardInterrupt:
-            print "Interrupted!"
+            print("Interrupted!")
             raise KeyboardInterrupt
         except:
-            print "Failed:", info.desc
+            print("Failed:", info.desc)
             traceback.print_exc()
         if makepy.bForDemandDefault:
             # This only builds enums etc by default - build each
@@ -47,7 +47,7 @@ def TestBuildAll(verbose = 1):
 
 def TestAll(verbose = 0):
     num = TestBuildAll(verbose)
-    print "Generated and imported", num, "modules"
+    print("Generated and imported", num, "modules")
     win32com.test.util.CheckClean()
 
 if __name__=='__main__':

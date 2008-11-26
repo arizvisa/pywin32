@@ -114,15 +114,15 @@ def stamp(pathname, options):
   try:
     f = open(pathname, "a+b")
     f.close()
-  except IOError, why:
-    print "WARNING: File %s could not be opened - %s" % (pathname, why)
+  except IOError as why:
+    print("WARNING: File %s could not be opened - %s" % (pathname, why))
 
   ver = options.version
   try:
     bits = [int(i) for i in ver.split(".")]
     vmaj, vmin, vsub, vbuild = bits
   except (IndexError, TypeError, ValueError):
-    raise ValueError, "--version must be a.b.c.d (all integers) - got %r" % ver
+    raise ValueError("--version must be a.b.c.d (all integers) - got %r" % ver)
   
   ifn = options.internal_name
   if not ifn:
@@ -163,7 +163,7 @@ def stamp(pathname, options):
   EndUpdateResource(h, 0)
 
   if options.verbose:
-    print "Stamped:", pathname
+    print("Stamped:", pathname)
 
 if __name__ == '__main__':
   parser = optparse.OptionParser("%prog [options] filespec ...",

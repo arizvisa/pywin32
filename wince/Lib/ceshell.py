@@ -105,7 +105,7 @@ class SimpleShell:
 		self.eventClosed = CreateEvent(None, 0, 0, None)
 
 	def __del__(self):
-		print "InteractiveManager dieing"
+		print("InteractiveManager dieing")
 
 	def write(self, text):
 		text = string.replace(text, "\n", "\r\n")
@@ -408,8 +408,9 @@ def RunCode(shell):
 
 			try:
 				file = open(fname, mode)
-			except IOError, (code, why):
-				print "python: can't open %s: %s\n" % (fname, why)
+			except IOError as xxx_todo_changeme:
+				(code, why) = xxx_todo_changeme.args
+				print("python: can't open %s: %s\n" % (fname, why))
 				bKeepOpen = 1
 				file = None
 			if file:

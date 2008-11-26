@@ -119,6 +119,6 @@ class ArrayTest(util.TestCase):
 if __name__ == "__main__":
     try:
         util.testmain()
-    except SystemExit, rc:
+    except SystemExit as rc:
         if not rc:
             raise

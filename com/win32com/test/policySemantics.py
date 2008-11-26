@@ -31,7 +31,7 @@ class PythonSemanticClass:
         self.list.remove(value)
 
 def DispExTest(ob):
-    if not __debug__: print "WARNING: Tests dressed up as assertions are being skipped!"
+    if not __debug__: print("WARNING: Tests dressed up as assertions are being skipped!")
     assert ob.GetDispID("Add", 0)==10, "Policy did not honour the dispid"
 # Not impl
 #       assert ob.GetMemberName(10, 0)=="add", "Policy did not give me the correct function for the dispid"
@@ -44,12 +44,13 @@ def DispExTest(ob):
         try:
             dispid = ob.GetNextDispID(0, dispid)
             dispids.append(dispid)
-        except pythoncom.com_error, (hr, desc, exc, arg):
+        except pythoncom.com_error as xxx_todo_changeme:
+            (hr, desc, exc, arg) = xxx_todo_changeme.args
             assert hr==winerror.S_FALSE, "Bad result at end of enum"
             break
     dispids.sort()
     if dispids <> [pythoncom.DISPID_EVALUATE, pythoncom.DISPID_NEWENUM, 10, 11, 1000]:
-        raise Error, "Got back the wrong dispids: %s" % dispids
+        raise Error("Got back the wrong dispids: %s" % dispids)
 
 def SemanticTest(ob):
     # First just check our object "generally" as expected.
@@ -58,13 +59,13 @@ def SemanticTest(ob):
     ob.Add(3)
     # invoke _value_
     if ob() != (1,2,3):
-        raise Error, "Bad result - got %s" % (`ob()`)
+        raise Error("Bad result - got %s" % (`ob()`))
 
     dispob = ob._oleobj_
 
     rc = dispob.Invoke(pythoncom.DISPID_EVALUATE, 0, pythoncom.DISPATCH_METHOD|pythoncom.DISPATCH_PROPERTYGET, 1)
     if rc != 6:
-        raise Error, "Evaluate returned", rc
+        raise Error("Evaluate returned").with_traceback(rc)
 
 
 class Tester(win32com.test.util.TestCase):

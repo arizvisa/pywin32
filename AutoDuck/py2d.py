@@ -61,37 +61,37 @@ def build_module(fp, mod_name):
         elif name.upper()==name and type(ob) in (int, str):
             constants.append( (name, ob) )
     info = BuildInfo(mod_name, mod)
-    print >> fp, "// @module %s|%s" % (mod_name, format_desc(info.desc))
+    print("// @module %s|%s" % (mod_name, format_desc(info.desc)), file=fp)
     for ob in functions:
-        print >> fp, "// @pymeth %s|%s" % (ob.name, ob.short_desc)
+        print("// @pymeth %s|%s" % (ob.name, ob.short_desc), file=fp)
     for ob in functions:
-        print >> fp, "// @pymethod |%s|%s|%s" % (mod_name, ob.name, format_desc(ob.desc))
+        print("// @pymethod |%s|%s|%s" % (mod_name, ob.name, format_desc(ob.desc)), file=fp)
         for ai in BuildArgInfos(ob.ob):
-            print >> fp, "// @pyparm |%s|%s|%s" % (ai.name, ai.default, ai.short_desc)
+            print("// @pyparm |%s|%s|%s" % (ai.name, ai.default, ai.short_desc), file=fp)
 
     for ob in classes:
         ob_name = mod_name + "." + ob.name
-        print >> fp, "// @object %s|%s" % (ob_name, format_desc(ob.desc))
+        print("// @object %s|%s" % (ob_name, format_desc(ob.desc)), file=fp)
         func_infos = []
         for n, o in ob.ob.__dict__.items():
             if type(o)==types.FunctionType:
                 info = BuildInfo(n, o)
                 func_infos.append(info)
         for fi in func_infos:
-            print >> fp, "// @pymeth %s|%s" % (fi.name, fi.short_desc)
+            print("// @pymeth %s|%s" % (fi.name, fi.short_desc), file=fp)
         for fi in func_infos:
-            print >> fp, "// @pymethod |%s|%s|%s" % (ob_name, fi.name, format_desc(fi.desc))
+            print("// @pymethod |%s|%s|%s" % (ob_name, fi.name, format_desc(fi.desc)), file=fp)
             for ai in BuildArgInfos(fi.ob):
-                print >> fp, "// @pyparm |%s|%s|%s" % (ai.name, ai.default, ai.short_desc)
+                print("// @pyparm |%s|%s|%s" % (ai.name, ai.default, ai.short_desc), file=fp)
                 
     for (name, val) in constants:
         desc = "%s = %r" % (name, val)
         if type(val) in (int, long):
             desc += " (0x%x)" % (val,)
-        print >> fp, "// @const %s|%s|%s" % (mod_name, name, desc)
+        print("// @const %s|%s|%s" % (mod_name, name, desc), file=fp)
 
 def main(fp, args):
-    print >> fp, "// @doc"
+    print("// @doc", file=fp)
     for arg in args:
         build_module(sys.stdout, arg)
 

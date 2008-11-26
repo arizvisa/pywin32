@@ -27,7 +27,7 @@ class FileSpec:
 			if platform: dest = os.path.join(dest, platform)
 			destname = os.path.join(dest, base)
 			if verbose:
-				print "Copy", fname,"->", destname
+				print("Copy", fname,"->", destname)
 			shutil.copyfile(fname, destname)
 			ret.append(destname)
 		return ret
@@ -40,7 +40,7 @@ class SourceFileSpec(FileSpec):
 			base = os.path.basename(fname)
 			destname = os.path.join(destdir, base) + "c"
 			if verbose:
-				print "Compile", fname,"->", destname
+				print("Compile", fname,"->", destname)
 			py_compile.compile(fname, destname, base)
 			ret.append(destname)
 		return ret
@@ -105,7 +105,7 @@ def UpdateInf( fileName, fileLists ):
 			try:
 				fileList = fileLists[setName]
 			except KeyError:
-				print "Warning: No files found for file set '%s'" % setName
+				print("Warning: No files found for file set '%s'" % setName)
 				fileList = [] # No files
 
 			for file in fileList:
@@ -224,14 +224,14 @@ def main():
 	try:
 		fmap = BuildFileList("FileList.txt")
 		builtFiles = CopyFilesToDist(fmap, ["sh","mips"])	
-	except RuntimeError, details:
-		print "ERROR:", details
+	except RuntimeError as details:
+		print("ERROR:", details)
 		sys.exit(1)
 
 	num = 0
 	for l in builtFiles.values():
 		num = num + len(l)
-	print "Copied %d files - updating .inf file..." % num
+	print("Copied %d files - updating .inf file..." % num)
 	UpdateInf("PythonCE.inf", builtFiles)
 
 if __name__=='__main__':

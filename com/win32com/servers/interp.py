@@ -49,5 +49,5 @@ def Register():
     return win32com.server.register.UseCommandLine(Interpreter)
 
 if __name__=='__main__':
-    print "Registering COM server..."
+    print("Registering COM server...")
     Register()

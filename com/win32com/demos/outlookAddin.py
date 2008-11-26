@@ -49,9 +49,9 @@ class ButtonEvent:
 class FolderEvent:
     def OnItemAdd(self, item):
         try:
-            print "An item was added to the inbox with subject:", item.Subject
+            print("An item was added to the inbox with subject:", item.Subject)
         except AttributeError:
-            print "An item was added to the inbox, but it has no subject! - ", repr(item)
+            print("An item was added to the inbox, but it has no subject! - ", repr(item))
 
 
 
@@ -63,7 +63,7 @@ class OutlookAddin:
     _reg_progid_ = "Python.Test.OutlookAddin"
     _reg_policy_spec_ = "win32com.server.policy.EventHandlerPolicy"
     def OnConnection(self, application, connectMode, addin, custom):
-        print "OnConnection", application, connectMode, addin, custom
+        print("OnConnection", application, connectMode, addin, custom)
         # ActiveExplorer may be none when started without a UI (eg, WinCE synchronisation)
         activeExplorer = application.ActiveExplorer()
         if activeExplorer is not None:
@@ -81,13 +81,13 @@ class OutlookAddin:
         self.inboxItems = DispatchWithEvents(inbox.Items, FolderEvent)
 
     def OnDisconnection(self, mode, custom):
-        print "OnDisconnection"
+        print("OnDisconnection")
     def OnAddInsUpdate(self, custom):
-        print "OnAddInsUpdate", custom
+        print("OnAddInsUpdate", custom)
     def OnStartupComplete(self, custom):
-        print "OnStartupComplete", custom
+        print("OnStartupComplete", custom)
     def OnBeginShutdown(self, custom):
-        print "OnBeginShutdown", custom
+        print("OnBeginShutdown", custom)
 
 def RegisterAddin(klass):
     import _winreg

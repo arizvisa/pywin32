@@ -111,9 +111,9 @@ if logging is not None:
         def emit(self, record):
             self.num_emits += 1
             return
-            print "--- record start"
-            print self.format(record)
-            print "--- record end"
+            print("--- record start")
+            print(self.format(record))
+            print("--- record end")
     
     def testLogger():
         assert not hasattr(win32com, "logger")
@@ -128,7 +128,7 @@ if logging is not None:
         com_server = wrap(TestServer(), pythoncom.IID_IStream)
         try:
             com_server.Commit(0)
-            raise RuntimeError, "should have failed"
+            raise RuntimeError("should have failed")
         except pythoncom.error:
             pass
         assert handler.num_emits == 1, handler.num_emits
@@ -137,7 +137,7 @@ if logging is not None:
         com_server = Dispatch(wrap(TestServer()))
         try:
             com_server.Commit(0)
-            raise RuntimeError, "should have failed"
+            raise RuntimeError("should have failed")
         except pythoncom.error:
             pass
         assert handler.num_emits == 1, handler.num_emits
@@ -148,4 +148,4 @@ if __name__=='__main__':
         testLogger()
     from util import CheckClean
     CheckClean()
-    print "error semantic tests worked"
+    print("error semantic tests worked")

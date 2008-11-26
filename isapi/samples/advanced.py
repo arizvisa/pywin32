@@ -75,14 +75,14 @@ class ReloadWatcherThread(threading.Thread):
                 rc = win32event.WaitForSingleObject(self.handle, 
                                                     win32event.INFINITE)
                 win32file.FindNextChangeNotification(self.handle)
-            except win32event.error, details:
+            except win32event.error as details:
                 # handle closed - thread should terminate.
                 if details[0] != winerror.ERROR_INVALID_HANDLE:
                     raise
                 break
             this_time = os.stat(self.filename)[stat.ST_MTIME]
             if this_time != last_time:
-                print "Detected file change - flagging for reload."
+                print("Detected file change - flagging for reload.")
                 self.change_detected = True
                 last_time = this_time
     
@@ -103,14 +103,14 @@ class Extension(SimpleExtension):
         # The "Dispatch" method will just cause the exception to be
         # rendered to the browser.
         if self.reload_watcher.change_detected:
-            print "Doing reload"
+            print("Doing reload")
             raise InternalReloadException
 
         ecb.SendResponseHeaders("200 OK", "Content-Type: text/html\r\n\r\n", 0)
-        print >> ecb, "<HTML><BODY>"
-        print >> ecb, "This module has been imported"
-        print >> ecb, "%d times" % (reload_counter,)
-        print >> ecb, "</BODY></HTML>"
+        print("<HTML><BODY>", file=ecb)
+        print("This module has been imported", file=ecb)
+        print("%d times" % (reload_counter,), file=ecb)
+        print("</BODY></HTML>", file=ecb)
         ecb.close()
         return isapicon.HSE_STATUS_SUCCESS
     
@@ -131,16 +131,16 @@ def PreInstallDirectory(params, options):
 
 # Post install hook for our entire script
 def PostInstall(params, options):
-    print
-    print "The sample has been installed."
-    print "Point your browser to /AdvancedPythonSample"
-    print "If you modify the source file and reload the page,"
-    print "you should see the reload counter increment"
+    print()
+    print("The sample has been installed.")
+    print("Point your browser to /AdvancedPythonSample")
+    print("If you modify the source file and reload the page,")
+    print("you should see the reload counter increment")
 
 # Handler for our custom 'status' argument.
 def status_handler(options, log, arg):
     "Query the status of something"
-    print "Everything seems to be fine!"
+    print("Everything seems to be fine!")
 
 custom_arg_handlers = {"status": status_handler}
 

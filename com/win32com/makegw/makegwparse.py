@@ -57,7 +57,7 @@ class ArgFormatter:
 		  return "*"
 		else:
 		  return "?? (%d)" % (dif,)
-		  raise error_not_supported, "Can't indirect this far - please fix me :-)"
+		  raise error_not_supported("Can't indirect this far - please fix me :-)")
 	def GetIndirectedArgName(self, indirectFrom, indirectionTo):
 		#print 'get:',self.arg.name, indirectFrom,self._GetDeclaredIndirection() + self.builtinIndirection, indirectionTo, self.arg.indirectionLevel
 
@@ -125,7 +125,7 @@ class ArgFormatter:
 		self.gatewayMode = 1
 	def _GetDeclaredIndirection(self):
 		return self.arg.indirectionLevel
-		print 'declared:', self.arg.name, self.gatewayMode
+		print('declared:', self.arg.name, self.gatewayMode)
 		if self.gatewayMode:
 			return self.arg.indirectionLevel
 		else:
@@ -585,7 +585,7 @@ def make_arg_converter(arg):
 		if arg.type[0]=="I":
 			return ArgFormatterInterface(arg, 0, 1)
 
-		raise error_not_supported, "The type '%s' (%s) is unknown." % (arg.type, arg.name)
+		raise error_not_supported("The type '%s' (%s) is unknown." % (arg.type, arg.name))
 
 
 #############################################################
@@ -646,7 +646,7 @@ class Argument:
 			self.unc_type = self.type
 		
 		if VERBOSE:
-			print "	   Arg %s of type %s%s (%s)" % (self.name, self.type, "*" * self.indirectionLevel, self.inout)
+			print("	   Arg %s of type %s%s (%s)" % (self.name, self.type, "*" * self.indirectionLevel, self.inout))
 
 	def HasAttribute(self, typ):
 		"""Determines if the argument has the specific attribute.
@@ -691,11 +691,11 @@ class Method:
 		self.result = mo.group(2)
 		if self.result != "HRESULT":
 			if self.result=="DWORD": # DWORD is for old old stuff?
-				print "Warning: Old style interface detected - compilation errors likely!"
+				print("Warning: Old style interface detected - compilation errors likely!")
 			else:
-				print "Method %s - Only HRESULT return types are supported." % self.name
+				print("Method %s - Only HRESULT return types are supported." % self.name)
 #				raise error_not_supported,		if VERBOSE:
-			print "	 Method %s %s(" % (self.result, self.name)
+			print("	 Method %s %s(" % (self.result, self.name))
 		while 1:
 			arg = Argument(self.good_interface_names)
 			try:
@@ -718,7 +718,7 @@ class Interface:
 		self.name = mo.group(2)
 		self.base = mo.group(3)
 		if VERBOSE:
-			print "Interface %s : public %s" % (self.name, self.base)
+			print("Interface %s : public %s" % (self.name, self.base))
 
 	def BuildMethods(self, file):
 		"""Build all sub-methods for this interface"""
@@ -746,7 +746,7 @@ def find_interface(interfaceName, file):
 		mo = Interface.regex.search(line)
 		if mo:
 			name = mo.group(2)
-			print name
+			print(name)
 			AllConverters[name] = (ArgFormatterInterface, 0, 1)
 			if name==interfaceName:
 				interface = Interface(mo)
@@ -768,7 +768,7 @@ def parse_interface_info(interfaceName, file):
 		return find_interface(interfaceName, file)
 	except re.error:
 		traceback.print_exc()
-		print "The interface could not be built, as the regular expression failed!"
+		print("The interface could not be built, as the regular expression failed!")
 def test():
 	f=open("d:\\msdev\\include\\objidl.h")
 	try:
@@ -779,6 +779,6 @@ def test():
 def test_regex(r,text):
 	res=r.search(text,0)
 	if res==-1:
-		print "** Not found"
+		print("** Not found")
 	else:
-		print "%d\n%s\n%s\n%s\n%s" % (res, r.group(1), r.group(2), r.group(3), r.group(4))
+		print("%d\n%s\n%s\n%s\n%s" % (res, r.group(1), r.group(2), r.group(3), r.group(4)))

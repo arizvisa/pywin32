@@ -79,7 +79,7 @@ def make_doc_summary(inFile, outFile):
 							else:
 								extra_tags.append("// " + doc + '\n')
 		except:
-			print "Line %d is badly formed - %s" % (lineNo, str(sys.exc_value))
+			print("Line %d is badly formed - %s" % (lineNo, str(sys.exc_value)))
 			
 		lineNo = lineNo + 1
 
@@ -108,7 +108,7 @@ def make_doc_summary(inFile, outFile):
 		for (meth, extras) in these_methods:
 			fields = string.split(meth,'|')
 			if len(fields)<>3:
-				print "**Error - %s does not have enough fields" % meth
+				print("**Error - %s does not have enough fields" % meth)
 			else:
 				outFile.write("// @pymethod %s|%s|%s|%s\n" % (fields[0],thisModName,fields[1], fields[2]))
 			for extra in extras:
@@ -142,9 +142,9 @@ def doit():
 			elif o=='-o':
 				outName = a
 		msg = string.join(args)
-	except getopt.error, msg:
-		print msg
-		print "Usage: %s [-o output_name] [-p com_parent] filename" % sys.argv[0]
+	except getopt.error as msg:
+		print(msg)
+		print("Usage: %s [-o output_name] [-p com_parent] filename" % sys.argv[0])
 		return
 
 	inName = args[0]

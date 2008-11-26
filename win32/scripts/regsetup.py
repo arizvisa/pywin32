@@ -12,7 +12,7 @@ def FileExists(fname):
     try:
         os.stat(fname)
         return 1
-    except os.error, details:
+    except os.error as details:
         return 0
 
 def IsPackageDir(path, packageName, knownFileName):
@@ -53,7 +53,7 @@ def FindPackagePath(packageName, knownFileName, searchPaths):
             # Found it
             ret = os.path.abspath(pathLook)
             return ret, ret
-    raise error, "The package %s can not be located" % packageName
+    raise error("The package %s can not be located" % packageName)
 
 def FindHelpPath(helpFile, helpDesc, searchPaths):
     # See if the current registry entry is OK
@@ -77,7 +77,7 @@ def FindHelpPath(helpFile, helpDesc, searchPaths):
         pathLook = os.path.join(pathLook, "Help")
         if FileExists(os.path.join( pathLook, helpFile)):
             return os.path.abspath(pathLook)
-    raise error, "The help file %s can not be located" % helpFile
+    raise error("The help file %s can not be located" % helpFile)
 
 def FindAppPath(appName, knownFileName, searchPaths):
     """Find an application.
@@ -97,7 +97,7 @@ def FindAppPath(appName, knownFileName, searchPaths):
         if FileExists(os.path.join(pathLook, knownFileName)):
             # Found it
             return os.path.abspath(pathLook)
-    raise error, "The file %s can not be located for application %s" % (knownFileName, appName)
+    raise error("The file %s can not be located for application %s" % (knownFileName, appName))
 
 def FindPythonExe(exeAlias, possibleRealNames, searchPaths):
     """Find an exe.
@@ -160,7 +160,7 @@ def LocateFileName(fileNamesString, searchPaths):
         try:
             import win32ui, win32con
         except ImportError:
-            raise error, "Need to locate the file %s, but the win32ui module is not available\nPlease run the program again, passing as a parameter the path to this file." % fileName
+            raise error("Need to locate the file %s, but the win32ui module is not available\nPlease run the program again, passing as a parameter the path to this file." % fileName)
         # Display a common dialog to locate the file.
         flags=win32con.OFN_FILEMUSTEXIST
         ext = os.path.splitext(fileName)[1]
@@ -168,7 +168,7 @@ def LocateFileName(fileNamesString, searchPaths):
         dlg = win32ui.CreateFileDialog(1,None,fileName,flags,filter,None)
         dlg.SetOFNTitle("Locate " + fileName)
         if dlg.DoModal() <> win32con.IDOK:
-            raise KeyboardInterrupt, "User cancelled the process"
+            raise KeyboardInterrupt("User cancelled the process")
         retPath = dlg.GetPathName()
     return os.path.abspath(retPath)
 
@@ -214,7 +214,7 @@ def LocatePythonCore(searchPaths):
     if libPath is None and searchPaths is not None:
         libPath = LocatePath("os.py", searchPaths)
     if libPath is None:
-        raise error, "The core Python library could not be located."
+        raise error("The core Python library could not be located.")
 
     corePath = None
     suffix = IsDebug()
@@ -225,7 +225,7 @@ def LocatePythonCore(searchPaths):
     if corePath is None and searchPaths is not None:
         corePath = LocatePath("unicodedata%s.pyd" % suffix, searchPaths)
     if corePath is None:
-        raise error, "The core Python path could not be located."
+        raise error("The core Python path could not be located.")
 
     installPath = os.path.abspath(os.path.join(libPath, ".."))
     return installPath, [libPath, corePath]
@@ -241,7 +241,7 @@ def FindRegisterPackage(packageName, knownFile, searchPaths, registryAppName = N
        may later be uninstalled.  This should not happen with the core)
     """
     import regutil, string
-    if not packageName: raise error, "A package name must be supplied"
+    if not packageName: raise error("A package name must be supplied")
     corePaths = string.split(regutil.GetRegisteredNamedPath(None),";")
     if not searchPaths: searchPaths = corePaths
     registryAppName = registryAppName or packageName
@@ -252,11 +252,11 @@ def FindRegisterPackage(packageName, knownFile, searchPaths, registryAppName = N
                 pathAdd = ""
             regutil.RegisterNamedPath(registryAppName, pathAdd)
         return pathLook
-    except error, details:
-        print "*** The %s package could not be registered - %s" % (packageName, details)
-        print "*** Please ensure you have passed the correct paths on the command line."
-        print "*** - For packages, you should pass a path to the packages parent directory,"
-        print "*** - and not the package directory itself..."
+    except error as details:
+        print("*** The %s package could not be registered - %s" % (packageName, details))
+        print("*** Please ensure you have passed the correct paths on the command line.")
+        print("*** - For packages, you should pass a path to the packages parent directory,")
+        print("*** - and not the package directory itself...")
 
 
 def FindRegisterApp(appName, knownFiles, searchPaths):
@@ -274,8 +274,8 @@ def FindRegisterApp(appName, knownFiles, searchPaths):
             pathLook = FindAppPath(appName, knownFile, searchPaths)
             if pathLook:
                 paths.append(pathLook)
-    except error, details:
-        print "*** ", details
+    except error as details:
+        print("*** ", details)
         return
 
     regutil.RegisterNamedPath(appName, string.join(paths,";"))
@@ -297,8 +297,8 @@ def FindRegisterHelpFile(helpFile, searchPaths, helpDesc = None ):
 
     try:
         pathLook = FindHelpPath(helpFile, helpDesc, searchPaths)
-    except error, details:
-        print "*** ", details
+    except error as details:
+        print("*** ", details)
         return
 #       print "%s found at %s" % (helpFile, pathLook)
     regutil.RegisterHelpFile(helpFile, pathLook, helpDesc)
@@ -321,7 +321,7 @@ def SetupCore(searchPaths):
 
     installPath, corePaths = LocatePythonCore(searchPaths)
     # Register the core Pythonpath.
-    print corePaths
+    print(corePaths)
     regutil.RegisterNamedPath(None, string.join(corePaths,";"))
 
     # Register the install path.
@@ -439,7 +439,7 @@ for that module.
 
 if __name__=='__main__':
     if len(sys.argv)>1 and sys.argv[1] in ['/?','-?','-help','-h']:
-        print usage
+        print(usage)
     elif len(sys.argv)==1 or not sys.argv[1][0] in ['/','-']:
         # No args, or useful args.
         searchPath = sys.path[:]
@@ -459,13 +459,13 @@ if __name__=='__main__':
         searchPath.append("..\\build")
         searchPath.append("..\\..\\pcbuild")
 
-        print "Attempting to setup/repair the Python core"
+        print("Attempting to setup/repair the Python core")
 
         SetupCore(searchPath)
         RegisterShellInfo(searchPath)
         FindRegisterHelpFile("PyWin32.chm", searchPath, "Pythonwin Reference")
         # Check the registry.
-        print "Registration complete - checking the registry..."
+        print("Registration complete - checking the registry...")
         import regcheck
         regcheck.CheckRegistry()
     else:
@@ -477,27 +477,27 @@ if __name__=='__main__':
             searchPaths.append(arg)
         for o,a in opts:
             if o=='--description':
-                print description
+                print(description)
             if o=='--examples':
-                print examples
+                print(examples)
             if o=='--shell':
-                print "Registering the Python core."
+                print("Registering the Python core.")
                 RegisterShellInfo(searchPaths)
             if o=='-p':
-                print "Registering package", a
+                print("Registering package", a)
                 FindRegisterPackage(a,None,searchPaths)
             if o in ['--upackage', '--uapp']:
                 import regutil
-                print "Unregistering application/package", a
+                print("Unregistering application/package", a)
                 regutil.UnregisterNamedPath(a)
             if o=='-a':
                 import regutil
                 path = string.join(searchPaths,";")
-                print "Registering application", a,"to path",path
+                print("Registering application", a,"to path",path)
                 regutil.RegisterNamedPath(a,path)
             if o=='-c':
                 if not len(searchPaths):
-                    raise error, "-c option must provide at least one additional path"
+                    raise error("-c option must provide at least one additional path")
                 import win32api, regutil
                 currentPaths = string.split(regutil.GetRegisteredNamedPath(None),";")
                 oldLen = len(currentPaths)
@@ -505,7 +505,7 @@ if __name__=='__main__':
                     if newPath not in currentPaths:
                         currentPaths.append(newPath)
                 if len(currentPaths)<>oldLen:
-                    print "Registering %d new core paths" % (len(currentPaths)-oldLen)
+                    print("Registering %d new core paths" % (len(currentPaths)-oldLen))
                     regutil.RegisterNamedPath(None,string.join(currentPaths,";"))
                 else:
-                    print "All specified paths are already registered."
+                    print("All specified paths are already registered.")

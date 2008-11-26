@@ -35,7 +35,7 @@ class ColumnProvider:
     # IColumnProvider
     def Initialize(self, colInit):
         flags, reserved, name = colInit
-        print "ColumnProvider initializing for file", name
+        print("ColumnProvider initializing for file", name)
     def GetColumnInfo(self, index):
         # We support exactly 2 columns - 'pyc size' and 'pyo size'
         if index in [0,1]:
@@ -84,7 +84,7 @@ def DllRegisterServer():
                         "Folder\\ShellEx\\ColumnHandlers\\" + \
                         str(ColumnProvider._reg_clsid_ ))
     _winreg.SetValueEx(key, None, 0, _winreg.REG_SZ, ColumnProvider._reg_desc_)
-    print ColumnProvider._reg_desc_, "registration complete."
+    print(ColumnProvider._reg_desc_, "registration complete.")
 
 def DllUnregisterServer():
     import _winreg
@@ -92,11 +92,11 @@ def DllUnregisterServer():
         key = _winreg.DeleteKey(_winreg.HKEY_CLASSES_ROOT,
                             "Folder\\ShellEx\\ColumnHandlers\\" + \
                             str(ColumnProvider._reg_clsid_) )
-    except WindowsError, details:
+    except WindowsError as details:
         import errno
         if details.errno != errno.ENOENT:
             raise
-    print ColumnProvider._reg_desc_, "unregistration complete."
+    print(ColumnProvider._reg_desc_, "unregistration complete.")
 
 if __name__=='__main__':
     from win32com.server import register

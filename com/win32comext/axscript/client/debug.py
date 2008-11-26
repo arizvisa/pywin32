@@ -24,10 +24,10 @@ def trace(*args):
 	"""
 	if not debuggingTrace:
 		return 
-	print win32api.GetCurrentThreadId(),
+	print(win32api.GetCurrentThreadId(), end=' ')
 	for arg in args:
-		print arg,
-	print
+		print(arg, end=' ')
+	print()
 
 # Note that the DebugManager is not a COM gateway class for the 
 # debugger - but it does create and manage them.
