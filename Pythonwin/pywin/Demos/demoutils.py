@@ -50,5 +50,5 @@ def NeedApp():
 from pywin.framework.app import HaveGoodGUI
 
 if __name__=='__main__':
-	from . import demoutils
+	import demoutils
 	demoutils.NotAScript()

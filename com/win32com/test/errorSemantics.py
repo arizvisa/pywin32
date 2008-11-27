@@ -146,6 +146,6 @@ if __name__=='__main__':
     test()
     if logging is not None:
         testLogger()
-    from util import CheckClean
+    from .util import CheckClean
     CheckClean()
     print("error semantic tests worked")

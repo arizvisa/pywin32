@@ -210,15 +210,15 @@ class EnumerationItem(build.OleItem, WritableItem):
       vdesc = entry.desc
       if vdesc[4] == pythoncom.VAR_CONST:
         val = vdesc[1]
-        if sys.version_info <= (2,4) and (isinstance(val, int) or isinstance(val, long)):
+        if sys.version_info <= (2,4) and (isinstance(val, int) or isinstance(val, int)):
           if val==0x80000000: # special case
             use = "0x80000000L" # 'L' for future warning
           elif val > 0x80000000 or val < 0: # avoid a FutureWarning
-            use = long(val)
+            use = int(val)
           else:
             use = hex(val)
         else:
-          use = repr(str(val))
+          use = repr(val)
         print("\t%-30s=%-10s # from enum %s" % \
                       (build.MakePublicAttributeName(name, True), use, enumName), file=stream)
 
@@ -820,7 +820,7 @@ class Generator:
     assert self.file.encoding, self.file
     encoding = self.file.encoding # or "mbcs"
 
-    print('# -*- coding: mbcs -*-', file=self.file) # Is this always correct?
+    print('# -*- coding: %s -*-' % (encoding,), file=self.file)
     print('# Created by makepy.py version %s' % (makepy_version,), file=self.file)
     print('# By python version %s' % \
                         (sys.version.replace("\n", "-"),), file=self.file)
@@ -831,10 +831,7 @@ class Generator:
     print('"""' + docDesc + '"""', file=self.file)
 
     print('makepy_version =', repr(makepy_version), file=self.file)
-    try:
-        print('python_version = 0x%x' % (sys.hexversion,), file=self.file)
-    except AttributeError:
-        print('python_version = 0x0 # Presumably Python 1.5.2 - 0x0 is not a problem', file=self.file)
+    print('python_version = 0x%x' % (sys.hexversion,), file=self.file)
     print(file=self.file)
     print('import win32com.client.CLSIDToClass, pythoncom', file=self.file)
     print('import win32com.client.util', file=self.file)
@@ -872,23 +869,23 @@ class Generator:
     # Generate the constants and their support.
     if enumItems:
         print("class constants:", file=stream)
-        values = list(enumItems.values())
-        values.sort()
-        for oleitem in values:
+        items = list(enumItems.values())
+        items.sort()
+        for oleitem in items:
             oleitem.WriteEnumerationItems(stream)
             self.progress.Tick()
         print(file=stream)
 
     if self.generate_type == GEN_FULL:
-      values = [v for v in oleItems.values() if v is not None]
-      values.sort()
-      for oleitem in values:
+      items = [l for l in oleItems.values() if l is not None]
+      items.sort()
+      for oleitem in items:
         self.progress.Tick()
         oleitem.WriteClass(self)
 
-      values = list(vtableItems.values())
-      values.sort()
-      for oleitem in values:
+      items = list(vtableItems.values())
+      items.sort()
+      for oleitem in items:
         self.progress.Tick()
         oleitem.WriteClass(self)
     else:

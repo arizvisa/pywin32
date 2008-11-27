@@ -1,6 +1,6 @@
 import win32wnet
 import sys
-from .winnetwk import *
+from winnetwk import *
 import os
 
 possible_shares = []

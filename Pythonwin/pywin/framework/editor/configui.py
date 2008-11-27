@@ -46,6 +46,7 @@ class EditorPropertyPage(dialog.PropertyPage):
 		self["Configs"] = pywin.scintilla.config.find_config_files()
 
 
+
 	def _AddEditorOption(self, idd, typ, optionName, defaultVal):
 		self.AddDDX(idd, optionName, typ)
 		# some options are "derived" - ie, can be implied from others

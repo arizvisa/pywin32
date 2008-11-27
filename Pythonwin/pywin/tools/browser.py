@@ -8,6 +8,7 @@
 import __main__
 import win32ui
 from pywin.mfc import dialog
+
 from . import hierlist
 from types import *
 
@@ -63,7 +64,7 @@ class HLIPythonObject(hierlist.HierListItem):
 	def GetSubList(self):
 		ret = []
 		try:
-			for (key, ob) in list(self.myobject.__dict__.items()):
+			for (key, ob) in self.myobject.__dict__.items():
 				if key not in special_names:
 					ret.append(MakeHLI( ob, key ) )
 		except (AttributeError, TypeError):
@@ -92,7 +93,7 @@ class HLIPythonObject(hierlist.HierListItem):
 		if hasattr(self.myobject, '__doc__'):
 			return 1
 		try:
-			for key in list(self.myobject.__dict__.keys()):
+			for key in self.myobject.__dict__.keys():
 				if key not in special_names:
 					return 1
 		except (AttributeError, TypeError):

@@ -103,7 +103,7 @@ class PyHandleTestCase(unittest.TestCase):
         self.assertRaises(TypeError, pywintypes.HANDLE, "foo")
         self.assertRaises(TypeError, pywintypes.HANDLE, ())
         # should be able to get a long!
-        pywintypes.HANDLE(0L)
+        pywintypes.HANDLE(0)
 
 if __name__ == '__main__':
     unittest.main()

@@ -108,7 +108,7 @@ sub testcollection
    end if
 end sub
 """
-PyScript = u"""\
+PyScript = """\
 # A unicode \xa9omment.
 prop = "Property Value"
 def hello(arg1):
@@ -124,9 +124,12 @@ def testcollection():
    pass
 """
 
-PyScript_Exc = u"""\
+# XXX - needs py3k work!  Throwing a bytes string with an extended char
+# doesn't make much sense, but py2x allows it.  What it gets upset with
+# is a real unicode arg - which is the only thing py3k allows!
+PyScript_Exc = """\
 def hello(arg1):
-  raise RuntimeError(u"exc with extended \xa9har")
+  raise RuntimeError("exc with extended \xa9har")
 """
 
 ErrScript = """\
@@ -217,7 +220,7 @@ class EngineTester(win32com.test.util.TestCase):
     self.assertRaises(pythoncom.com_error,
                       self._TestEngine, "VBScript", ErrScript)
   def testPythonExceptions(self):
-    expected = u"RuntimeError: exc with extended \xa9har"
+    expected = "RuntimeError: exc with extended \xa9har"
     self._TestEngine("Python", PyScript_Exc, expected)
 
 if __name__ == '__main__':

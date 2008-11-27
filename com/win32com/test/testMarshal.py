@@ -27,7 +27,7 @@ import win32event, win32api
 import pythoncom
 import unittest
 
-from testServers import InterpCase
+from .testServers import InterpCase
 
 freeThreaded = 1
 

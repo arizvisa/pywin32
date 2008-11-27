@@ -4,8 +4,9 @@
 import warnings
 warnings.warn("The regcheck module has been pending deprecation since build 210",
 	      category=PendingDeprecationWarning)
-from . import win32con
-from . import regutil
+
+import win32con
+import regutil
 import win32api
 import os
 import sys
@@ -66,7 +67,7 @@ def CheckHelpFiles(verbose):
 	try:
 		key = win32api.RegOpenKey(regutil.GetRootKey(), regutil.BuildDefaultPythonKey() + "\\Help", 0, win32con.KEY_READ)
 	except win32api.error as exc:
-		from . import winerror
+		import winerror
 		if exc.winerror!=winerror.ERROR_FILE_NOT_FOUND:
 			raise
 		return
@@ -86,7 +87,7 @@ def CheckHelpFiles(verbose):
 					print("** Help file %s does not exist" % helpFile)
 				keyNo = keyNo + 1
 			except win32api.error as exc:
-				from . import winerror
+				import winerror
 				if exc.winerror!=winerror.ERROR_NO_MORE_ITEMS:
 					raise
 				break
@@ -100,8 +101,8 @@ def CheckRegisteredModules(verbose):
 		keyhandle = win32api.RegOpenKey(regutil.GetRootKey(), k)
 		print("WARNING: 'Modules' registry entry is deprectated and evil!")
 	except win32api.error as exc:
-		from . import winerror
-		if exc.strerror!=winerror.ERROR_FILE_NOT_FOUND:
+		import winerror
+		if exc.winerror!=winerror.ERROR_FILE_NOT_FOUND:
 			raise
 		return
 

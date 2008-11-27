@@ -583,7 +583,7 @@ def AddModuleToCache(typelibclsid, lcid, major, minor, verbose = 1, bFlushNow = 
 def GetGeneratedInfos():
 	zip_pos = win32com.__gen_path__.find(".zip\\")
 	if zip_pos >= 0:
-		import zipfile, io
+		import zipfile
 		zip_file = win32com.__gen_path__[:zip_pos+4]
 		zip_path = win32com.__gen_path__[zip_pos+5:].replace("\\", "/")
 		zf = zipfile.ZipFile(zip_file)

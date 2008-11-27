@@ -42,5 +42,5 @@ class TestAppDialog(dlgappcore.AppDialog):
 app.AppBuilder = TestDialogApp
 
 if __name__=='__main__':
-	from . import demoutils
+	import demoutils
 	demoutils.NeedApp()

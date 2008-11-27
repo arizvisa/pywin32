@@ -21,7 +21,7 @@ console_props={
 	'ScreenBufferSize':(152, 256),
 	'AutoPosition':False,
 	'FontSize':(4, 5),
-	'FaceName':u'',
+	'FaceName':'',
 	'HistoryBufferSize':32,
 	'InputBufferSize':0,
 	'QuickEdit':True,

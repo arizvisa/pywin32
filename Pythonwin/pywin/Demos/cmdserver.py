@@ -103,6 +103,6 @@ def ServerThread(myout, cmd, title, bCloseOnEnd):
 #except NameError:
 #	writer=ThreadWriter()
 if __name__=='__main__':
-	from . import demoutils
+	import demoutils
 	demoutils.NotAScript()
 	

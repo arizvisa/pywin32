@@ -17,7 +17,7 @@ except NameError:
     this_file = sys.argv[0]
 
 def GenerateAndRunOldStyle():
-    import GenTestScripts
+    from . import GenTestScripts
     GenTestScripts.GenerateAll()
     try:
         pass #

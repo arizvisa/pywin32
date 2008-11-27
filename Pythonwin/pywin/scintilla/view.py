@@ -1,9 +1,10 @@
+# A general purpose MFC CCtrlView view that uses Scintilla.
+
 from . import control
 from . import IDLEenvironment # IDLE emulation.
 from pywin.mfc import docview
 from pywin.mfc import dialog
 from . import scintillacon
-
 import win32con
 import win32ui
 import afxres
@@ -527,7 +528,7 @@ class CScintillaView(docview.CtrlView, control.CScintillaColorEditInterface):
 		curline = self.LineFromChar(pos)
 		curclass = None
 		# Find out which class we are in
-		for item in list(clbrdata.values()):
+		for item in clbrdata.values():
 			if item.module==curmodule:
 				item_lineno = item.lineno - 1 # Scintilla counts lines from 0, whereas pyclbr - from 1
 				if minline < item_lineno <= curline:

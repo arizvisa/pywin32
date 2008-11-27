@@ -28,7 +28,7 @@ SCRIPTTEXT_ISEXPRESSION   = 0x00000020
 SCRIPTTEXT_ISPERSISTENT = 0x00000040
 
 from win32com.server.exception import Exception, IsCOMServerException
-import error # ax.client.error
+from . import error # ax.client.error
 
 state_map = {
 	axscript.SCRIPTSTATE_UNINITIALIZED: "SCRIPTSTATE_UNINITIALIZED",
@@ -45,7 +45,7 @@ def profile(fn, *args):
 	try:
 # roll on 1.6 :-)		
 #		return prof.runcall(fn, *args)
-		return apply(prof.runcall, (fn,) + args)
+		return prof.runcall(*(fn,) + args)
 	finally:
 		import pstats
 		# Damn - really want to send this to Excel!
@@ -186,7 +186,7 @@ class EventSink:
 		if typeKind not in [pythoncom.TKIND_COCLASS, pythoncom.TKIND_INTERFACE]:
 			RaiseAssert(winerror.E_UNEXPECTED, "The typeKind of the object is unexpected")
 		cImplType = attr[8]
-		for i in xrange(cImplType):
+		for i in range(cImplType):
 			# Look for the [source, default] interface on the coclass
 			# that isn't marked as restricted.
 			flags = typeinfo.GetImplTypeFlags(i)
@@ -210,7 +210,7 @@ class EventSink:
 			except pythoncom.com_error:
 				numTypeInfos = 0
 		# Create an event handler for the item.
-		for item in xrange(numTypeInfos):
+		for item in range(numTypeInfos):
 			if isMulti:
 				typeinfo, flags = mainTypeInfo.GetInfoOfIndex(item, axscript.MULTICLASSINFO_GETTYPEINFO)
 			else:
@@ -221,7 +221,7 @@ class EventSink:
 				attr = sourceType.GetTypeAttr()
 				self.iid = attr[0]
 				cFuncs = attr[6]
-				for i in xrange(cFuncs):
+				for i in range(cFuncs):
 					funcdesc = sourceType.GetFuncDesc(i)
 					event = Event()
 					event.Build(sourceType, funcdesc)
@@ -399,7 +399,7 @@ class ScriptItem:
 			numTypeInfos = multiTypeInfo.GetMultiTypeInfoCount()
 		except pythoncom.com_error:
 			return
-		for item in xrange(numTypeInfos):
+		for item in range(numTypeInfos):
 			typeinfo, flags = multiTypeInfo.GetInfoOfIndex(item, axscript.MULTICLASSINFO_GETTYPEINFO)
 			defaultType = self.GetDefaultSourceTypeInfo(typeinfo)
 			index = 0
@@ -454,7 +454,7 @@ class ScriptItem:
 		if typeKind not in [pythoncom.TKIND_COCLASS, pythoncom.TKIND_INTERFACE]:
 			RaiseAssert(winerror.E_UNEXPECTED, "The typeKind of the object is unexpected")
 		cImplType = attr[8]
-		for i in xrange(cImplType):
+		for i in range(cImplType):
 			# Look for the [source, default] interface on the coclass
 			# that isn't marked as restricted.
 			flags = typeinfo.GetImplTypeFlags(i)
@@ -561,7 +561,7 @@ class COMScript:
 		import traceback
 		try:
 			import win32com.axdebug.axdebug # see if the core exists.
-			import debug
+			from . import debug
 			self.debugManager = debug.DebugManager(self)
 		except pythoncom.com_error:
 			# COM errors will occur if the debugger interface has never been
@@ -841,9 +841,9 @@ class COMScript:
 			if self.debugManager.adb.appDebugger:
 				return self.debugManager.adb.runcall(fn, *args)
 			else:
-				return apply(fn, args)
+				return fn(*args)
 		else:
-			return apply(fn, args)
+			return fn(*args)
 	
 	def ApplyInScriptedSection(self, codeBlock, fn, args):
 		self.BeginScriptedSection()
@@ -1000,7 +1000,7 @@ def dumptypeinfo(typeinfo):
 		attr = typeinfo.GetTypeAttr()
 		# Loop over all methods
 		print("Methods")
-		for j in xrange(attr[6]):
+		for j in range(attr[6]):
 			fdesc = list(typeinfo.GetFuncDesc(j))
 			id = fdesc[0]
 			try:
@@ -1013,7 +1013,7 @@ def dumptypeinfo(typeinfo):
 
 		# Loop over all variables (ie, properties)
 		print("Variables")
-		for j in xrange(attr[7]):
+		for j in range(attr[7]):
 			fdesc = list(typeinfo.GetVarDesc(j))
 			names = typeinfo.GetNames(id)
 			print(" ", names, "has attr", fdesc)

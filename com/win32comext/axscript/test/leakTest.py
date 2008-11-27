@@ -144,7 +144,7 @@ def doTestEngine(engine, echoer):
     print("Engine could not evaluate '1+1' - said the result was", result)
 
 def dotestall():
-  for i in xrange(10):
+  for i in range(10):
     TestEngine("Python", PyScript)
     print(sys.gettotalrefcount())
 ##  print "Testing Exceptions"

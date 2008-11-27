@@ -67,10 +67,7 @@ Examples:
 """
 
 import sys, os, pythoncom
-from win32com.client import genpy
-
-from . import selecttlb
-from . import gencache
+from win32com.client import genpy, selecttlb, gencache
 from win32com.client import NeedUnicodeConversions, Dispatch
 
 bForDemandDefault = 0 # Default value of bForDemand - toggle this to change the world - see also gencache.py

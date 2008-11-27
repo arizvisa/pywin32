@@ -55,7 +55,6 @@ class HierList(object.Object):
 		self.itemHandleMap = {}
 		self.filledItemHandlesMap = {}
 		self.bitmapMask = bitmapMask
-	
 	def __getattr__(self, attr):
 		try:
 			return getattr(self.listControl, attr)

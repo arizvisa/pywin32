@@ -205,7 +205,7 @@ def delete(args):
 def DumpCommands():
     print("%-10s - %s" % ("Command", "Description"))
     print("%-10s - %s" % ("-------", "-----------"))
-    for name, item in globals().items():
+    for name, item in list(globals().items()):
         if type(item)==type(DumpCommands):
             doc = getattr(item, "__doc__", "")
             if doc:

@@ -10,7 +10,7 @@
 import pythoncom
 from win32com.axscript import axscript
 import winerror
-import pyscript
+from . import pyscript
 
 INTERFACE_USES_DISPEX = 0x00000004	# Object knows to use IDispatchEx
 INTERFACE_USES_SECURITY_MANAGER = 0x00000008 # Object knows to use IInternetHostSecurityManager

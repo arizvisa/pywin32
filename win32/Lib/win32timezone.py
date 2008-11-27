@@ -568,7 +568,7 @@ class RangeMap(dict):
 		self.match = keyMatchComparator
 
 	def __getitem__(self, item):
-		sortedKeys = self.keys()
+		sortedKeys = list(self.keys())
 		sortedKeys.sort(self.sort)
 		if isinstance(item, RangeItem):
 			result = self.__getitem__(sortedKeys[item])
@@ -587,7 +587,7 @@ class RangeMap(dict):
 		raise KeyError(item)
 
 	def bounds(self):
-		sortedKeys = self.keys()
+		sortedKeys = list(self.keys())
 		sortedKeys.sort(self.sort)
 		return sortedKeys[RangeItemFirst()], sortedKeys[RangeItemLast()]
 

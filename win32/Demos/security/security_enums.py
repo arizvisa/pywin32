@@ -14,7 +14,7 @@ class Enum:
                     try:
                         const_val=getattr(winnt, const_name)
                     except AttributeError:
-                        raise AttributeError('Constant "%s" not found in win32security, ntsecuritycon, or winnt.' %const_name) 
+                        raise AttributeError('Constant "%s" not found in win32security, ntsecuritycon, or winnt.' %const_name)
             setattr(self, const_name, const_val)
 
     def lookup_name(self, const_val):

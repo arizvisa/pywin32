@@ -26,7 +26,7 @@ component={
     'CurItemState': shellcon.IS_NORMAL,
     'SubscribedURL': website,
     'Source' : website,
-    'FriendlyName' : u'Pywin32 on SF',
+    'FriendlyName' : 'Pywin32 on SF',
     'Checked' : True,   ## this controls whether item is currently displayed
     'NoScroll' : False,
     'Dirty': False,

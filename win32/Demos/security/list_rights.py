@@ -1,5 +1,5 @@
 import win32security,win32file,win32api,ntsecuritycon,win32con
-from .security_enums import TRUSTEE_TYPE,TRUSTEE_FORM,ACE_FLAGS,ACCESS_MODE
+from security_enums import TRUSTEE_TYPE,TRUSTEE_FORM,ACE_FLAGS,ACCESS_MODE
 
 new_privs = ((win32security.LookupPrivilegeValue('',ntsecuritycon.SE_SECURITY_NAME),win32con.SE_PRIVILEGE_ENABLED),
              (win32security.LookupPrivilegeValue('',ntsecuritycon.SE_CREATE_PERMANENT_NAME),win32con.SE_PRIVILEGE_ENABLED),

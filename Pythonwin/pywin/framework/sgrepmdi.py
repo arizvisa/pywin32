@@ -28,7 +28,7 @@ import glob
 import os
 import stat
 import glob
-from pywin.framework import scriptutils
+from . import scriptutils
 
 def getsubdirs(d):
 	dlist = []

@@ -65,5 +65,5 @@ class DIBDemo:
 		return 1
 	
 if __name__=='__main__':
-	from . import demoutils
+	import demoutils
 	demoutils.NotAScript()

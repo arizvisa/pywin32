@@ -90,7 +90,7 @@ def UnregisterPythonExe(exeAlias):
 	try:
 		win32api.RegDeleteKey(GetRootKey(), GetAppPathsKey() + "\\" + exeAlias)
 	except win32api.error as exc:
-		from . import winerror
+		import winerror
 		if exc.winerror!=winerror.ERROR_FILE_NOT_FOUND:
 			raise
 		return
@@ -109,7 +109,7 @@ def UnregisterNamedPath(name):
 	try:
 		win32api.RegDeleteKey(GetRootKey(), keyStr)
 	except win32api.error as exc:
-		from . import winerror
+		import winerror
 		if exc.winerror!=winerror.ERROR_FILE_NOT_FOUND:
 			raise
 		return
@@ -122,7 +122,7 @@ def GetRegisteredNamedPath(name):
 	try:
 		return win32api.RegQueryValue(GetRootKey(), keyStr)
 	except win32api.error as exc:
-		from . import winerror
+		import winerror
 		if exc.winerror!=winerror.ERROR_FILE_NOT_FOUND:
 			raise
 		return None
@@ -154,7 +154,7 @@ def UnregisterModule(modName):
 		win32api.RegDeleteKey(GetRootKey(), 
 		                     BuildDefaultPythonKey() + "\\Modules\\%s" % modName)
 	except win32api.error as exc:
-		from . import winerror
+		import winerror
 		if exc.winerror!=winerror.ERROR_FILE_NOT_FOUND:
 			raise
 
@@ -202,7 +202,7 @@ def UnregisterHelpFile(helpFile, helpDesc = None):
 		try:
 			win32api.RegDeleteValue(key, helpFile)
 		except win32api.error as exc:
-			from . import winerror
+			import winerror
 			if exc.winerror!=winerror.ERROR_FILE_NOT_FOUND:
 				raise
 	finally:
@@ -214,7 +214,7 @@ def UnregisterHelpFile(helpFile, helpDesc = None):
 		win32api.RegDeleteKey(GetRootKey(), 
 		                     BuildDefaultPythonKey() + "\\Help\\%s" % helpDesc)	
 	except win32api.error as exc:
-		from . import winerror
+		import winerror
 		if exc.winerror!=winerror.ERROR_FILE_NOT_FOUND:
 			raise
 

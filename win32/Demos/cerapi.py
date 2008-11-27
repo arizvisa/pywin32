@@ -9,7 +9,6 @@ import win32con
 import os
 import sys
 import getopt
-from reprlib import repr
 
 
 def DumpPythonRegistry():

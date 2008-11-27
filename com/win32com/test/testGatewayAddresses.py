@@ -37,7 +37,7 @@
 from win32com.server.util import wrap
 import pythoncom
 import string
-from util import CheckClean
+from .util import CheckClean
 
 numErrors = 0
 

@@ -381,6 +381,7 @@ class InteractivePythonApp(app.CApp):
 		# Add property pages we know about that need manual work.
 		from pywin.dialogs import ideoptions
 		sheet.AddPage( ideoptions.OptionsPropPage() )
+
 		from . import toolmenu
 		sheet.AddPage( toolmenu.ToolMenuPropPage() )
 
@@ -429,9 +430,12 @@ class InteractivePythonApp(app.CApp):
 	def OnFileSaveAll(self, id, code):
 		# Only attempt to save editor documents.
 		from pywin.framework.editor import editorTemplate
-		docs = [doc for doc in editorTemplate.GetDocumentList() if doc.IsModified() and doc.GetPathName()]
-		list(map(lambda doc: doc.OnSaveDocument(doc.GetPathName()), docs))
-		win32ui.SetStatusText("%d documents saved" % len(docs), 1)
+		num = 0
+		for doc in editorTemplate.GetDocumentList():
+			if doc.IsModified() and doc.GetPathName():
+				num = num = 1
+				doc.OnSaveDocument(doc.GetPathName())
+		win32ui.SetStatusText("%d documents saved" % num, 1)
 
 	def OnViewToolbarDbg(self, id, code):
 		if code==0:

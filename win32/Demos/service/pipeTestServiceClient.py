@@ -65,7 +65,7 @@ def testLargeMessage(server, size = 4096):
 def stressThread(server, numMessages, wait):
     try:
         try:
-            for i in xrange(numMessages):
+            for i in range(numMessages):
                 r = CallPipe(CallNamedPipe, ("\\\\%s\\pipe\\PyPipeTest" % server, "#" * 512, 1024, NMPWAIT_WAIT_FOREVER))
         except:
             traceback.print_exc()
@@ -76,7 +76,7 @@ def stressThread(server, numMessages, wait):
 def stressTestClient(server, numThreads, numMessages):
     import _thread
     thread_waits = []
-    for t_num in xrange(numThreads):
+    for t_num in range(numThreads):
         # Note I could just wait on thread handles (after calling DuplicateHandle)
         # See the service itself for an example of waiting for the clients...
         wait = CreateEvent(None, 0, 0, None)

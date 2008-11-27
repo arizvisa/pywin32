@@ -48,7 +48,7 @@
 
 import re
 import string
-import makegwparse
+from . import makegwparse
 
 def make_framework_support(header_file_name, interface_name, bMakeInterface = 1, bMakeGateway = 1):
   """Generate C++ code for a Python Interface and Gateway

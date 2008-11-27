@@ -100,7 +100,7 @@ def CreateTestAccessDatabase(dbname = None):
 
 
 def DoDumpAccessInfo(dbname):
-    import daodump
+    from . import daodump
     a = forms = None
     try:
         sys.stderr.write("Creating Access Application...\n")
@@ -159,7 +159,7 @@ def test(dbname = None):
 
 if __name__=='__main__':
     import sys
-    from util import CheckClean
+    from .util import CheckClean
     dbname = None
     if len(sys.argv)>1:
         dbname = sys.argv[1]

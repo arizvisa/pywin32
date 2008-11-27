@@ -3,7 +3,7 @@ from pywin.framework import interact
 import win32con
 
 if __name__=='__main__':
-	from . import demoutils
+	import demoutils
 	if demoutils.NeedGoodGUI():
 		win=interact.edit.currentView.GetParent()
 		menu=win.GetSystemMenu()

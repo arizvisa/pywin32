@@ -5,7 +5,7 @@ from win32com.util import IIDToInterfaceName
 from win32com.client.util import Enumerator
 from win32com.server.exception import COMException
 import pythoncom
-from framework import trace
+from .framework import trace
 from win32com.axdebug import axdebug, gateways, contexts, stackframe, documents, adb
 from win32com.axdebug.codecontainer import SourceCodeContainer
 from win32com.axdebug.util import _wrap, _wrap_remove

@@ -10,7 +10,8 @@
 NeedUnicodeConversions = False
 
 import pythoncom
-from . import dynamic, gencache
+from . import dynamic
+from . import gencache
 import sys
 import pywintypes
 

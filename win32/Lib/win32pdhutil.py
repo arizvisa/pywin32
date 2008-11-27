@@ -111,7 +111,7 @@ def ShowAllProcesses():
 
     # Bit of a hack to get useful info.
     items = [find_pdh_counter_localized_name("ID Process")] + items[:5]
-    print ("Process Name", ",".join(items))
+    print("Process Name", ",".join(items))
     for instance, max_instances in instance_dict.items():
         for inum in range(max_instances+1):
             hq = win32pdh.OpenQuery()
@@ -125,22 +125,24 @@ def ShowAllProcesses():
             # counters need two collections
             time.sleep(0.01)
             win32pdh.CollectQueryData(hq)
-            print ("%-15s\t" % (instance[:15]),)
+            print("%-15s\t" % (instance[:15]), end=' ')
             for hc in hcs:
                 type, val = win32pdh.GetFormattedCounterValue(hc, win32pdh.PDH_FMT_LONG)
-                print ("%5d" % (val),)
+                print("%5d" % (val), end=' ')
                 win32pdh.RemoveCounter(hc)
-            print
+            print()
             win32pdh.CloseQuery(hq)
 
+# NOTE: This BrowseCallback doesn't seem to work on Vista for markh.
+# XXX - look at why!?
 def BrowseCallBackDemo(counter):
     machine, object, instance, parentInstance, index, counterName = \
             win32pdh.ParseCounterPath(counter)
 
     result = GetPerformanceAttributes(object, counterName, instance, index,
                                       win32pdh.PDH_FMT_DOUBLE, machine)
-    print ("Value of '%s' is" % counter, result)
-    print ("Added '%s' on object '%s' (machine %s), instance %s(%d)-parent of %s" \
+    print("Value of '%s' is" % counter, result)
+    print("Added '%s' on object '%s' (machine %s), instance %s(%d)-parent of %s" \
           % (counterName, object, machine, instance, index, parentInstance))
 
 def browse(callback = BrowseCallBackDemo, title="Python Browser",
@@ -151,11 +153,11 @@ if __name__=='__main__':
     ShowAllProcesses()
     # Show how to get a couple of attributes by name.
     counter = find_pdh_counter_localized_name("Virtual Bytes")
-    print ("Virtual Bytes = ", FindPerformanceAttributesByName("python",
+    print("Virtual Bytes = ", FindPerformanceAttributesByName("python",
                                                               counter=counter))
-    print ("Available Bytes = ", GetPerformanceAttributes(
+    print("Available Bytes = ", GetPerformanceAttributes(
                                         find_pdh_counter_localized_name("Memory"),
                                         find_pdh_counter_localized_name("Available Bytes")))
     # And a browser.
-    print ("Browsing for counters...")
+    print("Browsing for counters...")
     browse()

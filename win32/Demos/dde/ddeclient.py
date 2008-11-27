@@ -1,5 +1,5 @@
 # 'Request' example added jjk  11/20/98
-import site ## Py3k bug 3279
+
 import win32ui
 import dde
 

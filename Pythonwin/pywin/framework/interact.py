@@ -27,6 +27,7 @@ ID_EDIT_COPY_CODE = 0xe2002
 ID_EDIT_EXEC_CLIPBOARD = 0x2003
 
 trace=pywin.scintilla.formatter.trace
+
 from . import winout
 
 import re

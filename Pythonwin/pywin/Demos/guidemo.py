@@ -24,7 +24,7 @@ demos = [ \
 def demo():
 	try:
 		# seeif I can locate the demo files.
-		from . import fontdemo
+		import fontdemo
 	except ImportError:
 		# else put the demos direectory on the path (if not already)
 		try:
@@ -39,7 +39,7 @@ def demo():
 				break
 		else:
 			sys.path.append(demosDir)
-		from . import fontdemo
+		import fontdemo
 
 	import sys
 	if "/go" in sys.argv:
@@ -63,6 +63,6 @@ def demo():
 			print("Demo of %s failed - %s:%s" % (title,sys.exc_info()[0], sys.exc_info()[1]))
 
 if __name__==__main__.__name__:
-	from . import demoutils
+	import demoutils
 	if demoutils.NeedGoodGUI():
 		demo()

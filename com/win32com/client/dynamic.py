@@ -23,7 +23,6 @@ import pythoncom
 import winerror
 from . import build
 
-
 from pywintypes import IIDType
 
 import win32com.client # Needed as code we eval() references it.
@@ -74,7 +73,7 @@ else:
 # get the type objects for IDispatch and IUnknown
 dispatchType = pythoncom.TypeIIDs[pythoncom.IID_IDispatch]
 iunkType = pythoncom.TypeIIDs[pythoncom.IID_IUnknown]
-_GoodDispatchTypes=(str, IIDType, str)
+_GoodDispatchTypes=[str, IIDType, str]
 _defaultDispatchItem=build.DispatchItem
 
 def _GetGoodDispatch(IDispatch, clsctx = pythoncom.CLSCTX_SERVER):
@@ -319,7 +318,7 @@ class CDispatch:
 	def _Release_(self):
 		"""Cleanup object - like a close - to force cleanup when you dont 
 		   want to rely on Python's reference counting."""
-		for childCont in self._mapCachedItems_.itervalues():
+		for childCont in self._mapCachedItems_.values():
 			childCont._Release_()
 		self._mapCachedItems_ = {}
 		if self._oleobj_:
@@ -344,16 +343,16 @@ class CDispatch:
 		print("AxDispatch container",self._username_)
 		try:
 			print("Methods:")
-			for method in list(self._olerepr_.mapFuncs.keys()):
+			for method in self._olerepr_.mapFuncs.keys():
 				print("\t", method)
 			print("Props:")
-			for prop, entry in list(self._olerepr_.propMap.items()):
+			for prop, entry in self._olerepr_.propMap.items():
 				print("\t%s = 0x%x - %s" % (prop, entry.dispid, repr(entry)))
 			print("Get Props:")
-			for prop, entry in list(self._olerepr_.propMapGet.items()):
+			for prop, entry in self._olerepr_.propMapGet.items():
 				print("\t%s = 0x%x - %s" % (prop, entry.dispid, repr(entry)))
 			print("Put Props:")
-			for prop, entry in list(self._olerepr_.propMapPut.items()):
+			for prop, entry in self._olerepr_.propMapPut.items():
 				print("\t%s = 0x%x - %s" % (prop, entry.dispid, repr(entry)))
 		except:
 			traceback.print_exc()

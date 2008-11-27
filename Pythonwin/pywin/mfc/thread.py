@@ -1,3 +1,5 @@
+# Thread and application objects
+
 from . import object
 import win32ui
 

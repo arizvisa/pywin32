@@ -58,7 +58,7 @@ def TestConnection(dbname):
         print("XXX - Failed to connect!")
 
 def Test():
-    import testAccess
+    from . import testAccess
     try:
         testAccess.GenerateSupport()
     except pythoncom.com_error:

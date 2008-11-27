@@ -176,7 +176,7 @@ class AXScriptException(win32com.server.exception.COMException):
 
 		# all items in the list are utf8 courtesy of Python magically
 		# converting unicode to utf8 before compilation.
-		for i in xrange(len(bits)):
+		for i in range(len(bits)):
 			if type(bits[i]) is str:
 			#assert type(bits[i]) is str, type(bits[i])
 				bits[i] = bits[i].decode('utf8')

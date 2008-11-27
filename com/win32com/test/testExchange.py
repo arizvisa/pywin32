@@ -107,6 +107,6 @@ def test():
         os.chdir(oldcwd)
 
 if __name__=='__main__':
-    from util import CheckClean
+    from .util import CheckClean
     test()
     CheckClean()
