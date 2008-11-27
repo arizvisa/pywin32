@@ -13,7 +13,7 @@ import pythoncom
 
 def yield_iter(iter):
     while 1:
-        yield iter.next()
+        yield next(iter)
 
 class _BaseTestCase(win32com.test.util.TestCase):
     def test_enumvariant_vb(self):
@@ -65,7 +65,7 @@ class _BaseTestCase(win32com.test.util.TestCase):
         # So either the 'iter(); will raise a type error, or an attempt to
         # fetch it
         try:
-            iter(ob).next()
+            next(iter(ob))
             self.fail("Expected a TypeError fetching this iterator")
         except TypeError:
             pass

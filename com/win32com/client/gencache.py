@@ -559,19 +559,19 @@ def AddModuleToCache(typelibclsid, lcid, major, minor, verbose = 1, bFlushNow = 
 	mod._in_gencache_ = 1
 	dict = mod.CLSIDToClassMap
 	info = str(typelibclsid), lcid, major, minor
-	for clsid, cls in dict.iteritems():
+	for clsid, cls in dict.items():
 		clsidToTypelib[clsid] = info
 
 	dict = mod.CLSIDToPackageMap
-	for clsid, name in dict.iteritems():
+	for clsid, name in dict.items():
 		clsidToTypelib[clsid] = info
 
 	dict = mod.VTablesToClassMap
-	for clsid, cls in dict.iteritems():
+	for clsid, cls in dict.items():
 		clsidToTypelib[clsid] = info
 
 	dict = mod.VTablesToPackageMap
-	for clsid, cls in dict.iteritems():
+	for clsid, cls in dict.items():
 		clsidToTypelib[clsid] = info
 
 	# If this lib was previously redirected, drop it
@@ -658,9 +658,9 @@ def _Dump():
 	print("Cache is in directory", win32com.__gen_path__)
 	# Build a unique dir
 	d = {}
-	for clsid, (typelibCLSID, lcid, major, minor) in clsidToTypelib.iteritems():
+	for clsid, (typelibCLSID, lcid, major, minor) in clsidToTypelib.items():
 		d[typelibCLSID, lcid, major, minor] = None
-	for typelibCLSID, lcid, major, minor in d.iterkeys():
+	for typelibCLSID, lcid, major, minor in d.keys():
 		mod = GetModuleForTypelib(typelibCLSID, lcid, major, minor)
 		print("%s - %s" % (mod.__doc__, typelibCLSID))
 

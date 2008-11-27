@@ -355,7 +355,7 @@ class BasicWrapPolicy:
   def _GetNextDispID_(self, fdex, dispid):
     return self._getnextdispid_(fdex, dispid)
   def _getnextdispid_(self, fdex, dispid):
-    ids = self._name_to_dispid_.values()
+    ids = list(self._name_to_dispid_.values())
     ids.sort()
     if DISPID_STARTENUM in ids: ids.remove(DISPID_STARTENUM)
     if dispid==DISPID_STARTENUM:

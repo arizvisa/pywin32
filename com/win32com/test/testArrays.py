@@ -76,7 +76,7 @@ FourD = [
           ]
 
 LargeD = [
-    [ [range(10)] * 10],
+    [ [list(range(10))] * 10],
 ] * 512
 
 def _normalize_array(a):

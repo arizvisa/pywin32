@@ -46,7 +46,7 @@ def TestApplyResult(fn, args, result):
         fnName = str(fn)
     progress("Testing ", fnName)
     pref = "function " + fnName
-    rc  = apply(fn, args)
+    rc  = fn(*args)
     if rc != result:
         raise error("%s failed - result not %r but %r" % (pref, result, rc))
 
@@ -352,7 +352,7 @@ def TestCounter(counter, bIsGenerated):
     # Test random access into container
     progress("Testing counter", repr(counter))
     import random
-    for i in xrange(50):
+    for i in range(50):
         num = int(random.random() * len(counter))
         try:
             ret = counter[num]

@@ -50,7 +50,7 @@ def TestWord7(word):
     # If not shown, show the app.
     if not word.AppShow(): word._proc_("AppShow")
 
-    for i in xrange(12):
+    for i in range(12):
         word.FormatFont(Color=i+1, Points=i+12)
         word.Insert("Hello from Python %d\n" % i)
 
@@ -100,7 +100,7 @@ def TextExcel(xl):
     xl.Range("A2:C2").Value = ('x','y','z')
     xl.Range("A3:C3").Value = ('3','2','1')
 
-    for i in xrange(20):
+    for i in range(20):
         xl.Cells(i+1,i+1).Value = "Hi %d" % i
 
     if xl.Range("A1").Value != "Hi 0":

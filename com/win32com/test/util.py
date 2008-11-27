@@ -32,7 +32,7 @@ def CheckClean():
 
 def RegisterPythonServer(filename, progids=None, verbose=0):
     if progids:
-        if isinstance(progids, basestring):
+        if isinstance(progids, str):
             progids = [progids]
         # we know the CLSIDs we need, but we might not be an admin user
         # and otherwise unable to register them.  So as long as the progids
