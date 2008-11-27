@@ -6,7 +6,12 @@ import unittest
 import gc
 import pythoncom
 import winerror
-import cStringIO as StringIO
+
+try:
+    import cStringIO as StringIO
+except:
+    import io as StringIO
+
 from pythoncom import _GetInterfaceCount, _GetGatewayCount
 import win32com
 import logging

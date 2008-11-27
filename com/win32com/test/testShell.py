@@ -160,7 +160,7 @@ class FILEGROUPDESCRIPTORTester(win32com.test.util.TestCase):
                  ftLastAccessTime=pythoncom.MakeTime(11),
                  ftLastWriteTime=pythoncom.MakeTime(12),
                  nFileSize=sys_maxsize + 1),
-            dict(cFileName=u"foo\xa9.txt",
+            dict(cFileName="foo\xa9.txt",
                  sizel=(1,2),
                  pointl=(3,4),
                  dwFileAttributes = win32con.FILE_ATTRIBUTE_NORMAL,

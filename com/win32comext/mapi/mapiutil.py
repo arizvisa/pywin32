@@ -82,7 +82,7 @@ def GetProperties(obj, propList):
 		data = None
 		return None
 	if bRetList:
-		return map( lambda(v): v[1], data )
+		return map( lambda v: v[1], data )
 	else:
 		return data[0][1]
 
@@ -93,7 +93,7 @@ def GetAllProperties(obj, make_tag_names = True):
 	for tag, val in data:
 		if make_tag_names:
 			hr, tags, array = obj.GetNamesFromIDs( (tag,) )
-			if type(array[0][1])==type(u''):
+			if type(array[0][1])==type(''):
 				name = array[0][1]
 			else:
 				name = GetPropTagName(tag)
@@ -105,8 +105,8 @@ def GetAllProperties(obj, make_tag_names = True):
 _MapiTypeMap = {
     type(0.0): mapitags.PT_DOUBLE,
     type(0): mapitags.PT_I4,
-    type(''): mapitags.PT_STRING8,
-    type(u''): mapitags.PT_UNICODE,
+    type(''.encode('ascii')): mapitags.PT_STRING8, # str in py2x, bytes in 3x
+    type(''): mapitags.PT_UNICODE, # XXX - fix better for py3k
     type(None): mapitags.PT_UNSPECIFIED,
     # In Python 2.2.2, bool isn't a distinct type (type(1==1) is type(0)).
 }
@@ -158,7 +158,7 @@ def SetProperties( msg, propDict):
 			elif type_val==TimeType:
 				tagType = mapitags.PT_SYSTIME
 			else:
-				raise ValueError("The type of object %s(%s) can not be written" % (`val`,type_val))
+				raise ValueError("The type of object %s(%s) can not be written" % (repr(val),type_val))
 			key = mapitags.PROP_TAG(tagType, mapitags.PROP_ID(newIds[newIdNo]))
 			newIdNo = newIdNo + 1
 		newProps.append( (key, val) )

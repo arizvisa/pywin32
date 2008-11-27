@@ -413,7 +413,7 @@ def _RegEnumerator(key, func):
 def _RegKeyDict(key):
 	values = _RegValueEnumerator(key)
 	values = tuple(values)
-	return dict(map(lambda (name,value,type): (name,value), values))
+	return dict(map(lambda name_value_type: (name_value_type[0],name_value_type[1]), values))
 
 # for backward compatibility
 def deprecated(func, name='Unknown'):

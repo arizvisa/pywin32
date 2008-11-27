@@ -42,7 +42,7 @@ class Interpreter:
         """
         if type(exp) not in [type(''), UnicodeType]:
             raise Exception(desc="Must be a string",scode=winerror.DISP_E_TYPEMISMATCH)
-        exec str(exp) in self.dict
+        exec(str(exp), self.dict)
 
 def Register():
     import win32com.server.register

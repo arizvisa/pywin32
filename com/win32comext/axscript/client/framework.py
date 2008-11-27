@@ -889,9 +889,9 @@ class COMScript:
 			if self.debugManager.adb.appDebugger:
 				return self.debugManager.adb.run(codeObject, globals, locals)
 			else:
-				exec codeObject in globals, locals
+				exec(codeObject, globals, locals)
 		else:
-			exec codeObject in globals, locals
+			exec(codeObject, globals, locals)
 
 	def ExecInScriptedSection(self, codeBlock, globals, locals = None):
 		if locals is None: locals = globals

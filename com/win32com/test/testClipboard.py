@@ -49,7 +49,7 @@ class TestDataObject:
                 ret_stg.set(pythoncom.TYMED_HGLOBAL, self.strval.encode("ascii"))
             elif cf == win32con.CF_UNICODETEXT:
                 ret_stg = pythoncom.STGMEDIUM()
-                ret_stg.set(pythoncom.TYMED_HGLOBAL, unicode(self.strval))
+                ret_stg.set(pythoncom.TYMED_HGLOBAL, str(self.strval))
 
         if ret_stg is None:
             raise COMException(hresult=winerror.E_NOTIMPL)
@@ -115,7 +115,7 @@ class ClipboardTester(unittest.TestCase):
         self.assertEqual(got, expected)
         # Now check unicode
         got = win32clipboard.GetClipboardData(win32con.CF_UNICODETEXT)
-        self.assertEqual(got, u"Hello from Python")
+        self.assertEqual(got, "Hello from Python")
         win32clipboard.CloseClipboard()
 
     def testWin32ToCom(self):

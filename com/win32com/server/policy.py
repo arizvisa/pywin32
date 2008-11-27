@@ -87,7 +87,7 @@ S_OK = 0
 IDispatchType = pythoncom.TypeIIDs[pythoncom.IID_IDispatch]
 IUnknownType = pythoncom.TypeIIDs[pythoncom.IID_IUnknown]
 
-from exception import COMException
+from .exception import COMException
 error = __name__ + " error"
 
 regSpec = 'CLSID\\%s\\PythonCOM'
@@ -409,11 +409,11 @@ class MappedWrapPolicy(BasicWrapPolicy):
       self._dispid_to_put_ = { }
 
   def _getmembername_(self, dispid):
-    if self._dispid_to_func_.has_key(dispid):
+    if dispid in self._dispid_to_func_:
       return self._dispid_to_func_[dispid]
-    elif self._dispid_to_get_.has_key(dispid):
+    elif dispid in self._dispid_to_get_:
       return self._dispid_to_get_[dispid]
-    elif self._dispid_to_put_.has_key(dispid):
+    elif dispid in self._dispid_to_put_:
       return self._dispid_to_put_[dispid]
     else:
       raise COMException(scode = winerror.DISP_E_MEMBERNOTFOUND)
@@ -561,9 +561,9 @@ class DesignatedWrapPolicy(MappedWrapPolicy):
   def _allocnextdispid(self, last_dispid):
       while 1:
         last_dispid = last_dispid + 1
-        if not self._dispid_to_func_.has_key(last_dispid) and \
-           not self._dispid_to_get_.has_key(last_dispid) and \
-           not self._dispid_to_put_.has_key(last_dispid):
+        if last_dispid not in self._dispid_to_func_ and \
+           last_dispid not in self._dispid_to_get_ and \
+           last_dispid not in self._dispid_to_put_:
               return last_dispid
 
   def _invokeex_(self, dispid, lcid, wFlags, args, kwArgs, serviceProvider):
@@ -745,6 +745,6 @@ def _import_module(mname):
 # These have been moved to a new source file, but some code may
 # still reference them here.  These will end up being removed.
 try:
-  from dispatcher import DispatcherTrace, DispatcherWin32trace
+  from .dispatcher import DispatcherTrace, DispatcherWin32trace
 except ImportError: # Quite likely a frozen executable that doesnt need dispatchers
   pass

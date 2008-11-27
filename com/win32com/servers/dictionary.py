@@ -43,7 +43,7 @@ from pythoncom import DISPATCH_METHOD, DISPATCH_PROPERTYGET
 from winerror import S_OK
 
 UnicodeType = pywintypes.UnicodeType
-StringType = types.StringType
+StringType = bytes
 
 
 class DictionaryPolicy(policy.BasicWrapPolicy):
@@ -96,7 +96,7 @@ class DictionaryPolicy(policy.BasicWrapPolicy):
         except KeyError:
           return None	# unknown keys return None (VT_NULL)
 
-      if l <> 2:
+      if l != 2:
         raise COMException(scode=winerror.DISP_E_BADPARAMCOUNT)
       if args[1] is None:
         # delete a key when None is assigned to it

@@ -126,7 +126,7 @@ class DispatcherBase:
       else:
         traceback.print_exc()
     # But still raise it for the framework.
-    reraise()
+    raise
 
   def _trace_(self, *args):
     if self.logger is not None:
@@ -143,7 +143,7 @@ class DispatcherTrace(DispatcherBase):
   def _QueryInterface_(self, iid):
     rc = DispatcherBase._QueryInterface_(self, iid)
     if not rc:
-      self._trace_("in %s._QueryInterface_ with unsupported IID %s (%s)" % (`self.policy._obj_`, IIDToInterfaceName(iid),iid))
+      self._trace_("in %s._QueryInterface_ with unsupported IID %s (%s)" % (repr(self.policy._obj_), IIDToInterfaceName(iid),iid))
     return rc
 
   def _GetIDsOfNames_(self, names, lcid):
@@ -204,7 +204,7 @@ class DispatcherWin32trace(DispatcherTrace):
     if self.logger is None:
       # If we have no logger, setup our output.
       import win32traceutil # Sets up everything.
-    self._trace_("Object with win32trace dispatcher created (object=%s)" % `object`)
+    self._trace_("Object with win32trace dispatcher created (object=%s)" % repr(object))
 
 
 class DispatcherOutputDebugString(DispatcherTrace):
@@ -246,7 +246,7 @@ class DispatcherWin32dbg(DispatcherBase):
     #import pywin.debugger, pywin.debugger.dbgcon
     debug = 0
     try:
-      raise typ, val
+      raise typ(val)
     except Exception: # AARG - What is this Exception???
       # Use some inside knowledge to borrow a Debugger option which dictates if we
       # stop at "expected" exceptions.
@@ -261,20 +261,7 @@ class DispatcherWin32dbg(DispatcherBase):
 
     # But still raise it.
     del tb
-    reraise()
-
-def reraise():
-  """Handy function for re-raising errors.
-
-  Note: storing a traceback in a local variable can introduce reference
-  loops if you aren't careful.  Specifically, that local variable should
-  not be within an execution context contained with the traceback.
-
-  By using a utility function, we ensure that our local variable holding
-  the traceback is not referenced by the traceback itself.
-  """
-  t, v, tb = exc_info()
-  raise t, v, tb
+    raise
 
 try:
   import win32trace
