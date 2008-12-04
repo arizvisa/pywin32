@@ -3,6 +3,7 @@ import pywin.framework.window
 import win32ui
 import win32con
 import afxres
+
 from . import ModuleBrowser
 
 class EditorFrame(pywin.framework.window.MDIChildWnd):
