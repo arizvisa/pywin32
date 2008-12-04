@@ -3,7 +3,7 @@
 from win32com.axdebug.util import trace, _wrap, _wrap_remove
 from win32com.server.util import unwrap
 import win32com.client.connect
-import gateways
+from . import gateways
 import sys, bdb, traceback
 import axdebug, stackframe
 import win32api, pythoncom
@@ -86,7 +86,7 @@ class Adb(bdb.Bdb,gateways.RemoteDebugApplicationEvents):
 
     def __xxxxx__set_break(self, filename, lineno, cond = None):
         # As per standard one, except no linecache checking!
-        if not self.breaks.has_key(filename):
+        if filename not in self.breaks:
             self.breaks[filename] = []
         list = self.breaks[filename]
         if lineno in list:
