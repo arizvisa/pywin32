@@ -7,7 +7,7 @@ from . import gateways
 import sys, bdb, traceback
 import axdebug, stackframe
 import win32api, pythoncom
-import thread, os
+import _thread, os
 
 def fnull(*args):
     pass
@@ -72,7 +72,7 @@ class Adb(bdb.Bdb,gateways.RemoteDebugApplicationEvents):
         self.currentframe = None # The frame we are currently in.
         self.recursiveData = [] # Data saved for each reentery on this thread.
         bdb.Bdb.__init__(self)
-        self._threadprotectlock = thread.allocate_lock()
+        self._threadprotectlock = _thread.allocate_lock()
         self.reset()
 
     def canonic(self, fname):

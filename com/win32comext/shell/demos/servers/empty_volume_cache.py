@@ -147,18 +147,18 @@ def DllRegisterServer():
     # Also need to register specially in:
     # HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Explorer\VolumeCaches
     # See link at top of file.
-    import _winreg
+    import winreg
     kn = r"Software\Microsoft\Windows\CurrentVersion\Explorer\VolumeCaches\%s" \
          % (EmptyVolumeCache._reg_desc_,)
-    key = _winreg.CreateKey(_winreg.HKEY_LOCAL_MACHINE, kn)
-    _winreg.SetValueEx(key, None, 0, _winreg.REG_SZ, EmptyVolumeCache._reg_clsid_)
+    key = winreg.CreateKey(_winreg.HKEY_LOCAL_MACHINE, kn)
+    winreg.SetValueEx(key, None, 0, _winreg.REG_SZ, EmptyVolumeCache._reg_clsid_)
 
 def DllUnregisterServer():
-    import _winreg
+    import winreg
     kn = r"Software\Microsoft\Windows\CurrentVersion\Explorer\VolumeCaches\%s" \
          % (EmptyVolumeCache._reg_desc_,)
     try:
-        key = _winreg.DeleteKey(_winreg.HKEY_LOCAL_MACHINE, kn)
+        key = winreg.DeleteKey(_winreg.HKEY_LOCAL_MACHINE, kn)
     except WindowsError as details:
         import errno
         if details.errno != errno.ENOENT:

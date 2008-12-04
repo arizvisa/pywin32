@@ -47,7 +47,7 @@
 # string content)
 
 import sys, os
-import thread
+import _thread
 import pyclbr
 import pythoncom
 import win32gui, win32gui_struct, win32api, win32con, winerror
@@ -811,27 +811,27 @@ class ScintillaShellView:
         win32gui.MoveWindow(self.hwnd, 0, 0, x, y, False)
 
 def DllRegisterServer():
-    import _winreg
-    key = _winreg.CreateKey(_winreg.HKEY_LOCAL_MACHINE,
+    import winreg
+    key = winreg.CreateKey(_winreg.HKEY_LOCAL_MACHINE,
                             "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\" \
                             "Explorer\\Desktop\\Namespace\\" + \
                             ShellFolderRoot._reg_clsid_)
-    _winreg.SetValueEx(key, None, 0, _winreg.REG_SZ, ShellFolderRoot._reg_desc_)
+    winreg.SetValueEx(key, None, 0, _winreg.REG_SZ, ShellFolderRoot._reg_desc_)
     # And special shell keys under our CLSID
-    key = _winreg.CreateKey(_winreg.HKEY_CLASSES_ROOT,
+    key = winreg.CreateKey(_winreg.HKEY_CLASSES_ROOT,
                         "CLSID\\" + ShellFolderRoot._reg_clsid_ + "\\ShellFolder")
     # 'Attributes' is an int stored as a binary! use struct
     attr = shellcon.SFGAO_FOLDER | shellcon.SFGAO_HASSUBFOLDER | \
            shellcon.SFGAO_BROWSABLE
     import struct
     s = struct.pack("i", attr)
-    _winreg.SetValueEx(key, "Attributes", 0, _winreg.REG_BINARY, s)
+    winreg.SetValueEx(key, "Attributes", 0, _winreg.REG_BINARY, s)
     print(ShellFolderRoot._reg_desc_, "registration complete.")
 
 def DllUnregisterServer():
-    import _winreg
+    import winreg
     try:
-        key = _winreg.DeleteKey(_winreg.HKEY_LOCAL_MACHINE,
+        key = winreg.DeleteKey(_winreg.HKEY_LOCAL_MACHINE,
                             "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\" \
                             "Explorer\\Desktop\\Namespace\\" + \
                             ShellFolderRoot._reg_clsid_)

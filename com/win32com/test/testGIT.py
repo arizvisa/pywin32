@@ -21,7 +21,7 @@ this is a pain in the but!
 
 """
 
-import thread, traceback
+import _thread, traceback
 import win32com.client
 import win32event, win32api
 import pythoncom
@@ -77,7 +77,7 @@ def BeginThreadsSimpleMarshal(numThreads, cookie):
     ret = []
     for i in range(numThreads):
         hEvent = win32event.CreateEvent(None, 0, 0, None)
-        thread.start_new(TestInterpInThread, (hEvent, cookie))
+        _thread.start_new(TestInterpInThread, (hEvent, cookie))
         ret.append(hEvent)
     return ret
 

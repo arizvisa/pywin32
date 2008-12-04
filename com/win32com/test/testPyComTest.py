@@ -509,8 +509,8 @@ if __name__=='__main__':
     # Should NOT be necessary
     def NullThreadFunc():
         pass
-    import thread
-    thread.start_new( NullThreadFunc, () )
+    import _thread
+    _thread.start_new( NullThreadFunc, () )
 
     if "-v" in sys.argv: verbose = 1
     

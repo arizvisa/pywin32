@@ -129,35 +129,35 @@ class IEButton:
         return self._reg_clsid_
 
 def register(classobj):
-    import _winreg
+    import winreg
     subKeyCLSID = "SOFTWARE\\Microsoft\\Internet Explorer\\Extensions\\%38s" % classobj._reg_clsid_
     try:
-        hKey = _winreg.CreateKey( _winreg.HKEY_LOCAL_MACHINE, subKeyCLSID )
-        subKey = _winreg.SetValueEx( hKey, "ButtonText", 0, _winreg.REG_SZ, classobj._button_text_ )
-        _winreg.SetValueEx( hKey, "ClsidExtension", 0, _winreg.REG_SZ, classobj._reg_clsid_ ) # reg value for calling COM object
-        _winreg.SetValueEx( hKey, "CLSID", 0, _winreg.REG_SZ, "{1FBA04EE-3024-11D2-8F1F-0000F87ABD16}" ) # CLSID for button that sends command to COM object
-        _winreg.SetValueEx( hKey, "Default Visible", 0, _winreg.REG_SZ, "Yes" )
-        _winreg.SetValueEx( hKey, "ToolTip", 0, _winreg.REG_SZ, classobj._tool_tip_ )
-        _winreg.SetValueEx( hKey, "Icon", 0, _winreg.REG_SZ, classobj._icon_)
-        _winreg.SetValueEx( hKey, "HotIcon", 0, _winreg.REG_SZ, classobj._hot_icon_)
+        hKey = winreg.CreateKey( _winreg.HKEY_LOCAL_MACHINE, subKeyCLSID )
+        subKey = winreg.SetValueEx( hKey, "ButtonText", 0, _winreg.REG_SZ, classobj._button_text_ )
+        winreg.SetValueEx( hKey, "ClsidExtension", 0, _winreg.REG_SZ, classobj._reg_clsid_ ) # reg value for calling COM object
+        winreg.SetValueEx( hKey, "CLSID", 0, _winreg.REG_SZ, "{1FBA04EE-3024-11D2-8F1F-0000F87ABD16}" ) # CLSID for button that sends command to COM object
+        winreg.SetValueEx( hKey, "Default Visible", 0, _winreg.REG_SZ, "Yes" )
+        winreg.SetValueEx( hKey, "ToolTip", 0, _winreg.REG_SZ, classobj._tool_tip_ )
+        winreg.SetValueEx( hKey, "Icon", 0, _winreg.REG_SZ, classobj._icon_)
+        winreg.SetValueEx( hKey, "HotIcon", 0, _winreg.REG_SZ, classobj._hot_icon_)
     except WindowsError:
         print("Couldn't set standard toolbar reg keys.")
     else:
         print("Set standard toolbar reg keys.")
 
 def unregister(classobj):
-    import _winreg
+    import winreg
     subKeyCLSID = "SOFTWARE\\Microsoft\\Internet Explorer\\Extensions\\%38s" % classobj._reg_clsid_
     try:
-        hKey = _winreg.CreateKey( _winreg.HKEY_LOCAL_MACHINE, subKeyCLSID )
-        subKey = _winreg.DeleteValue( hKey, "ButtonText" )
-        _winreg.DeleteValue( hKey, "ClsidExtension" ) # for calling COM object
-        _winreg.DeleteValue( hKey, "CLSID" )
-        _winreg.DeleteValue( hKey, "Default Visible" )
-        _winreg.DeleteValue( hKey, "ToolTip" )
-        _winreg.DeleteValue( hKey, "Icon" )
-        _winreg.DeleteValue( hKey, "HotIcon" )
-        _winreg.DeleteKey( _winreg.HKEY_LOCAL_MACHINE, subKeyCLSID )
+        hKey = winreg.CreateKey( _winreg.HKEY_LOCAL_MACHINE, subKeyCLSID )
+        subKey = winreg.DeleteValue( hKey, "ButtonText" )
+        winreg.DeleteValue( hKey, "ClsidExtension" ) # for calling COM object
+        winreg.DeleteValue( hKey, "CLSID" )
+        winreg.DeleteValue( hKey, "Default Visible" )
+        winreg.DeleteValue( hKey, "ToolTip" )
+        winreg.DeleteValue( hKey, "Icon" )
+        winreg.DeleteValue( hKey, "HotIcon" )
+        winreg.DeleteKey( _winreg.HKEY_LOCAL_MACHINE, subKeyCLSID )
     except WindowsError:
         print("Couldn't delete Standard toolbar regkey.")
     else:

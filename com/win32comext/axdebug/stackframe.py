@@ -3,13 +3,12 @@
 Provides Implements a nearly complete wrapper for a stack frame.
 """
 import sys
-from util import _wrap, RaiseNotImpl
+from .util import _wrap, RaiseNotImpl
 import expressions, gateways, axdebug, winerror
 import pythoncom
 from win32com.server.exception import COMException
-import repr, string
 
-from util import trace
+from .util import trace
 #def trace(*args):
 #       pass
 
@@ -139,7 +138,7 @@ class StackFrameDebugProperty:
 
     def EnumMembers(self, dwFieldSpec, nRadix, iid):
         print("EnumMembers", dwFieldSpec, nRadix, iid)
-        import expressions
+        from . import expressions
         return expressions.MakeEnumDebugProperty(self.frame.f_locals, dwFieldSpec, nRadix, iid, self.frame)
 
     def GetParent(self):

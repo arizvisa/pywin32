@@ -31,21 +31,21 @@ class ShellExtension:
                                    win32con.MB_YESNO)
 
 def DllRegisterServer():
-    import _winreg
-    key = _winreg.CreateKey(_winreg.HKEY_CLASSES_ROOT,
+    import winreg
+    key = winreg.CreateKey(_winreg.HKEY_CLASSES_ROOT,
                             "directory\\shellex\\CopyHookHandlers\\" +
                             ShellExtension._reg_desc_)
-    _winreg.SetValueEx(key, None, 0, _winreg.REG_SZ, ShellExtension._reg_clsid_)
-    key = _winreg.CreateKey(_winreg.HKEY_CLASSES_ROOT,
+    winreg.SetValueEx(key, None, 0, _winreg.REG_SZ, ShellExtension._reg_clsid_)
+    key = winreg.CreateKey(_winreg.HKEY_CLASSES_ROOT,
                             "*\\shellex\\CopyHookHandlers\\" +
                             ShellExtension._reg_desc_)
-    _winreg.SetValueEx(key, None, 0, _winreg.REG_SZ, ShellExtension._reg_clsid_)
+    winreg.SetValueEx(key, None, 0, _winreg.REG_SZ, ShellExtension._reg_clsid_)
     print(ShellExtension._reg_desc_, "registration complete.")
 
 def DllUnregisterServer():
-    import _winreg
+    import winreg
     try:
-        key = _winreg.DeleteKey(_winreg.HKEY_CLASSES_ROOT,
+        key = winreg.DeleteKey(_winreg.HKEY_CLASSES_ROOT,
                                 "directory\\shellex\\CopyHookHandlers\\" +
                             ShellExtension._reg_desc_)
     except WindowsError as details:
@@ -53,7 +53,7 @@ def DllUnregisterServer():
         if details.errno != errno.ENOENT:
             raise
     try:
-        key = _winreg.DeleteKey(_winreg.HKEY_CLASSES_ROOT,
+        key = winreg.DeleteKey(_winreg.HKEY_CLASSES_ROOT,
                                 "*\\shellex\\CopyHookHandlers\\" +
                             ShellExtension._reg_desc_)
     except WindowsError as details:

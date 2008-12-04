@@ -45,17 +45,17 @@ class ShellExtension:
         return winerror.S_FALSE
 
 def DllRegisterServer():
-    import _winreg
-    key = _winreg.CreateKey(_winreg.HKEY_CLASSES_ROOT,
+    import winreg
+    key = winreg.CreateKey(_winreg.HKEY_CLASSES_ROOT,
                             "Python.File\\shellex")
-    subkey = _winreg.CreateKey(key, "IconHandler")
-    _winreg.SetValueEx(subkey, None, 0, _winreg.REG_SZ, ShellExtension._reg_clsid_)
+    subkey = winreg.CreateKey(key, "IconHandler")
+    winreg.SetValueEx(subkey, None, 0, _winreg.REG_SZ, ShellExtension._reg_clsid_)
     print(ShellExtension._reg_desc_, "registration complete.")
 
 def DllUnregisterServer():
-    import _winreg
+    import winreg
     try:
-        key = _winreg.DeleteKey(_winreg.HKEY_CLASSES_ROOT,
+        key = winreg.DeleteKey(_winreg.HKEY_CLASSES_ROOT,
                                 "Python.File\\shellex\\IconHandler")
     except WindowsError as details:
         import errno

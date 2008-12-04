@@ -128,7 +128,7 @@ __sccauthor__ = '$Author$'[9:-2]
 __date__ = '$Date$'[10:-2]
 
 import os
-import _winreg
+import winreg
 import struct
 import datetime
 import win32api
@@ -152,7 +152,7 @@ class WinTZI(object):
 	def __init_from_reg_key__(self, key, name = None):
 		if not name:
 			key, name = os.path.split(key)
-		value, type = _winreg.QueryValueEx(key, name) 
+		value, type = winreg.QueryValueEx(key, name) 
 		self.__init_from_bytes__(value)
 		
 	def __init_from_bytes__(self, bytes):
@@ -231,7 +231,7 @@ class TimeZoneInfo(datetime.tzinfo):
 		timeZoneName = zoneNames.get(self.timeZoneName, self.timeZoneName)
 		tzRegKeyPath = os.path.join(self.tzRegKey, timeZoneName)
 		try:
-			key = _winreg.OpenKeyEx(_winreg.HKEY_LOCAL_MACHINE, tzRegKeyPath)
+			key = winreg.OpenKeyEx(_winreg.HKEY_LOCAL_MACHINE, tzRegKeyPath)
 		except:
 			raise ValueError('Timezone Name %s not found.' % timeZoneName)
 		return key
@@ -242,22 +242,22 @@ class TimeZoneInfo(datetime.tzinfo):
 	def _LoadInfoFromKey(self, key):
 		"""Loads the information from an opened time zone registry key
 		into relevant fields of this TZI object"""
-		self.displayName = _winreg.QueryValueEx(key, "Display")[0]
-		self.standardName = _winreg.QueryValueEx(key, "Std")[0]
-		self.daylightName = _winreg.QueryValueEx(key, "Dlt")[0]
+		self.displayName = winreg.QueryValueEx(key, "Display")[0]
+		self.standardName = winreg.QueryValueEx(key, "Std")[0]
+		self.daylightName = winreg.QueryValueEx(key, "Dlt")[0]
 		self.staticInfo = WinTZI(key, "TZI")
 		self._LoadDynamicInfoFromKey(key)
 
 	def _LoadDynamicInfoFromKey(self, key):
 		try:
-			dkey = _winreg.OpenKeyEx(key, 'Dynamic DST')
+			dkey = winreg.OpenKeyEx(key, 'Dynamic DST')
 		except WindowsError:
 			return
 		info = _RegKeyDict(dkey)
 		del info['FirstEntry']
 		del info['LastEntry']
-		years = map(int, info.keys())
-		values = map(WinTZI, info.values())
+		years = map(int, list(info.keys()))
+		values = map(WinTZI, list(info.values()))
 		# create a range mapping that searches by descending year and matches
 		# if the target year is greater or equal.
 		self.dynamicInfo = RangeMap(zip(years, values), descending, operator.ge)
@@ -346,9 +346,9 @@ class TimeZoneInfo(datetime.tzinfo):
 	# helper methods for accessing the timezone info from the registry
 	def _get_time_zone_key(subkey=None):
 		"Return the registry key that stores time zone details"
-		key = _winreg.OpenKeyEx(_winreg.HKEY_LOCAL_MACHINE, TimeZoneInfo.tzRegKey)
+		key = winreg.OpenKeyEx(_winreg.HKEY_LOCAL_MACHINE, TimeZoneInfo.tzRegKey)
 		if subkey:
-			key = _winreg.OpenKeyEx(key, subkey)
+			key = winreg.OpenKeyEx(key, subkey)
 		return key
 	_get_time_zone_key = staticmethod(_get_time_zone_key)
 
@@ -364,7 +364,7 @@ class TimeZoneInfo(datetime.tzinfo):
 		key_names = tuple(TimeZoneInfo._get_time_zone_key_names())
 		def get_index_value(key_name):
 			key = TimeZoneInfo._get_time_zone_key(key_name)
-			value, type = _winreg.QueryValueEx(key, index_key)
+			value, type = winreg.QueryValueEx(key, index_key)
 			return value
 		values = map(get_index_value, key_names)
 		return zip(values, key_names)
@@ -396,10 +396,10 @@ class TimeZoneInfo(datetime.tzinfo):
 	get_sorted_time_zones = staticmethod(get_sorted_time_zones)
 
 def _RegKeyEnumerator(key):
-	return _RegEnumerator(key, _winreg.EnumKey)
+	return _RegEnumerator(key, winreg.EnumKey)
 
 def _RegValueEnumerator(key):
-	return _RegEnumerator(key, _winreg.EnumValue)
+	return _RegEnumerator(key, winreg.EnumValue)
 
 def _RegEnumerator(key, func):
 	"Enumerates an open registry key as an iterable generator"
@@ -413,7 +413,7 @@ def _RegEnumerator(key, func):
 def _RegKeyDict(key):
 	values = _RegValueEnumerator(key)
 	values = tuple(values)
-	return dict(map(lambda name_value_type: (name_value_type[0],name_value_type[1]), values))
+	return dict(map(lambda (name,value,type): (name,value), values))
 
 # for backward compatibility
 def deprecated(func, name='Unknown'):
@@ -454,7 +454,7 @@ def GetLocalTimeZone():
 	True
 	"""
 	tzRegKey = r'SYSTEM\CurrentControlSet\Control\TimeZoneInformation'
-	key = _winreg.OpenKeyEx(_winreg.HKEY_LOCAL_MACHINE, tzRegKey)
+	key = winreg.OpenKeyEx(_winreg.HKEY_LOCAL_MACHINE, tzRegKey)
 	local = _RegKeyDict(key)
 	# if the user has not checked "Automatically adjust clock for daylight
 	# saving changes" in the Date and Time Properties control, the standard

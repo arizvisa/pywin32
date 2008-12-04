@@ -22,7 +22,7 @@ from win32com.client import gencache, DispatchWithEvents, Dispatch
 from win32com.client import constants, getevents
 import win32com
 import pythoncom
-import _winreg
+import winreg
 
 from win32com.shell import shell
 from win32com.shell.shellcon import *
@@ -283,8 +283,8 @@ def DllRegisterServer():
     # register toolbar with IE
     try:
         print("Trying to register Toolbar.\n")
-        hkey = _winreg.CreateKey( _winreg.HKEY_LOCAL_MACHINE, "SOFTWARE\\Microsoft\\Internet Explorer\\Toolbar" )
-        subKey = _winreg.SetValueEx( hkey, comclass._reg_clsid_, 0, _winreg.REG_BINARY, "\0" )
+        hkey = winreg.CreateKey( _winreg.HKEY_LOCAL_MACHINE, "SOFTWARE\\Microsoft\\Internet Explorer\\Toolbar" )
+        subKey = winreg.SetValueEx( hkey, comclass._reg_clsid_, 0, _winreg.REG_BINARY, "\0" )
     except WindowsError:
         print("Couldn't set registry value.\nhkey: %d\tCLSID: %s\n" % ( hkey, comclass._reg_clsid_ ))
     else:
@@ -298,8 +298,8 @@ def DllUnregisterServer():
     # unregister toolbar from internet explorer
     try:
         print("Trying to unregister Toolbar.\n")
-        hkey = _winreg.CreateKey( _winreg.HKEY_LOCAL_MACHINE, "SOFTWARE\\Microsoft\\Internet Explorer\\Toolbar" )
-        _winreg.DeleteValue( hkey, comclass._reg_clsid_ )
+        hkey = winreg.CreateKey( _winreg.HKEY_LOCAL_MACHINE, "SOFTWARE\\Microsoft\\Internet Explorer\\Toolbar" )
+        winreg.DeleteValue( hkey, comclass._reg_clsid_ )
     except WindowsError:
         print("Couldn't delete registry value.\nhkey: %d\tCLSID: %s\n" % ( hkey, comclass._reg_clsid_ ))
     else:
