@@ -63,18 +63,18 @@ static connectionObject *connection(PyObject *o)
 	return  (connectionObject *) o;
 }
 
-typedef PyObject * (* CopyFcn)(const void *, int);
+typedef PyObject * (* CopyFcn)(const void *, SQLLEN);
 
 typedef struct _out
 {
 	struct _out *next;
-	long rcode;
+	SQLLEN rcode;
 	void *bind_area;
 	CopyFcn copy_fcn;
 	bool bGetData;
 	short vtype;
 	int pos;
-	long vsize;
+	SQLLEN vsize;
 } OutputBinding;
 
 typedef struct _in {
@@ -97,7 +97,6 @@ typedef struct
 	PyObject *description;
 	PyObject *cursorError;
 	int n_columns;
-	bool bGetDataIsNeeded;
 } cursorObject;
 
 static cursorObject *cursor(PyObject *o)
@@ -436,7 +435,6 @@ static PyObject *odbcCursor(PyObject *self, PyObject *args)
 	cur->description = 0;
 	cur->max_width = 65536L;
 	cur->my_conx = 0;
-	cur->bGetDataIsNeeded = false;
 	cur->hstmt=NULL;
 	cur->cursorError=odbcError;
 	Py_INCREF(odbcError);
@@ -544,17 +542,21 @@ static PyObject *odbcCurClose(PyObject *self, PyObject *args)
 	return Py_None;
 }
 
-static void bindOutputVar
+static BOOL bindOutputVar
 (
 	cursorObject *cur,
 	CopyFcn fcn,
 	short vtype,
-	long vsize,
+	SQLLEN vsize,
 	int pos,
 	bool bUseGet
 )
 {
 	OutputBinding *ob = (OutputBinding *) malloc(sizeof(OutputBinding));
+	if (ob==NULL){
+		PyErr_NoMemory();
+		return FALSE;
+		}
 	OutputBinding *current = NULL;
 
 	ob->bGetData = bUseGet;
@@ -583,6 +585,10 @@ static void bindOutputVar
 	
 	ob->copy_fcn = fcn;
 	ob->bind_area = malloc(vsize);
+	if (ob->bind_area == NULL){
+		PyErr_NoMemory();
+		return FALSE;
+		}
 	ob->rcode = vsize;
 	if (ob->bGetData == false)
 	{
@@ -592,36 +598,38 @@ static void bindOutputVar
 			vtype,
 			ob->bind_area,
 			vsize,
-			(SQLLEN *)&ob->rcode)))
+			&ob->rcode)))
 		{
 			cursorError(cur, _T("BIND"));
+			return FALSE;
 		}
 	}
+	return TRUE;
 }
 
-static PyObject *wcharCopy(const void *v, int sz)
+static PyObject *wcharCopy(const void *v, SQLLEN sz)
 {
 	return PyWinObject_FromWCHAR((WCHAR *)v, sz/sizeof(WCHAR));
 }
 
-static PyObject *stringCopy(const void *v, int sz)
+static PyObject *stringCopy(const void *v, SQLLEN sz)
 {
 	return PyString_FromStringAndSize((char *)v, sz);
 }
 
-static PyObject *longCopy(const void *v, int sz)
+static PyObject *longCopy(const void *v, SQLLEN sz)
 {
 	return PyInt_FromLong(*(unsigned long *)v);
 }
 
-static PyObject *doubleCopy(const void *v, int sz)
+static PyObject *doubleCopy(const void *v, SQLLEN sz)
 {
 	double d = *(double *)v;
 
 	return (d == floor(d)) ? PyLong_FromDouble(d) : PyFloat_FromDouble(d);
 }
 
-static PyObject *dateCopy(const void *v, int sz)
+static PyObject *dateCopy(const void *v, SQLLEN sz)
 {
 	const TIMESTAMP_STRUCT  *dt = (const TIMESTAMP_STRUCT *) v;
 	// Units for fraction is billionths, python datetime uses microseconds
@@ -631,7 +639,7 @@ static PyObject *dateCopy(const void *v, int sz)
 		dt->hour, dt->minute, dt->second, usec);
 }
 
-static PyObject *rawCopy(const void *v, int sz)
+static PyObject *rawCopy(const void *v, SQLLEN sz)
 {
 	PyObject *ret = PyBuffer_New(sz);
 	if (!ret)
@@ -837,27 +845,21 @@ static int ibindNull(cursorObject*cur, int column)
   return 1;
 }
 
-// Class to hold a temporary reference that decrements itself
-class TmpPyObject
-{
-public:
-	PyObject *tmp;
-	TmpPyObject() { tmp=NULL; }
-	TmpPyObject(PyObject *ob) { tmp=ob; }
-	PyObject * operator= (PyObject *ob){
-		Py_XDECREF(tmp);
-		tmp=ob;
-		return tmp;
-		}
-
-	boolean operator== (PyObject *ob) { return tmp==ob; }
-	operator PyObject *() { return tmp; }
-	~TmpPyObject() { Py_XDECREF(tmp); }
-};
-
 static int ibindDate(cursorObject*cur, int column, PyObject *item) 
 {
-	int len = sizeof(TIMESTAMP_STRUCT);
+	/* Sql server apparently determines the precision and type of date based
+		on length of input, according to the character size required for column
+		storage.  This is completely bogus when passing a TIMESTAMP_STRUCT, whose
+		length is always 16.  This apparently causes Sql Server to treat it as a
+		SMALLDATETIME, and truncates seconds as well as fraction of second, and
+		also limits the range of acceptable dates.
+		Tell it we have enough room for 3 decimals, since this is all that
+		SYSTEMTIME affords, and all that Sql Server 2005 will accept.
+		Sql Server 2008 has a datetime2 with up to 7 decimals.
+		Might need to use SqlDescribeCol to get length and precision to support this.
+	*/
+	SQLLEN len = 23;	// length of character storage for yyyy-mm-dd hh:mm:ss.ddd
+	assert(len >= sizeof(TIMESTAMP_STRUCT));
 	InputBinding *ib = initInputBinding(cur, len);
 	if (!ib)
 		return 0;
@@ -918,7 +920,7 @@ static int ibindDate(cursorObject*cur, int column, PyObject *item)
 		SQL_C_TIMESTAMP,
 		SQL_TIMESTAMP,
 		len,
-		9,	// Decimal digits of precision, appears to be ignored for datetime
+		3,	// Decimal digits of precision, appears to be ignored for datetime
 		ib->bind_area,
 		len,
 		&ib->len)))
@@ -1005,7 +1007,7 @@ static int ibindString(cursorObject *cur, int column, PyObject *item)
 
   strcpy(ib->bind_area, val);
   int sqlType = SQL_VARCHAR; /* SQL_CHAR can cause padding in some drivers.. */
-  if (len > 255)
+  if (len > 255)	/* should remove hardcoded value and actually implement setinputsize method */
   {
 	  ib->sqlBytesAvailable = SQL_LEN_DATA_AT_EXEC(ib->len);
 	  sqlType = SQL_LONGVARCHAR;
@@ -1214,7 +1216,7 @@ static int display_size(short coltype, int collen, const TCHAR *colname)
 }
 
 
-static int bindOutput(cursorObject *cur)
+static BOOL bindOutput(cursorObject *cur)
 {
 	short vtype;
 	SQLULEN vsize;
@@ -1225,7 +1227,6 @@ static int bindOutput(cursorObject *cur)
 	cur->n_columns = n_columns; 
 	for (pos = 1; pos <= cur->n_columns; pos++)
 	{
-		PyObject *new_tuple;
 		PyObject *typeOf;
 		long dsize;
 		unsigned long prec;
@@ -1251,13 +1252,14 @@ static int bindOutput(cursorObject *cur)
 		case SQL_SMALLINT:
 		case SQL_INTEGER:
 		case SQL_TINYINT:
-			bindOutputVar(
+			if (!bindOutputVar(
 				cur,
 				longCopy,
 				SQL_C_LONG,
 				sizeof(unsigned long),
 				pos,
-				false);
+				false))
+				return FALSE;
 			typeOf = DbiNumber;
 			break;
 		case SQL_NUMERIC:
@@ -1266,84 +1268,77 @@ static int bindOutput(cursorObject *cur)
 		case SQL_DOUBLE:
 		case SQL_REAL:
 		case SQL_BIGINT:
-			bindOutputVar(
+			if (!bindOutputVar(
 				cur,
 				doubleCopy,
 				SQL_C_DOUBLE,
 				sizeof(double),
 				pos,
-				false);
+				false))
+				return FALSE;
 			typeOf = DbiNumber;
 			prec = vsize;
 			break;
 		case SQL_DATE:
 		case SQL_TIMESTAMP:
-			bindOutputVar(
+			if (!bindOutputVar(
 				cur,
 				dateCopy,
 				SQL_C_TIMESTAMP,
 				vsize,
 				pos,
-				false);
+				false))
+				return FALSE;
 			typeOf = DbiDate;
 			break;
 		case SQL_LONGVARBINARY:
-			cur->bGetDataIsNeeded = true;
-			bindOutputVar(
+			if (!bindOutputVar(
 				cur,
 				rawCopy,
 				SQL_C_BINARY,
 				cur->max_width,
 				pos,
-				true);
+				true))
+				return FALSE;
 			typeOf = DbiRaw;
 			break;
 		case SQL_BINARY:
 		case SQL_VARBINARY:
-			bindOutputVar(
-				cur,
-				rawCopy,
-				SQL_C_BINARY,
-				cur->max_width,
-				pos,
-				false);
+			if (!bindOutputVar(cur, rawCopy, SQL_C_BINARY, cur->max_width, pos, false))
+				return FALSE;
 			typeOf = DbiRaw;
 			break;
 		case SQL_VARCHAR:
 		case SQL_WVARCHAR:
-			bindOutputVar(cur, wcharCopy, SQL_C_WCHAR, (vsize+1)*sizeof(WCHAR), pos, false);
+			if (!bindOutputVar(cur, wcharCopy, SQL_C_WCHAR, (vsize+1)*sizeof(WCHAR), pos, false))
+				return FALSE;
 			typeOf = DbiString;
 			break;
 		case SQL_LONGVARCHAR:
 		case SQL_WLONGVARCHAR:
-			bindOutputVar(cur, wcharCopy, SQL_C_WCHAR, cur->max_width, pos, true);
+			if (!bindOutputVar(cur, wcharCopy, SQL_C_WCHAR, cur->max_width, pos, true))
+				return FALSE;
 			typeOf = DbiString;
 			break;
 		default:
-			bindOutputVar(cur, stringCopy, SQL_C_CHAR, vsize+1, pos, false);
+			if (!bindOutputVar(cur, stringCopy, SQL_C_CHAR, vsize+1, pos, false))
+				return FALSE;
 			typeOf = DbiString;
 			break;
 		}
-		if (PyErr_Occurred())
-		{
-			return 0;
-		}
-		new_tuple = Py_BuildValue(
+
+		TmpPyObject new_tuple = Py_BuildValue(
 			"(NOiiiii)",
 			PyWinObject_FromTCHAR(name), typeOf, dsize,
 			(int)vsize, prec, scale, nullok);
 
-		if (!new_tuple)
-		{
-			return 0;
-		}
-
-		PyList_Append(cur->description, new_tuple);
-		Py_DECREF(new_tuple);
+		if ((new_tuple == NULL)
+			|| PyList_Append(cur->description, new_tuple) == -1)
+			return FALSE;
 	}
 
 	/* success */
-	return 1;
+	return TRUE;
 }
 
 
@@ -1411,7 +1406,6 @@ static RETCODE sendSQLInputData
 static PyObject *odbcCurExec(PyObject *self, PyObject *args)
 {
 	cursorObject *cur = cursor(self);
-	PyObject *temp = NULL;
 	TCHAR *sql=NULL;
 	PyObject *obsql;
 	TCHAR *sqlbuf;
@@ -1429,30 +1423,32 @@ static PyObject *odbcCurExec(PyObject *self, PyObject *args)
 
 	/* @pyparm string|sql||The SQL to execute */
 	/* @pyparm sequence|[var, ...]|[]|Input variables. */
-	if (!PyArg_ParseTuple(args, "O|O", &obsql, &inputvars))
+	/* If the first element is itself a sequence (other than a string)
+		the input will be interpreted as a sequence of sequences to be
+		used to execute the statement multiple times.
+	*/
+	if (!PyArg_ParseTuple(args, "O|O:execute", &obsql, &inputvars))
 	{
 		return NULL;
 	}
+
+	if (inputvars){
+		if (PyString_Check(inputvars) || PyUnicode_Check(inputvars) || !PySequence_Check(inputvars))
+			return PyErr_Format(odbcError, "Values must be a sequence, not %s", inputvars->ob_type->tp_name);
+		if (PySequence_Length(inputvars) > 0){
+			PyObject *temp = PySequence_GetItem(inputvars, 0);
+			if (temp==NULL)
+				return NULL;
+			/* Strings don't count as a list in this case. */
+			if (PySequence_Check(temp) && !PyString_Check(temp) && !PyUnicode_Check(temp)){
+				rows = inputvars;
+				inputvars = NULL;
+				}
+			Py_DECREF(temp);
+			}
+		}
 	if (!PyWinObject_AsTCHAR(obsql, &sql, FALSE))
 		return NULL;
-
-	if (inputvars && !PySequence_Check(inputvars))
-	{
-		PyWinObject_FreeTCHAR(sql);
-		PyErr_SetString(odbcError, "expected sequence as second parameter");
-		return NULL;
-	}
-	else if (inputvars && PySequence_Length(inputvars) > 0)
-	{
-		temp = PySequence_GetItem(inputvars, 0);
-		/* Strings don't count as a list in this case. */
-		if (PySequence_Check(temp) && !PyString_Check(temp) && !PyUnicode_Check(temp))
-		{
-			rows = inputvars;
-			inputvars = NULL;
-		}
-		Py_DECREF(temp);
-	}
 
 	deleteBinding(cur);
 
@@ -1594,9 +1590,9 @@ static PyObject *processOutput(cursorObject *cur)
 		return NULL;
 
 	while (ob) {
-		long cbRequired;
+		SQLLEN cbRequired;
 		RETCODE rc;
-		long cbRead = 0;
+		SQLLEN cbRead = 0;
         /* Use SQLGetData to retrieve data for blob (or long varchar) type columns. */
         if (ob->bGetData)
         {
@@ -1616,62 +1612,61 @@ static PyObject *processOutput(cursorObject *cur)
                          set ob->vsize = cbRequired */
                 if (cbRequired > ob->vsize)
                 {
-                    void *pTemp;
+                    void *pTemp = ob->bind_area;
 					/* Some BLOBs can be huge, be paranoid about allowing
 					   other threads to run. */
 					Py_BEGIN_ALLOW_THREADS
-                    pTemp = malloc (cbRequired);
-                    memcpy(pTemp, ob->bind_area, ob->vsize);
-                    free (ob->bind_area);
+                    ob->bind_area = realloc (ob->bind_area, cbRequired);
 					Py_END_ALLOW_THREADS
-                    ob->bind_area = pTemp;
+					if (ob->bind_area == NULL){
+						PyErr_NoMemory();
+						ob->bind_area = pTemp;
+						Py_DECREF(row);
+						return NULL;
+						}
                     ob->vsize = cbRequired;
                 }
 
                 /* rc = GetData( ... , bind_area + offset, vsize - offset, &rcode ) */
-                SQLLEN rcode;
 				Py_BEGIN_ALLOW_THREADS
                 rc = SQLGetData(cur->hstmt,
                                        ob->pos,
                                        ob->vtype,
                                        (char *)ob->bind_area + cbRead,
                                        ob->vsize - cbRead,
-                                       &rcode);
-                ob->rcode = PyWin_SAFE_DOWNCAST(rcode, SQLLEN, long);
+                                       &ob->rcode);
 				Py_END_ALLOW_THREADS
 				if (unsuccessful(rc))
 				{
 					Py_DECREF(row);
-	 				cursorError(cur, _T("FETCH"));
+	 				cursorError(cur, _T("SQLGetData"));
 					return NULL;
 				}
-
-                if ((ob->rcode != SQL_NO_TOTAL) && (ob->rcode <= ob->vsize - cbRead))
+				/* Returned length is total length remaining including current read.
+					If length is not known, returns SQL_NO_TOTAL */
+                if ((ob->rcode != SQL_NO_TOTAL) && (ob->rcode <= cur->max_width))
                 {
-                    /* If we get here, then this should be the last iteration
-		       through the loop. */
+                    /* If we get here, then this should be the last iteration through the loop. */
                     cbRead += ob->rcode;
                 }
                 else
                 {
-                    /* Grow buffer by (32k minus 1 byte) each for each chunk.
-		       If not for the SQL Anywhere 5.0 problem (driver version
-		       5.05.041867), we could probably grow by 50% each time
-		       or the remaining size (as determined by ob->rcode). */
-
-                    /*cbRequired += ob->rcode - ob->vsize; */
-                    cbRequired += 32767;    /* Fix that works for SQL Anywhere 5.0 driver. */
-                    if (ob->vtype == SQL_C_CHAR)
-					{
-						/* We want to ignore the intermediate
-						   NULL characters SQLGetData() gives us.
+                    /* Grow buffer by cursor chunk size for each read.
+			       If not for the SQL Anywhere 5.0 problem (driver version
+			       5.05.041867), we could probably grow by 50% each time
+				   or the remaining size (as determined by ob->rcode).
+					Regarding above note, caller can now use cursor.setoutputsize
+					to work around any such bug in a driver */
+                    cbRequired += cur->max_width;
+					/* We want to ignore the intermediate
+						  NULL characters SQLGetData() gives us.
 						   (silly, silly) */
+					if (ob->vtype == SQL_C_CHAR)
 						cbRead = ob->vsize - 1;
-					}
+					else if (ob->vtype == SQL_C_WCHAR)
+						cbRead = ob->vsize - sizeof(WCHAR);
 					else
-					{
 						cbRead = ob->vsize;
-					}
                 }
 
             } while (rc == SQL_SUCCESS_WITH_INFO); 
