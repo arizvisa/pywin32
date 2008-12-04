@@ -746,9 +746,8 @@ class COMScript:
 
 	def ResetNamedItems(self):
 		# Due to the way we work, we re-create persistent ones.
-		si = self.subItems.items()
 		self.subItems = {}
-		for name, item in si:
+		for name, item in self.subItems.items():
 			item.Close()
 			if item.flags & axscript.SCRIPTITEM_ISPERSISTENT:
 				self.AddNamedItem(item.name, item.flags)

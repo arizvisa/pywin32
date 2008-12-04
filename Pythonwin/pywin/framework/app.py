@@ -10,8 +10,11 @@ import win32ui
 import sys
 import string
 import os
-from pywin.mfc import window, dialog, thread, afxres
+from pywin.mfc import window, dialog, afxres
+from pywin.mfc.thread import WinApp
 import traceback
+import regutil
+
 from . import scriptutils
 
 ## NOTE: App and AppBuild should NOT be used - instead, you should contruct your
@@ -112,11 +115,11 @@ class MainFrame(window.MDIFrameWnd):
 			SaveWindowSize(self.sectionPos, rectNow)
 		return 0
 
-class CApp(thread.WinApp):
+class CApp(WinApp):
 	" A class for the application "
 	def __init__(self):
 		self.oldCallbackCaller = None
-		thread.WinApp.__init__(self, win32ui.GetApp() )
+		WinApp.__init__(self, win32ui.GetApp() )
 		self.idleHandlers = []
 		
 	def InitInstance(self):
@@ -195,7 +198,6 @@ class CApp(thread.WinApp):
 
 	def OnHelp(self,id, code):
 		try:
-			import regutil
 			if id==win32ui.ID_HELP_GUI_REF:
 				helpFile = regutil.GetRegisteredHelpFile("Pythonwin Reference")
 				helpCmd = win32con.HELP_CONTENTS
@@ -371,12 +373,14 @@ def Win32Input(prompt=None):
 	"Provide input() for gui apps"
 	return eval(input(prompt))
 
-
-## sys.modules['__builtin__'].raw_input=Win32RawInput
-## sys.modules['__builtin__'].input=Win32Input
-import code
-code.InteractiveConsole.raw_input=Win32RawInput
-code.InteractiveConsole.input=Win32Input
+try:
+	raw_input
+	# must be py2x...
+	sys.modules['__builtin__'].raw_input=Win32RawInput
+except NameError:
+	# must be py3k
+	import code
+	code.InteractiveConsole.input=Win32Input
 
 def HaveGoodGUI():
 	"""Returns true if we currently have a good gui available.
