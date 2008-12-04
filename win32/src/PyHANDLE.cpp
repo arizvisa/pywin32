@@ -321,15 +321,15 @@ long PyHANDLE::hash(void)
 
 int PyHANDLE::print(FILE *fp, int flags)
 {
-	WCHAR resBuf[160];
-	wsprintfW(resBuf, L"<%hs at %Id (%Id)>", GetTypeName(), this, m_handle);
+	TCHAR resBuf[160];
+	wsprintf(resBuf, _T("<%hs at %Id (%Id)>"), GetTypeName(), this, m_handle);
     // ### ACK! Python uses a non-debug runtime. We can't use stream
 	// ### functions when in DEBUG mode!!  (we link against a different
 	// ### runtime library)  Hack it by getting Python to do the print!
 	//
 	// ### - Double Ack - Always use the hack!
 //#ifdef _DEBUG
-	PyObject *ob = PyUnicode_FromWideChar(resBuf, wcslen(resBuf));
+	PyObject *ob = PyWinCoreString_FromString(resBuf);
 	PyObject_Print(ob, fp, flags|Py_PRINT_RAW);
 	Py_DECREF(ob);
 /***

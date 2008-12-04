@@ -639,12 +639,7 @@ PyObject *PyTime::repr()
 
 	TCHAR resBuf[160];
 	wsprintf(resBuf, _T("<PyTime:%s %s>"), dateBuf, timeBuf);
-#if (PY_VERSION_HEX < 0x03000000)
-	return PyString_FromTCHAR(resBuf);
-#else
-	// Py3k requires that Unicode is returned
-	return PyWinObject_FromWCHAR(resBuf);
-#endif
+	return PyWinCoreString_FromString(resBuf);
 }
 
 PyObject *PyTime::getattro(PyObject *self, PyObject *obname)

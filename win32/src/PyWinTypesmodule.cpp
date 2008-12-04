@@ -325,11 +325,7 @@ PyObject *PyWin_SetAPIError(char *fnName, long err /*= 0*/)
 
 	PyObject *v = Py_BuildValue("(iNN)",
 		errorCode,
-		#if (PY_VERSION_HEX >= 0x03000000)
-			PyUnicode_FromString(fnName),
-		#else
-			PyString_FromString(fnName),
-		#endif
+		PyWinCoreString_FromString(fnName),
 		PyWinObject_FromTCHAR(buf));
 	if (free_buf && buf)
 		LocalFree(buf);		

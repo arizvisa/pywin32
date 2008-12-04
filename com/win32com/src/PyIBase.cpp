@@ -67,7 +67,7 @@ PyObject * PyIBase::repr()
 {
 	TCHAR buf[80];
 	wsprintf(buf, _T("<%hs at %p>"),ob_type->tp_name, (PyObject *)this);
-	return PyWinObject_FromTCHAR(buf);
+	return PyWinCoreString_FromString(buf);
 }
 
 /*static*/ void PyIBase::dealloc(PyObject *ob)

@@ -2481,7 +2481,7 @@ static PyObject *PySHILCreateFromPath(PyObject *self, PyObject *args)
 }
 
 // @pymethod bool|shell|IsUserAnAdmin|Tests whether the current user is a member of the Administrator's group.
-// @rdesc The result is true or false.
+// @rdesc The result is true or false, or a com_error with E_NOTIMPL is raised.
 static PyObject *PyIsUserAnAdmin(PyObject *self, PyObject *args)
 {
 	if(!PyArg_ParseTuple(args, ":IsUserAnAdmin"))
@@ -3284,13 +3284,13 @@ static const PyCom_InterfaceSupportInfo g_interfaceSupportData[] =
 	PYCOM_INTERFACE_CLIENT_ONLY(ExplorerPaneVisibility),
 	PYCOM_INTERFACE_CLIENT_ONLY(NameSpaceTreeControl),
 	PYCOM_INTERFACE_FULL(ExplorerCommand),
-        PYCOM_INTERFACE_FULL(CopyHookA),
-        PYCOM_INTERFACE_FULL(CopyHookW),
-        // For b/w compat, Add IID_ICopyHook as IID_CopyHookA
-        { &IID_ICopyHookA, "ICopyHook", "IID_ICopyHook", NULL, NULL  },
-        PYCOM_INTERFACE_IID_ONLY(ShellCopyHookA),
-        PYCOM_INTERFACE_IID_ONLY(ShellCopyHookW),
-        PYCOM_INTERFACE_IID_ONLY(ShellCopyHook),
+	PYCOM_INTERFACE_FULL(CopyHookA),
+	PYCOM_INTERFACE_FULL(CopyHookW),
+	// For b/w compat, Add IID_ICopyHook as IID_CopyHookA
+	{ &IID_ICopyHookA, "ICopyHook", "IID_ICopyHook", NULL, NULL  },
+	PYCOM_INTERFACE_IID_ONLY(ShellCopyHookA),
+	PYCOM_INTERFACE_IID_ONLY(ShellCopyHookW),
+	PYCOM_INTERFACE_IID_ONLY(ShellCopyHook),
 	PYCOM_INTERFACE_FULL(ShellItem),
 	PYCOM_INTERFACE_FULL(ShellItemArray),
 	PYCOM_INTERFACE_CLIENT_ONLY(ShellLinkDataList),

@@ -502,7 +502,7 @@ PyObject *PyCDialog::create( PyObject *self, PyObject *args )
 PyObject *PyCDialog::createIndirect( PyObject *, PyObject *args )
 {
 	PyObject *obList = NULL;
-	// @pyparm <o PyDialogTemplate>|obList||A list of [<o PyDLGTEMPLATE>, <o PyDLGITEMTEMPLATE>, ...], which describe the dialog to be created.
+	// @pyparm list|obList||A list of [<o PyDLGTEMPLATE>, <o PyDLGITEMTEMPLATE>, ...], which describe the dialog to be created.
 	if (!PyArg_ParseTuple(args, "O:CreateDialogIndirect", &obList))
 		return NULL;
 	

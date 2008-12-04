@@ -480,7 +480,7 @@ py_get_global_memory(PyObject* self, PyObject* args)
     if (!PyArg_ParseTuple(args, "O", &obhglobal))
         return NULL;
     if (!PyWinObject_AsHANDLE(obhglobal, &hglobal))
-    return NULL;
+        return NULL;
     size_t size = GlobalSize(hglobal);
     if (!size)
         return ReturnAPIError("GlobalSize");
@@ -902,7 +902,7 @@ py_set_clipboard_data(PyObject* self, PyObject* args)
 			if (PyString_Check(obhandle))
 				bufSize++;	// size doesnt include nulls!
 			// else assume buffer needs no terminator...
-			}
+		}
 		handle = GlobalAlloc(GHND, bufSize);
 		if (handle == NULL) {
 			return ReturnAPIError("GlobalAlloc");
@@ -917,6 +917,7 @@ py_set_clipboard_data(PyObject* self, PyObject* args)
 	Py_END_ALLOW_THREADS;
 
 	if (!data)
+		// XXX - should we GlobalFree the mem?
 		return ReturnAPIError("SetClipboardData");
 	return PyWinLong_FromHANDLE(data);
 

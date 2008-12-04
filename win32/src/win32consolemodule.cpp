@@ -210,11 +210,7 @@ PyObject *PySMALL_RECT::tp_str(PyObject *self)
 		PyErr_SetString(PyExc_SystemError, "String representation of PySMALL_RECT too long for buffer");
 		return NULL;
 		}
-#if (PY_VERSION_HEX < 0x03000000)
-	return PyString_FromStringAndSize(buf,chars_printed);
-#else
-	return PyUnicode_FromString(buf);
-#endif
+	return PyWinCoreString_FromString(buf,chars_printed);
 }
 
 PySMALL_RECT::PySMALL_RECT(SMALL_RECT *psr)
@@ -362,11 +358,7 @@ PyObject *PyCOORD::tp_str(PyObject *self)
 		PyErr_SetString(PyExc_SystemError, "String representation of PyCOORD too long for buffer");
 		return NULL;
 		}
-#if (PY_VERSION_HEX < 0x03000000)
-	return PyString_FromStringAndSize(buf,chars_printed);
-#else
-	return PyUnicode_FromString(buf);
-#endif
+	return PyWinCoreString_FromString(buf,chars_printed);
 }
 
 PyCOORD::PyCOORD(COORD *pcoord)
@@ -754,11 +746,7 @@ PyObject *PyINPUT_RECORD::tp_str(PyObject *self)
 		PyErr_SetString(PyExc_SystemError, "String representation of PyINPUT_RECORD too long for buffer");
 		return NULL;
 		}
-#if (PY_VERSION_HEX < 0x03000000)
-	return PyString_FromStringAndSize(buf,chars_printed);
-#else
-	return PyUnicode_FromString(buf);
-#endif
+	return PyWinCoreString_FromString(buf,chars_printed);
 }
 
 

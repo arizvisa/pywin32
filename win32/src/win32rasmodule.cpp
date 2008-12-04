@@ -63,20 +63,14 @@ PyObject *ReturnRasError(char *fnName, long err = 0)
 	if (!bHaveMessage)
 		_tcscpy(buf, _T("No error message is available"));
 	/* strip trailing cr/lf */
-	/* Too much of a pain for unicode, it's just an error msg
-	size_t end = strlen(buf)-1;
-	if (end>1 && (buf[end-1]=='\n' || buf[end-1]=='\r'))
-		buf[end-1] = '\0';
+	size_t end = _tcslen(buf)-1;
+	if (end>1 && (buf[end-1]==_T('\n') || buf[end-1]==_T('\r')))
+		buf[end-1] = 0;
 	else
-		if (end>0 && (buf[end]=='\n' || buf[end]=='\r'))
-			buf[end]='\0';
-	*/
+		if (end>0 && (buf[end]==_T('\n') || buf[end]==_T('\r')))
+			buf[end]=0;
 	PyObject *v = Py_BuildValue("(iNN)", errorCode,
-#if (PY_VERSION_HEX >= 0x03000000)
-		PyUnicode_FromString(fnName),
-#else
-		PyString_FromString(fnName),
-#endif
+		PyWinCoreString_FromString(fnName),
 		PyWinObject_FromTCHAR(buf));
 	if (v != NULL) {
 		PyErr_SetObject(module_error, v);
@@ -582,7 +576,7 @@ PyRasEnumConnections( PyObject *self, PyObject *args )
 	} else {
 		pCon = &tc;
 	}
-	PyObject *ret = PyTuple_New(noConns);
+	PyObject *ret = PyList_New(noConns);
 	if (ret==NULL)
 		return NULL;
 
@@ -597,7 +591,7 @@ PyRasEnumConnections( PyObject *self, PyObject *args )
 			ret=NULL;
 			break;
 			}
-		PyTuple_SET_ITEM(ret, i, item);
+		PyList_SET_ITEM(ret, i, item);
 		}
 	// @rdesc Each tuple is of format (handle, entryName, deviceType, deviceName)
 	if (pCon && pCon != &tc)
