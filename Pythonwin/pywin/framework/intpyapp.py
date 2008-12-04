@@ -291,7 +291,7 @@ class InteractivePythonApp(app.CApp):
 		modules = moduleNames.split(",")
 		for module in modules:
 			try:
-				exec("import "+module)
+				__import__(module)
 			except: # Catch em all, else the app itself dies! 'ImportError:
 				traceback.print_exc()
 				msg = 'Startup import of user module "%s" failed' % module

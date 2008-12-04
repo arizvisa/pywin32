@@ -36,7 +36,7 @@ class MainWindow:
                 0, 0, hinst, None)
         win32gui.UpdateWindow(self.hwnd)
         self._DoCreateIcons()
-        
+
     def _DoCreateIcons(self):
         # Try and find a custom icon
         hinst =  win32api.GetModuleHandle(None)

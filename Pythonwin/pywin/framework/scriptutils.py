@@ -380,7 +380,7 @@ def ImportFile():
 	path, modName = os.path.split(pathName)
 	modName, modExt = os.path.splitext(modName)
 	newPath = None
-	for key, mod in sys.modules.iteritems():
+	for key, mod in sys.modules.items():
 		if hasattr(mod, '__file__'):
 			fname = mod.__file__
 			base, ext = os.path.splitext(fname)
@@ -458,10 +458,7 @@ def CheckFile():
 	win32ui.DoWaitCursor(0)
 
 def RunTabNanny(filename):
-	try:
-		import cStringIO as io
-	except ImportError:
-		import io
+	import io as io
 	tabnanny = FindTabNanny()
 	if tabnanny is None:
 		win32ui.MessageBox("The TabNanny is not around, so the children can run amok!" )

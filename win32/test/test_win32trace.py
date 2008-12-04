@@ -156,7 +156,7 @@ class TestMultipleThreadsWriting(unittest.TestCase):
         win32trace.InitWrite()
         CheckNoOtherReaders()
         self.threads = [WriterThread() for each in range(self.FullBucket)]
-        self.buckets = range(self.BucketCount)
+        self.buckets = list(range(self.BucketCount))
         for each in self.buckets:
             self.buckets[each] = 0
 
@@ -254,7 +254,7 @@ class TestOutofProcess(unittest.TestCase):
         win32trace.InitRead()
         TraceWriteProcess.BucketCount = self.BucketCount
         self.setUpWriters()
-        self.buckets = range(self.BucketCount)
+        self.buckets = list(range(self.BucketCount))
         for each in self.buckets:
             self.buckets[each] = 0
 
@@ -308,12 +308,12 @@ def _RunAsTestProcess():
     threadCount = int(sys.argv[3])
     threads = [WriterThread() for each in range(threadCount)]
     win32trace.InitWrite()
-    for thread in threads:
-        thread.start()
-    for thread in threads:
-        thread.join()
-    for thread in threads:
-        if not thread.verifyWritten():
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    for t in threads:
+        if not t.verifyWritten():
             sys.exit(-1)
     
 if __name__ == '__main__':

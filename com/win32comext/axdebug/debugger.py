@@ -40,7 +40,7 @@ def BuildModule(module, built_nodes, rootNode, create_node_fn, create_node_args 
 #        print "keeping", module.__name__
         node = ModuleTreeNode(module)
         built_nodes[module] = node
-        realNode = apply(create_node_fn, (node,)+create_node_args)
+        realNode = create_node_fn(*(node,)+create_node_args)
         node.realNode = realNode
 
         # Split into parent nodes.
@@ -56,7 +56,7 @@ def BuildModule(module, built_nodes, rootNode, create_node_fn, create_node_args 
         node.Attach(parentNode)
 
 def RefreshAllModules(builtItems, rootNode, create_node, create_node_args):
-    for module in sys.modules.values():
+    for module in list(sys.modules.values()):
         BuildModule(module, builtItems, rootNode, create_node, create_node_args)
 
 # realNode = pdm.CreateDebugDocumentHelper(None) # DebugDocumentHelper node?
@@ -193,7 +193,7 @@ def dosomething():
 
 def test():
     Break()
-    raw_input("Waiting...")
+    input("Waiting...")
     dosomething()
     print("Done")
 
