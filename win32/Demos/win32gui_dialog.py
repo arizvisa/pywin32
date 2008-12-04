@@ -43,7 +43,7 @@ class _WIN32MASKEDSTRUCT:
                 full_fmt += "pi"
             else:
                 full_fmt += fmt
-        for name, val in list(kw.items()):
+        for name, val in kw.items():
             if name not in self.__dict__:
                 raise ValueError("LVITEM structures do not have an item '%s'" % (name,))
             self.__dict__[name] = val
@@ -162,7 +162,7 @@ class DemoWindowBase:
         title = "Dynamic Dialog Demo"
 
         # Window frame and title
-        dlg = [ [title, (0, 0, 210, 250), style, 0, (8, "MS Sans Serif"), None, dlgClassName], ]
+        dlg = [ [title, (0, 0, 210, 250), style, None, (8, "MS Sans Serif"), None, dlgClassName], ]
 
         # ID label and text box
         dlg.append([130, "Enter something", -1, (5, 5, 200, 9), cs | win32con.SS_LEFT])

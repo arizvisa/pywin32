@@ -255,6 +255,7 @@ CPythonDialogTemplate::~CPythonDialogTemplate()
 // Python-specific dialog code
 
 // Extracts a string or resource id/atom from a dialog template buffer
+// and updates the pointer param to reflect how many bytes were consumed.
 static PyObject *MakeResName(WCHAR **val)
 {
 	WCHAR *ptr = *val;
@@ -279,7 +280,10 @@ static PyObject *MakeResName(WCHAR **val)
 }
 
 // Given a pointer to a dialog hdr template, return a Python list to match it
-// ??? This leaks refs all over the place ???
+// ??? This leaks refs all over the place ???  markh: where?  It looks OK
+// to me - MakeResName creates a new reference, but its always immediately
+// placed in the new list, or the list is DECREF'd on error.
+// It could be simplified with a goto error handler though...
 /* Also need to handle extended templates (DLGTEMPLATEEX), quoting from MSDN:
 	To distinguish between a standard template and an extended template,
 	check the first 16-bits of a dialog box template.
@@ -505,27 +509,28 @@ static CPythonDialogTemplate *ParseDlgHdrList(PyObject *tmpl)
 		return NULL;
 	WCHAR *caption=NULL, *menu=NULL, *wclass=NULL, *fontname=NULL;
 	PyObject *obcaption, *obfontname, *obfont=Py_None, *obmenu=Py_None, *obwclass=Py_None;
+	PyObject *obexstyle=Py_None;
 	DLGTEMPLATE tpl={0,0,0,0,0,0,0};
 	WORD fontsize;
 
 	CPythonDialogTemplate *ret=NULL;
 
-	if (!PyArg_ParseTuple(obhdr, "O(hhhh)k|kOOO:DLGTEMPLATE",
+	if (!PyArg_ParseTuple(obhdr, "O(hhhh)k|OOOO:DLGTEMPLATE",
 		&obcaption,		
 		&tpl.x, &tpl.y, &tpl.cx, &tpl.cy,
 		&tpl.style,
-		&tpl.dwExtendedStyle,
+		&obexstyle,
 		&obfont,
 		&obmenu,
 		&obwclass))
-		return NULL;
+		goto cleanup;
 
 	// @tupleitem 0|string|caption|The caption for the window
 	// @tupleitem 1|(int,int,int,int)|(x,y,cx,cy)|The bounding rectange for the dialog.
 	// @tupleitem 2|int|style|The style bits for the dialog.  Combination of WS_* and DS_* constants.
 	// Note that the DS_SETFONT style need never be specified - it is determined by the font item (below)
 	// <nl>See MSDN documentation on Dialog Boxes for allowable values.
-	// @tupleitem 3|int|extStyle|The extended style bits for the dialog. Defaults to 0 if not passed.
+	// @tupleitem 3|int|extStyle|The extended style bits for the dialog. Defaults to 0 if not passed and None is supported for backwards compatibility.
 	// @tupleitem 4|(int, string)|(fontSize, fontName)|A tuple describing the font, or None if the system default font is to be used.
 	// @tupleitem 5|<o PyResourceId>|menuResource|The resource ID of the menu to be used for the dialog, or None for no menu.
 	// @tupleitem 6|<o PyResourceId>|windowClass|Window class name or atom as returned from RegisterWindowClass.  Defaults to None.
@@ -536,6 +541,11 @@ static CPythonDialogTemplate *ParseDlgHdrList(PyObject *tmpl)
 		goto cleanup;
 	if (!PyWinObject_AsResourceIdW(obwclass, &wclass, TRUE))
 		goto cleanup;
+	if (obexstyle != Py_None) {
+		tpl.dwExtendedStyle = PyLong_AsUnsignedLong(obexstyle);
+		if (tpl.dwExtendedStyle==-1 && PyErr_Occurred())
+			goto cleanup;
+	}
 
 	tpl.style &= ~DS_SETFONT;
 	if (obfont != Py_None){
