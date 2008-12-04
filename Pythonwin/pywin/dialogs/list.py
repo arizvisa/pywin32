@@ -22,7 +22,7 @@ class ListDialog (dialog.Dialog):
 			win32con.WS_CHILD           |
 			win32con.WS_VISIBLE
 		     )
-		return [ [title, (0, 0, 200, 200), style, 0, (8, "MS Sans Serif")],
+		return [ [title, (0, 0, 200, 200), style, None, (8, "MS Sans Serif")],
 			["SysListView32", None, win32ui.IDC_LIST1, (0, 0, 200, 200), ls], 
 			[128,	"OK", win32con.IDOK, (10, 0, 50, 14), bs | win32con.BS_DEFPUSHBUTTON],
 			[128,	"Cancel",win32con.IDCANCEL,(0, 0, 50, 14), bs],

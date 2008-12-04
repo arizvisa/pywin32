@@ -403,7 +403,7 @@ class GrepDialog(dialog.Dialog):
 	def __init__(self, dp, fp, gp, cs, r, v):
 		style = win32con.DS_MODALFRAME | win32con.WS_POPUP | win32con.WS_VISIBLE | win32con.WS_CAPTION | win32con.WS_SYSMENU | win32con.DS_SETFONT
 		CS = win32con.WS_CHILD | win32con.WS_VISIBLE
-		tmp = [ ["Grep", (0, 0, 210, 90), style, 0, (8, "MS Sans Serif")], ]
+		tmp = [ ["Grep", (0, 0, 210, 90), style, None, (8, "MS Sans Serif")], ]
 		tmp.append([STATIC, "Grep For:",            -1, (7,   7,  50,  9), CS ])
 		tmp.append([EDIT,   gp,                    101, (52,  7, 144,  11), CS | win32con.WS_TABSTOP | win32con.ES_AUTOHSCROLL | win32con.WS_BORDER])
 		tmp.append([STATIC, "Directories:",         -1, (7,  20,  50,  9), CS ])
@@ -477,7 +477,7 @@ class GrepParamsDialog(dialog.Dialog):
 		self.newitems = []
 		style = win32con.DS_MODALFRAME | win32con.WS_POPUP | win32con.WS_VISIBLE | win32con.WS_CAPTION | win32con.WS_SYSMENU | win32con.DS_SETFONT
 		CS = win32con.WS_CHILD | win32con.WS_VISIBLE
-		tmp = [ ["Grep Parameters", (0, 0, 205, 100), style, 0, (8, "MS Sans Serif")], ]
+		tmp = [ ["Grep Parameters", (0, 0, 205, 100), style, None, (8, "MS Sans Serif")], ]
 		tmp.append([LISTBOX, '',                   107, (7,   7,  150,  72), CS | win32con.LBS_MULTIPLESEL| win32con.LBS_STANDARD | win32con.LBS_HASSTRINGS | win32con.WS_TABSTOP | win32con.LBS_NOTIFY])
 		tmp.append([BUTTON,'OK',         win32con.IDOK, (167, 7,  32, 12), CS | win32con.BS_DEFPUSHBUTTON| win32con.WS_TABSTOP])
 		tmp.append([BUTTON,'Cancel', win32con.IDCANCEL, (167,23,  32, 12), CS | win32con.BS_PUSHBUTTON| win32con.WS_TABSTOP])

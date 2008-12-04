@@ -25,7 +25,7 @@ def MakeProgressDlgTemplate(caption, staticText = ""):
     dlg = [[caption,
 	    (0, 0, w, h),
 	    style,
-	    0,
+	    None,
 	    (8, "MS Sans Serif")],
 	   ]
 
