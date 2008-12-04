@@ -26,7 +26,6 @@ from . import build
 from pywintypes import IIDType
 
 import win32com.client # Needed as code we eval() references it.
-from win32com.client import NeedUnicodeConversions
 
 debugging=0			# General debugging
 debugging_attr=0	# Debugging dynamic attribute lookups.
@@ -105,7 +104,8 @@ def _GetDescInvokeType(entry, default_invoke_type):
 	if not entry or not entry.desc: return default_invoke_type
 	return entry.desc[4]
 
-def Dispatch(IDispatch, userName = None, createClass = None, typeinfo = None, UnicodeToString=NeedUnicodeConversions, clsctx = pythoncom.CLSCTX_SERVER):
+def Dispatch(IDispatch, userName = None, createClass = None, typeinfo = None, UnicodeToString=None, clsctx = pythoncom.CLSCTX_SERVER):
+	assert UnicodeToString is None, "this is deprecated and will go away"
 	IDispatch, userName = _GetGoodDispatchAndUserName(IDispatch,userName,clsctx)
 	if createClass is None:
 		createClass = CDispatch
@@ -122,7 +122,7 @@ def Dispatch(IDispatch, userName = None, createClass = None, typeinfo = None, Un
 	except pythoncom.com_error:
 		typeinfo = None
 	olerepr = MakeOleRepr(IDispatch, typeinfo, lazydata)
-	return createClass(IDispatch, olerepr, userName,UnicodeToString, lazydata)
+	return createClass(IDispatch, olerepr, userName, lazydata=lazydata)
 
 def MakeOleRepr(IDispatch, typeinfo, typecomp):
 	olerepr = None
@@ -146,15 +146,17 @@ def MakeOleRepr(IDispatch, typeinfo, typecomp):
 	if olerepr is None: olerepr = build.DispatchItem()
 	return olerepr
 
-def DumbDispatch(IDispatch, userName = None, createClass = None,UnicodeToString=NeedUnicodeConversions, clsctx=pythoncom.CLSCTX_SERVER):
+def DumbDispatch(IDispatch, userName = None, createClass = None,UnicodeToString=None, clsctx=pythoncom.CLSCTX_SERVER):
 	"Dispatch with no type info"
+	assert UnicodeToString is None, "this is deprecated and will go away"
 	IDispatch, userName = _GetGoodDispatchAndUserName(IDispatch,userName,clsctx)
 	if createClass is None:
 		createClass = CDispatch
-	return createClass(IDispatch, build.DispatchItem(), userName,UnicodeToString)
+	return createClass(IDispatch, build.DispatchItem(), userName)
 
 class CDispatch:
-	def __init__(self, IDispatch, olerepr, userName =  None, UnicodeToString=NeedUnicodeConversions, lazydata = None):
+	def __init__(self, IDispatch, olerepr, userName=None, UnicodeToString=None, lazydata=None):
+		assert UnicodeToString is None, "this is deprecated and will go away"
 		if userName is None: userName = "<unknown>"
 		self.__dict__['_oleobj_'] = IDispatch
 		self.__dict__['_username_'] = userName
@@ -162,7 +164,7 @@ class CDispatch:
 		self.__dict__['_mapCachedItems_'] = {}
 		self.__dict__['_builtMethods_'] = {}
 		self.__dict__['_enum_'] = None
-		self.__dict__['_unicode_to_string_'] = UnicodeToString
+		self.__dict__['_unicode_to_string_'] = None
 		self.__dict__['_lazydata_'] = lazydata
 
 	def __call__(self, *args):
@@ -262,9 +264,10 @@ class CDispatch:
 		result = self._oleobj_.InvokeTypes(*(dispid, LCID, wFlags, retType, argTypes) + args)
 		return self._get_good_object_(result, user, resultCLSID)
 
-	def _wrap_dispatch_(self, ob, userName = None, returnCLSID = None, UnicodeToString = NeedUnicodeConversions):
+	def _wrap_dispatch_(self, ob, userName = None, returnCLSID = None, UnicodeToString=None):
 		# Given a dispatch object, wrap it in a class
-		return Dispatch(ob, userName, UnicodeToString=UnicodeToString)
+		assert UnicodeToString is None, "this is deprecated and will go away"
+		return Dispatch(ob, userName)
 
 	def _get_good_single_object_(self,ob,userName = None, ReturnCLSID=None):
 		if iunkType==type(ob):

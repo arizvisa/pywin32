@@ -1,7 +1,5 @@
 # 'Request' example added jjk  11/20/98
 
-import site ## still not fixed in 3.0b3
-
 import win32ui
 from pywin.mfc import object
 import dde

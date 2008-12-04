@@ -1,4 +1,3 @@
-import string
 import win32com.axscript.axscript
 import winerror
 from win32com.axscript import axscript
@@ -43,7 +42,7 @@ class AXEngine:
     self.eScript = self.eParse = self.eSafety = None
   def SetScriptState(self, state):
     self.eScript.SetScriptState(state)
-		
+
 IActiveScriptSite_methods = [
   'GetLCID',
   'GetItemInfo',
@@ -63,7 +62,6 @@ class AXSite:
 
   def __init__(self, objModel={}, engine = None, lcid=0):
     self.lcid = lcid
-
     self.objModel = { }
     for name, object in objModel.items():
       # Gregs code did string.lower this - I think that is callers job if he wants!
@@ -72,7 +70,7 @@ class AXSite:
     self.engine = None
     if engine:
       self._AddEngine(engine)
-    
+
   def AddEngine(self, engine):
     """Adds a new engine to the site.
     engine can be a string, or a fully wrapped engine object.
@@ -99,8 +97,7 @@ class AXSite:
     return self.lcid
 
   def GetItemInfo(self, name, returnMask):
-#    name = string.lower(name)
-    if not self.objModel.has_key(name):
+    if name not in self.objModel:
       raise exception.Exception(scode=winerror.TYPE_E_ELEMENTNOTFOUND, desc='item not found')
 
     ### for now, we don't have any type information
