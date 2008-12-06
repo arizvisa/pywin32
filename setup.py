@@ -70,9 +70,14 @@ To build 64bit versions of this:
 import os, string, sys
 import types, glob
 import re
-import _winreg
 
 is_py3k = sys.version_info > (3,) # get this out of the way early on...
+# We have special handling for _winreg so our setup3.py script can avoid
+# using the 'imports' fixer and therefore start much faster...
+if is_py3k:
+    import winreg as _winreg
+else:
+    import _winreg
 
 # The rest of our imports.
 from distutils.core import setup, Extension, Command
@@ -408,15 +413,19 @@ class WinExt (Extension):
                 self.extra_compile_args.append("/DUNICODE")
                 self.extra_compile_args.append("/D_UNICODE")
                 self.extra_compile_args.append("/DWINNT")
+                # Unicode, Windows executables seem to need this magic:
+                if "/SUBSYSTEM:WINDOWS" in self.extra_link_args:
+                    self.extra_link_args.append("/ENTRY:wWinMainCRTStartup")
 
 class WinExt_pythonwin(WinExt):
     def __init__ (self, name, **kw):
         if "dsp_file" not in kw and not kw.get("sources"):
             kw["dsp_file"] = "pythonwin/" + name + ".dsp"
         if 'unicode_mode' not in kw:
-            kw['unicode_mode']=False
+            kw['unicode_mode']=None
         kw.setdefault("extra_compile_args", []).extend(
                             ['-D_AFXDLL', '-D_AFXEXT','-D_MBCS'])
+
         WinExt.__init__(self, name, **kw)
     def get_pywin32_dir(self):
         return "pythonwin"
@@ -498,20 +507,18 @@ class WinExt_system32(WinExt):
 # Start with 2to3 related stuff for py3k.
 do_2to3 = False and is_py3k # XXX - py3k branch - syntax is already py3k!
 if do_2to3:
-    # hack into the import fixer to remove the Tk fixers - they cause trouble
-    # for some of our things with the same name.
-    from lib2to3.fixes import fix_imports
-    # 'Dialog' fixer causes pywin/mfc/dialog.py's DlgSimpleImport to subclass
-    # a Tk dialog instead of a pywin one!
-    del fix_imports.MAPPING["Dialog"]
     def refactor_filenames(filenames):
-        from lib2to3.refactor import RefactoringTool, get_fixers_from_package
-        fixers = get_fixers_from_package('lib2to3.fixes')
+        from lib2to3.refactor import RefactoringTool
+        # we only need some fixers.
+        fixers = """basestring exec except dict import imports next nonzero
+                    print raw_input long standarderror types unicode urllib
+                    xrange""".split()
+        fqfixers = ['lib2to3.fixes.fix_' + f for f in fixers]
 
         options = dict(doctests_only=False, fix=[], list_fixes=[], 
                        print_function=False, verbose=False,
                        write=True)
-        r = RefactoringTool(fixers, options)
+        r = RefactoringTool(fqfixers, options)
         for updated_file in filenames:
             if os.path.splitext(updated_file)[1] not in ['.py', '.pys']:
                 continue
@@ -1224,7 +1231,7 @@ class my_install(install):
         # some other directory than Python itself (eg, into a temp directory
         # for bdist_wininst to use) - in which case we must *not* run our
         # installer
-        if not self.dry_run and not self.skip_build and not self.root:
+        if not self.dry_run and not self.root:
             # We must run the script we just installed into Scripts, as it
             # may have had 2to3 run over it.
             filename = os.path.join(sys.prefix, "Scripts", "pywin32_postinstall.py")
@@ -1312,8 +1319,6 @@ class my_compiler(base_compiler):
                 ok = True
             except ImportError:
                 ok = False
-            # XXX - verstamp still broken on py3k
-            ok = False
             if ok:
                 stamp_script = os.path.join(sys.prefix, "Lib", "site-packages",
                                             "win32", "lib", "win32verstamp.py")
@@ -1322,6 +1327,7 @@ class my_compiler(base_compiler):
                 args = [sys.executable]
                 args.append(stamp_script)
                 args.append("--version=%s" % (pywin32_version,))
+                args.append("--description=Python extension module")
                 args.append("--comments=http://pywin32.sourceforge.net")
                 args.append("--original-filename=%s" % (os.path.basename(output_filename),))
                 args.append("--product=PyWin32")
@@ -1714,7 +1720,9 @@ pythonwin_extensions = [
                      depends=["Pythonwin/stdafx.h", "Pythonwin/win32uiExt.h"]),
     WinExt_pythonwin("win32uiole", pch_header="stdafxole.h",
                      windows_h_version = 0x500),
-    WinExt_pythonwin("dde", pch_header="stdafxdde.h", platforms=['win32']),
+    WinExt_pythonwin("dde", pch_header="stdafxdde.h",
+                     depends=["win32/src/stddde.h", "pythonwin/ddemodule.h"],
+                     platforms=['win32']),
     ]
 # win32ui is large, so we reserve more bytes than normal
 dll_base_address += 0x100000

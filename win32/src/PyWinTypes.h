@@ -20,7 +20,7 @@
 #include "Python.h"
 #include "windows.h"
 
-
+// Helpers for our types.
 #if (PY_VERSION_HEX < 0x03000000)
 #define PYWIN_OBJECT_HEAD PyObject_HEAD_INIT(&PyType_Type) 0,
 #define PYWIN_ATTR_CONVERT PyString_AsString
@@ -295,7 +295,6 @@ inline PyObject *PyWinObject_FromTCHAR(const char *str, Py_ssize_t len=(Py_ssize
     return PyUnicodeObject_FromString(str, len);
 #endif
 }
-#define PyString_FromTCHAR PyString_FromString
 #endif
 
 // String support for buffers allocated via CoTaskMemAlloc and CoTaskMemFree

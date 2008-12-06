@@ -115,9 +115,9 @@ zone data.
 >>> caps = GetTZCapabilities()
 >>> isinstance(caps, dict)
 True
->>> caps.has_key('MissingTZPatch')
+>>> 'MissingTZPatch' in caps
 True
->>> caps.has_key('DynamicTZSupport')
+>>> 'DynamicTZSupport' in caps
 True
 """
 from __future__ import generators
@@ -378,7 +378,7 @@ class TimeZoneInfo(datetime.tzinfo):
 	get_sorted_time_zone_names = staticmethod(get_sorted_time_zone_names)
 
 	def get_all_time_zones():
-		return map(TimeZoneInfo, TimeZoneInfo._get_time_zone_key_names())
+		return [TimeZoneInfo(n) for n in TimeZoneInfo._get_time_zone_key_names()]
 	get_all_time_zones = staticmethod(get_all_time_zones)
 
 	def get_sorted_time_zones(key=None):
@@ -413,7 +413,7 @@ def _RegEnumerator(key, func):
 def _RegKeyDict(key):
 	values = _RegValueEnumerator(key)
 	values = tuple(values)
-	return dict(map(lambda (name,value,type): (name,value), values))
+	return dict([(name, value) for name,value,type in values])
 
 # for backward compatibility
 def deprecated(func, name='Unknown'):
@@ -500,7 +500,8 @@ DLLCache = DLLHandleCache()
 def resolveMUITimeZone(spec):
 	"""Resolve a multilingual user interface resource for the time zone name
 	>>> result = resolveMUITimeZone('@tzres.dll,-110')
-	>>> expectedResultType = [type(None),unicode][sys.getwindowsversion() >= (6,)]
+	>>> str_type = type(''.encode('ascii').decode('ascii')) # 2to3 doesn't do docstrings yet!
+	>>> expectedResultType = [type(None),str_type][sys.getwindowsversion() >= (6,)]
 	>>> type(result) is expectedResultType
 	True
 	

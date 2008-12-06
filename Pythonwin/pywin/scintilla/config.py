@@ -58,7 +58,9 @@ def find_config_file(f):
     return os.path.join(pywin.__path__[0], f + ".cfg")
 
 def find_config_files():
-    return [os.path.split(x)[1] for x in [os.path.splitext(x)[0] for x in glob.glob(os.path.join(pywin.__path__[0], "*.cfg"))]]
+    return [os.path.split(x)[1]
+            for x in [os.path.splitext(x)[0] for x in glob.glob(os.path.join(pywin.__path__[0], "*.cfg"))]
+            ]
 
 class ConfigManager:
     def __init__(self, f):
@@ -280,10 +282,10 @@ class ConfigManager:
             c = compile("".join(lines), self.filename, "exec")
             self._save_data("extension code", c)
         except SyntaxError as details:
-            msg = details[0]
-            errlineno = details[1][1] + start_lineno
+            errlineno = details.lineno + start_lineno
             # Should handle syntax errors better here, and offset the lineno.
-            self.report_error("Compiling extension code failed: Line %d: %s" % (errlineno, msg))
+            self.report_error("Compiling extension code failed:\r\nFile: %s\r\nLine %d\r\n%s" \
+                              % (details.filename, errlineno, details.msg))
         return line, lineno
 
     def _load_idle_extensions(self, sub_section, fp, lineno):
