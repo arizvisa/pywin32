@@ -1,6 +1,4 @@
-""" Unit tests for adodbapi version 2.2.3"""
-from __future__ import print_function
-from __future__ import unicode_literals
+""" Unit tests for adodbapi version 2.2.4"""
 """
     adodbapi - A python DB API 2.0 interface to Microsoft ADO
     
@@ -33,7 +31,7 @@ try:
 except ImportError:
     win32 = False
 
-import adodbapitestconfig #will find (parent?) adodbpai
+from import adodbapitestconfig #will find (parent?) adodbpai
 import adodbapi
 
 #adodbapi.adodbapi.verbose = 3
@@ -54,7 +52,7 @@ class CommonDBTests(unittest.TestCase):
         return self.engine
     
     def getConnection(self):
-        raise NotImplementedError("This method must be overriden by a subclass")
+        raise NotImplementedError("This method must be overriden by a subclass")  
 
     def getCursor(self):
         return self.getConnection().cursor()
@@ -180,15 +178,15 @@ class CommonDBTests(unittest.TestCase):
         assert descTuple[0] == 'fldData'
 
         if DBAPIDataTypeString=='STRING':
-            assert descTuple[1] == adodbapi.STRING, 'was "%s"'%descTuple[1]
+            assert descTuple[1] == adodbapi.STRING, 'was "%s" expected "%s"'%(descTuple[1],adodbapi.STRING.values)
         elif DBAPIDataTypeString == 'NUMBER':
-            assert descTuple[1] == adodbapi.NUMBER, 'was "%s"'%descTuple[1]
+            assert descTuple[1] == adodbapi.NUMBER, 'was "%s" expected "%s"'%(descTuple[1],adodbapi.NUMBER.values)
         elif DBAPIDataTypeString == 'BINARY':
-            assert descTuple[1] == adodbapi.BINARY, 'was "%s"'%descTuple[1]
+            assert descTuple[1] == adodbapi.BINARY, 'was "%s" expected "%s"'%(descTuple[1],adodbapi.BINARY.values)
         elif DBAPIDataTypeString == 'DATETIME':
-            assert descTuple[1] == adodbapi.DATETIME, 'was "%s"'%descTuple[1]
+            assert descTuple[1] == adodbapi.DATETIME, 'was "%s" expected "%s"'%(descTuple[1],adodbapi.DATETIME.values)
         elif DBAPIDataTypeString == 'ROWID':
-            assert descTuple[1] == adodbapi.ROWID, 'was "%s"'%descTuple[1]
+            assert descTuple[1] == adodbapi.ROWID, 'was "%s" expected "%s"'%(descTuple[1],adodbapi.ROWID.values)
         else:
             raise NotImplementedError("DBAPIDataTypeString not provided")
 
@@ -253,7 +251,7 @@ class CommonDBTests(unittest.TestCase):
 
     def testDataTypeChar(self):
         for sqlDataType in ("char(6)","nchar(6)"):
-            self.helpTestDataType(sqlDataType,'STRING','spam  ',allowedReturnValues=['spam','spam  '])
+            self.helpTestDataType(sqlDataType,'STRING','spam  ',allowedReturnValues=['spam','spam','spam  ','spam  '])
 
     def testDataTypeVarChar(self):
         stringKinds = ["varchar(10)","nvarchar(10)","text","ntext"]
@@ -275,10 +273,9 @@ class CommonDBTests(unittest.TestCase):
         if self.getEngine() == 'MySQL':
             pass #self.helpTestDataType("BLOB",'BINARY',adodbapi.Binary('\x00\x01\xE2\x40'))
         else:
-            ## Py3k no longer has the buffer interface for unicode objects
-            self.helpTestDataType("binary(4)",'BINARY',adodbapi.Binary(b'\x00\x01\xE2\x40'))
-            self.helpTestDataType("varbinary(100)",'BINARY',adodbapi.Binary(b'\x00\x01\xE2\x40'))
-            self.helpTestDataType("image",'BINARY',adodbapi.Binary(b'\x00\x01\xE2\x40'))
+            self.helpTestDataType("binary(4)",'BINARY',adodbapi.Binary('\x00\x01\xE2\x40'))
+            self.helpTestDataType("varbinary(100)",'BINARY',adodbapi.Binary('\x00\x01\xE2\x40'))
+            self.helpTestDataType("image",'BINARY',adodbapi.Binary('\x00\x01\xE2\x40'))
 
     def helpRollbackTblTemp(self):
         try:

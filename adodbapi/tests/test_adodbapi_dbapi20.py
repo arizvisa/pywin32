@@ -1,14 +1,11 @@
-from __future__ import print_function
-from __future__ import unicode_literals
 print("This module depends on the dbapi20 compliance tests created by Stuart Bishop")
 print("(see db-sig mailing list history for info)")
 
-import dbapi20
+from . import dbapi20
 print("Tested with dbapi20 %s" % dbapi20.__version__)
 import unittest
-import popen2
 
-import adodbapitestconfig
+from . import adodbapitestconfig
 import adodbapi
 
 import string
