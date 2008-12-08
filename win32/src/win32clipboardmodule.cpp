@@ -1181,59 +1181,22 @@ static int AddConstants(PyObject *module)
 	return 0;
 }
 
-
-extern "C" __declspec(dllexport)
-#if (PY_VERSION_HEX < 0x03000000)
-void initwin32clipboard(void)
+PYWIN_MODULE_INIT_FUNC(win32clipboard)
 {
-	PyObject *dict, *module;
-	PyWinGlobals_Ensure();
-	module = Py_InitModule("win32clipboard", clipboard_functions);
-	if (!module) /* Eeek - some serious error! */
-		return;
-	dict = PyModule_GetDict(module);
-	if (!dict) return; /* Another serious error!*/
+	PYWIN_MODULE_INIT_PREPARE(win32clipboard, clipboard_functions,
+				  "A module which supports the Windows Clipboard API.");
 
-	AddConstants(module);
-	PyDict_SetItemString(dict, "error", PyWinExc_ApiError);
-	PyDict_SetItemString(dict,"UNICODE",
-#ifdef UNICODE
-			Py_True
-#else
-			Py_False
-#endif
-	);
-}
-
-#else
-PyObject *PyInit_win32clipboard(void)
-{
-	PyObject *dict, *module;
-	PyWinGlobals_Ensure();
-	static PyModuleDef win32clipboard_def = {
-		PyModuleDef_HEAD_INIT,
-		"win32clipboard",
-		"A module which supports the Windows Clipboard API.",
-		-1,
-		clipboard_functions
-		};
-	module = PyModule_Create(&win32clipboard_def);
-	if (!module)
-		return NULL;
-	dict = PyModule_GetDict(module);
-	if (!dict)
-		return NULL;
 	if (AddConstants(module) != 0)
-		return NULL;
+		PYWIN_MODULE_INIT_RETURN_ERROR;
 	if (PyDict_SetItemString(dict, "error", PyWinExc_ApiError)==-1)
-		return NULL;
-	PyDict_SetItemString(dict,"UNICODE",
+		PYWIN_MODULE_INIT_RETURN_ERROR;
+	if (PyDict_SetItemString(dict,"UNICODE",
 #ifdef UNICODE
 			Py_True
 #else
 			Py_False
 #endif
-	);
-	return module;
+	)==-1)
+		PYWIN_MODULE_INIT_RETURN_ERROR;
+	PYWIN_MODULE_INIT_RETURN_SUCCESS;
 }
-#endif

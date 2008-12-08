@@ -653,47 +653,15 @@ static struct PyMethodDef mmapfile_functions[] = {
 	{NULL,			NULL}		 // Sentinel
 };
 
-
-extern "C" __declspec(dllexport)
-#if (PY_VERSION_HEX < 0x03000000)
-void initmmapfile(void)
+PYWIN_MODULE_INIT_FUNC(mmapfile)
 {
-	PyObject *dict, *module;
-	PyWinGlobals_Ensure();
-	module = Py_InitModule ("mmapfile", mmapfile_functions);
-	if (!module) /* Eeek - some serious error! */
-		return;
-	dict = PyModule_GetDict (module);
-	if (!dict) return; /* Another serious error!*/
+	PYWIN_MODULE_INIT_PREPARE(mmapfile, mmapfile_functions,
+				  "Compiled extension module that provides access to the memory mapped file API");
 
-	Py_INCREF(PyWinExc_ApiError);
-	PyDict_SetItemString(dict, "error", PyWinExc_ApiError);
-}
-
-#else
-PyObject *PyInit_mmapfile(void)
-{
-
-	PyObject *dict, *module;
-	PyWinGlobals_Ensure();
-
-	static PyModuleDef mmapfile_def = {
-		PyModuleDef_HEAD_INIT,
-		"mmapfile",
-		"Compiled extension module that provides access to the memory mapped file API",
-		-1,
-		mmapfile_functions
-		};
-	module = PyModule_Create(&mmapfile_def);
-	if (!module)
-		return NULL;
-	dict = PyModule_GetDict(module);
-	if (!dict)
-		return NULL;
 	if (PyDict_SetItemString(dict, "error", PyWinExc_ApiError) == -1)
-		return NULL;
+		PYWIN_MODULE_INIT_RETURN_ERROR;
 	if (PyType_Ready(&mmapfile_object_type) == -1)
-		return NULL;
-	return module;
+		PYWIN_MODULE_INIT_RETURN_ERROR;
+
+	PYWIN_MODULE_INIT_RETURN_SUCCESS;
 }
-#endif

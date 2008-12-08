@@ -1034,38 +1034,10 @@ static struct PyMethodDef win32cred_functions[] = {
 };
 
 
-extern "C" __declspec(dllexport)
-#if (PY_VERSION_HEX < 0x03000000)
-void initwin32cred(void)
-#else
-PyObject *PyInit_win32cred(void)
-#endif
+PYWIN_MODULE_INIT_FUNC(win32cred)
 {
-	PyObject *dict, *module;
-	PyWinGlobals_Ensure();
-
-#if (PY_VERSION_HEX < 0x03000000)
-	module = Py_InitModule("win32cred", win32cred_functions);
-	if (!module)
-		return;
-	dict = PyModule_GetDict(module);
-	if (!dict)
-		return;
-#else
-	static PyModuleDef win32cred_def = {
-		PyModuleDef_HEAD_INIT,
-		"win32cred",
-		"Interface to credentials management functions.",
-		-1,
-		win32cred_functions
-		};
-	module = PyModule_Create(&win32cred_def);
-	if (!module)
-		return NULL;
-	dict = PyModule_GetDict(module);
-	if (!dict)
-		return NULL;
-#endif
+	PYWIN_MODULE_INIT_PREPARE(win32cred, win32cred_functions,
+				  "Interface to credentials management functions.");
 
 	// CRED_MARSHAL_TYPE used with CredMarshalCredential and CredUnmarshalCredential
 	PyModule_AddIntConstant(module, "CertCredential", CertCredential);
@@ -1133,7 +1105,5 @@ PyObject *PyInit_win32cred(void)
 	PyModule_AddIntConstant(module, "CREDUI_MAX_USERNAME_LENGTH", CREDUI_MAX_USERNAME_LENGTH);
 	PyModule_AddIntConstant(module, "CREDUI_MAX_PASSWORD_LENGTH", CREDUI_MAX_PASSWORD_LENGTH);
 
-#if (PY_VERSION_HEX >= 0x03000000)
-	return module;
-#endif
+	PYWIN_MODULE_INIT_RETURN_SUCCESS;
 }

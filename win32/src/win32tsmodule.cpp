@@ -688,38 +688,10 @@ static struct PyMethodDef win32ts_functions[] = {
 };
 
 
-extern "C" __declspec(dllexport)
-#if (PY_VERSION_HEX < 0x03000000)
-void initwin32ts(void)
-#else
-PyObject *PyInit_win32ts(void)
-#endif
+PYWIN_MODULE_INIT_FUNC(win32ts)
 {
-	PyObject *dict, *module;
-	PyWinGlobals_Ensure();
-
-#if (PY_VERSION_HEX < 0x03000000)
-	module = Py_InitModule("win32ts", win32ts_functions);
-	if (!module)
-		return;
-	dict = PyModule_GetDict(module);
-	if (!dict)
-		return;
-#else
-	static PyModuleDef win32ts_def = {
-		PyModuleDef_HEAD_INIT,
-		"win32ts",
-		"Interface to the Terminal Services Api.",
-		-1,
-		win32ts_functions
-		};
-	module = PyModule_Create(&win32ts_def);
-	if (!module)
-		return NULL;
-	dict = PyModule_GetDict(module);
-	if (!dict)
-		return NULL;
-#endif
+	PYWIN_MODULE_INIT_PREPARE(win32ts, win32ts_functions,
+	                          "Interface to the Terminal Services Api.");
 
 	// WTS_CONNECTSTATE_CLASS
 	PyModule_AddIntConstant(module, "WTSActive", WTSActive);
@@ -829,7 +801,5 @@ PyObject *PyInit_win32ts(void)
 		pfnWTSGetActiveConsoleSessionId=(WTSGetActiveConsoleSessionIdfunc)GetProcAddress(h, "WTSGetActiveConsoleSessionId");
 	}
 
-#if (PY_VERSION_HEX >= 0x03000000)
-	return module;
-#endif
+	PYWIN_MODULE_INIT_RETURN_SUCCESS;
 }

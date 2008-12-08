@@ -990,66 +990,33 @@ void PyWin_ReleaseGlobalLock(void)
 }
 
 
-#define ADD_CONSTANT(tok) if (PyModule_AddIntConstant(module, #tok, tok) == -1) RETURN_ERROR;
+#define ADD_CONSTANT(tok) if (PyModule_AddIntConstant(module, #tok, tok) == -1) PYWIN_MODULE_INIT_RETURN_ERROR;
 
 #define ADD_TYPE(type_name)	\
 	if (PyType_Ready(&Py##type_name)==-1		\
 		|| PyDict_SetItemString(dict, #type_name, (PyObject *)&Py##type_name) == -1)	\
-		RETURN_ERROR;
+		PYWIN_MODULE_INIT_RETURN_ERROR;
 
-extern "C" __declspec(dllexport)
-#if (PY_VERSION_HEX < 0x03000000)
-void initpywintypes(void)
-#else
-PyObject *PyInit_pywintypes(void)
-#endif
+PYWIN_MODULE_INIT_FUNC(pywintypes)
 {
-	// ensure the framework has a valid thread state to work with.
-	PyWinGlobals_Ensure();
-	// Note we assume the Python global lock has been acquired for us already.
-	PyObject *dict, *module;
-
-#if (PY_VERSION_HEX < 0x03000000)
-#define RETURN_ERROR return;
-	module = Py_InitModule("pywintypes", pywintypes_functions);
-	if (!module) /* Eeek - some serious error! */
-		return;
-	dict = PyModule_GetDict(module);
-	if (!dict)
-		return; /* Another serious error!*/
-
-#else
-#define RETURN_ERROR return NULL;
-	static PyModuleDef pywintypes_def = {
-		PyModuleDef_HEAD_INIT,
-		"pywintypes",
-		"Module containing common objects and functions used by various Pywin32 modules",
-		-1,
-		pywintypes_functions
-		};
-	module = PyModule_Create(&pywintypes_def);
-	if (!module)
-		return NULL;
-	dict = PyModule_GetDict(module);
-	if (!dict)
-		return NULL;
-#endif
+	PYWIN_MODULE_INIT_PREPARE(pywintypes, pywintypes_functions,
+				  "Module containing common objects and functions used by various Pywin32 modules");
 
 	if (PyWinExc_ApiError == NULL || PyWinExc_COMError == NULL) {
 		PyErr_SetString(PyExc_MemoryError, "Could not initialise the error objects");
-		RETURN_ERROR;
+		PYWIN_MODULE_INIT_RETURN_ERROR;
 		}
 
 	if (PyDict_SetItemString(dict, "error", PyWinExc_ApiError) == -1
 		|| PyDict_SetItemString(dict, "com_error", PyWinExc_COMError) == -1
 		|| PyDict_SetItemString(dict, "TRUE", Py_True) == -1
 		|| PyDict_SetItemString(dict, "FALSE", Py_False) == -1)
-		RETURN_ERROR;
+		PYWIN_MODULE_INIT_RETURN_ERROR;
 	ADD_CONSTANT(WAVE_FORMAT_PCM);
 
   // Add a few types.
 	if (PyDict_SetItemString(dict, "UnicodeType", (PyObject *)&PyUnicode_Type) == -1)
-		RETURN_ERROR;
+		PYWIN_MODULE_INIT_RETURN_ERROR;
 
 #ifndef NO_PYWINTYPES_TIME
 	ADD_TYPE(TimeType);
@@ -1069,9 +1036,7 @@ PyObject *PyInit_pywintypes(void)
 	ADD_TYPE(DEVMODEWType);
 	ADD_TYPE(WAVEFORMATEXType);
 
-#if (PY_VERSION_HEX >= 0x03000000)
-  return module;
-#endif
+	PYWIN_MODULE_INIT_RETURN_SUCCESS;
 }
 
 #ifndef MS_WINCE

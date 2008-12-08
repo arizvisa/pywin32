@@ -204,46 +204,15 @@ static int AddConstants(PyObject *module)
 	return 0;
 }
 
-extern "C" __declspec(dllexport)
-#if (PY_VERSION_HEX < 0x03000000)
-void initwin2kras(void)
-#else
-PyObject *PyInit_win2kras(void)
-#endif
+PYWIN_MODULE_INIT_FUNC(win2kras)
 {
-	PyWinGlobals_Ensure();
-	PyObject *dict, *module;
-
-#if (PY_VERSION_HEX < 0x03000000)
-#define RETURN_ERROR return;
-	module = Py_InitModule("win2kras", win2kras_functions);
-	if (!module)
-		return;
-	dict = PyModule_GetDict(module);
-	if (!dict)
-		return;
-#else
-
-#define RETURN_ERROR return NULL;
-	static PyModuleDef win2kras_def = {
-		PyModuleDef_HEAD_INIT,
-		"win2kras",
-		"A module encapsulating the Windows 2000 extensions to the Remote Access Service (RAS) API.",
-		-1,
-		win2kras_functions
-		};
-	module = PyModule_Create(&win2kras_def);
-	if (!module)
-		return NULL;
-	dict = PyModule_GetDict(module);
-	if (!dict)
-		return NULL;
-#endif
+	PYWIN_MODULE_INIT_PREPARE(win2kras, win2kras_functions,
+				  "A module encapsulating the Windows 2000 extensions to the Remote Access Service (RAS) API.");
 
 	if (PyType_Ready(&PyRASEAPUSERIDENTITY::type) == -1)
-		RETURN_ERROR;
+		PYWIN_MODULE_INIT_RETURN_ERROR;
 	if (AddConstants(module) != 0)
-		RETURN_ERROR;
+		PYWIN_MODULE_INIT_RETURN_ERROR;
 
 #ifdef _DEBUG
 	const TCHAR *modName = _T("win32ras_d.pyd");
@@ -260,16 +229,14 @@ PyObject *PyInit_win2kras(void)
 	}
 	if (hmod==NULL) {
 		PyErr_SetString(PyExc_RuntimeError, "You must import 'win32ras' before importing this module");
-		RETURN_ERROR;
+		PYWIN_MODULE_INIT_RETURN_ERROR;
 	}
 	FARPROC fp = GetProcAddress(hmod, "ReturnRasError");
 	if (fp==NULL) {
 		PyErr_SetString(PyExc_RuntimeError, "Could not locate 'ReturnRasError' in 'win32ras'");
-		RETURN_ERROR;
+		PYWIN_MODULE_INIT_RETURN_ERROR;
 	}
 	pfnReturnRasError = (PFNReturnRasError)fp;
 
-#if (PY_VERSION_HEX >= 0x03000000)
-	return module;
-#endif
+	PYWIN_MODULE_INIT_RETURN_SUCCESS;
 }

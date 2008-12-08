@@ -14,7 +14,6 @@ generates Windows .hlp files.
 #include "Pywintypes.h"
 #include "lzexpand.h"
 
-static PyObject *module_error;
 static PyObject *obHandleMap = NULL;
 
 /* error helper */
@@ -22,7 +21,7 @@ void SetError(char *msg, char *fnName = NULL, DWORD code = 0)
 {
 	PyObject *v = Py_BuildValue("(izs)", 0, fnName, msg);
 	if (v != NULL) {
-		PyErr_SetObject(module_error, v);
+		PyErr_SetObject(PyWinExc_ApiError, v);
 		Py_DECREF(v);
 	}
 }
@@ -62,7 +61,7 @@ PyObject *ReturnLZError(char *fnName, long err = 0)
 	}
 	PyObject *v = Py_BuildValue("(iss)", err, fnName, pMsg);
 	if (v != NULL) {
-		PyErr_SetObject(module_error, v);
+		PyErr_SetObject(PyWinExc_ApiError, v);
 		Py_DECREF(v);
 	}
 	return NULL;
@@ -169,45 +168,12 @@ static struct PyMethodDef win32lz_functions[] = {
 	{NULL,			NULL}
 };
 
-
-extern "C" __declspec(dllexport)
-#if (PY_VERSION_HEX < 0x03000000)
-void initwin32lz(void)
-#else
-PyObject *PyInit_win32lz(void)
-#endif
+PYWIN_MODULE_INIT_FUNC(win32lz)
 {
-	PyObject *dict, *module;
-	PyWinGlobals_Ensure();
+	PYWIN_MODULE_INIT_PREPARE(win32lz, win32lz_functions,
+		"A module encapsulating the Windows LZ compression routines.");
 
-#if (PY_VERSION_HEX < 0x03000000)
-	module = Py_InitModule("win32lz", win32lz_functions);
-	if (!module)
-		return;
-	dict = PyModule_GetDict(module);
-	if (!dict)
-		return;
-#else
+	PyDict_SetItemString(dict, "error", PyWinExc_ApiError);
 
-	static PyModuleDef win32lz_def = {
-		PyModuleDef_HEAD_INIT,
-		"win32lz",
-		"A module encapsulating the Windows LZ compression routines.",
-		-1,
-		win32lz_functions
-		};
-	module = PyModule_Create(&win32lz_def);
-	if (!module)
-		return NULL;
-	dict = PyModule_GetDict(module);
-	if (!dict)
-		return NULL;
-#endif
-
-	module_error = PyString_FromString("win32lz error");
-	PyDict_SetItemString(dict, "error", module_error);
-
-#if (PY_VERSION_HEX >= 0x03000000)
-	return module;
-#endif
+	PYWIN_MODULE_INIT_RETURN_SUCCESS;
 }

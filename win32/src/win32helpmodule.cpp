@@ -3220,37 +3220,12 @@ static struct PyMethodDef win32help_functions[] = {
 
 // Module initialization:
 
-extern "C" __declspec(dllexport)
-#if (PY_VERSION_HEX < 0x03000000)
-void initwin32help(void)
-#else
-PyObject *PyInit_win32help(void)
-#endif
+PYWIN_MODULE_INIT_FUNC(win32help)
 {
-	PyObject *dict, *module;
-	PyWinGlobals_Ensure();
-
-#if (PY_VERSION_HEX < 0x03000000)
-#define RETURN_ERROR return;
-	module = Py_InitModule("win32help", win32help_functions);
-#else
-#define RETURN_ERROR return NULL;
-	static PyModuleDef win32help_def = {
-		PyModuleDef_HEAD_INIT,
-		"win32help",
-		"A module, encapsulating the Win32 help API's.",
-		-1,
-		win32help_functions
-		};
-	module = PyModule_Create(&win32help_def);
-#endif
-	if (!module)
-		RETURN_ERROR;
-	dict = PyModule_GetDict(module);
-	if (!dict)
-		RETURN_ERROR;
+	PYWIN_MODULE_INIT_PREPARE(win32help, win32help_functions,
+				  "A module, encapsulating the Win32 help API's.");
 	if (AddConstants(module) != 0)
-		RETURN_ERROR;
+		PYWIN_MODULE_INIT_RETURN_ERROR;
 	PyDict_SetItemString(dict, "__version__",
                        PyString_FromString("$Revision$"));
 
@@ -3261,10 +3236,7 @@ PyObject *PyInit_win32help(void)
 		||PyType_Ready(&PyNMHDRType) == -1
 		||PyType_Ready(&PyHHN_NOTIFYType) == -1
 		||PyType_Ready(&PyHHNTRACKType) == -1)
-		RETURN_ERROR;
+		PYWIN_MODULE_INIT_RETURN_ERROR;
 
-#if (PY_VERSION_HEX >= 0x03000000)
-	return module;
-#endif
+	PYWIN_MODULE_INIT_RETURN_SUCCESS;
 }
-

@@ -825,7 +825,7 @@ static struct PyMethodDef win32ras_functions[] = {
 
 static int AddConstants(PyObject *module)
 {
-	int rc;
+    int rc;
     ADD_CONSTANT(RASCS_OpenPort); // @const win32ras|RASCS_OpenPort|Constant for RAS state.
     ADD_CONSTANT(RASCS_PortOpened); // @const win32ras|RASCS_PortOpened|Constant for RAS state.
     ADD_CONSTANT(RASCS_ConnectDevice); // @const win32ras|RASCS_ConnectDevice|Constant for RAS state.
@@ -857,50 +857,18 @@ static int AddConstants(PyObject *module)
     return 0;
 }
 
-extern "C" __declspec(dllexport)
-#if (PY_VERSION_HEX < 0x03000000)
-void initwin32ras(void)
-#else
-PyObject *PyInit_win32ras(void)
-#endif
+PYWIN_MODULE_INIT_FUNC(win32ras)
 {
-  PyWinGlobals_Ensure();
-  PyObject *dict, *module;
+	PYWIN_MODULE_INIT_PREPARE(win32ras, win32ras_functions,
+				  "A module encapsulating the Windows Remote Access Service (RAS) API.");
 
-#if (PY_VERSION_HEX < 0x03000000)
-#define RETURN_ERROR return;
-	module = Py_InitModule("win32ras", win32ras_functions);
-	if (!module)
-		return;
-	dict = PyModule_GetDict(module);
-	if (!dict)
-		return;
-#else
-
-#define RETURN_ERROR return NULL;
-	static PyModuleDef win32ras_def = {
-		PyModuleDef_HEAD_INIT,
-		"win32ras",
-		"A module encapsulating the Windows Remote Access Service (RAS) API.",
-		-1,
-		win32ras_functions
-		};
-	module = PyModule_Create(&win32ras_def);
-	if (!module)
-		return NULL;
-	dict = PyModule_GetDict(module);
-	if (!dict)
-		return NULL;
-#endif
 	module_error = PyWinExc_ApiError;
 	Py_INCREF(module_error);
 	PyDict_SetItemString(dict, "error", module_error);
 	if (PyType_Ready(&PyRASDIALEXTENSIONS::type) == -1)
-		RETURN_ERROR;
+		PYWIN_MODULE_INIT_RETURN_ERROR;
 	if (AddConstants(module) != 0)
-		RETURN_ERROR;
+		PYWIN_MODULE_INIT_RETURN_ERROR;
 
-#if (PY_VERSION_HEX >= 0x03000000)
-	return module;
-#endif
+	PYWIN_MODULE_INIT_RETURN_SUCCESS;
 }

@@ -2052,43 +2052,11 @@ static struct PyMethodDef win32console_functions[] = {
 };
 
 
-extern "C" __declspec(dllexport)
-#if (PY_VERSION_HEX < 0x03000000)
-void initwin32console(void)
-#else
-PyObject *PyInit_win32console(void)
-#endif
+PYWIN_MODULE_INIT_FUNC(win32console)
 {
-	PyObject *dict, *module;
-	PyWinGlobals_Ensure();
+	PYWIN_MODULE_INIT_PREPARE(win32console, win32console_functions,
+		"Interface to the Windows Console functions for dealing with character-mode applications.");
 
-#if (PY_VERSION_HEX < 0x03000000)
-#define RETURN_ERROR return;
-	module = Py_InitModule("win32console", win32console_functions);
-	if (!module)
-		return;
-	dict = PyModule_GetDict(module);
-	if (!dict)
-		return;
-#else
-
-#define RETURN_ERROR return NULL;
-	static PyModuleDef win32console_def = {
-		PyModuleDef_HEAD_INIT,
-		"win32console",
-		"Interface to the Windows Console functions for dealing with character-mode applications.",
-		-1,
-		win32console_functions
-		};
-	module = PyModule_Create(&win32console_def);
-	if (!module)
-		return NULL;
-	dict = PyModule_GetDict(module);
-	if (!dict)
-		return NULL;
-#endif
-
-	Py_INCREF(PyWinExc_ApiError);
 	PyDict_SetItemString(dict, "error", PyWinExc_ApiError);
 
 	// load function pointers
@@ -2116,24 +2084,24 @@ PyObject *PyInit_win32console(void)
 
 
 	if (PyType_Ready(&PyConsoleScreenBufferType)==-1)
-		RETURN_ERROR;
+		PYWIN_MODULE_INIT_RETURN_ERROR;
 	if (PyDict_SetItemString(dict, "PyConsoleScreenBufferType", (PyObject *)&PyConsoleScreenBufferType) == -1)
-		RETURN_ERROR;
+		PYWIN_MODULE_INIT_RETURN_ERROR;
 
 	if (PyType_Ready(&PySMALL_RECTType)==-1)
-		RETURN_ERROR;
+		PYWIN_MODULE_INIT_RETURN_ERROR;
 	if (PyDict_SetItemString(dict, "PySMALL_RECTType", (PyObject *)&PySMALL_RECTType) == -1)
-		RETURN_ERROR;
+		PYWIN_MODULE_INIT_RETURN_ERROR;
 
 	if (PyType_Ready(&PyCOORDType)==-1)
-		RETURN_ERROR;
+		PYWIN_MODULE_INIT_RETURN_ERROR;
 	if (PyDict_SetItemString(dict, "PyCOORDType", (PyObject *)&PyCOORDType) == -1)
-		RETURN_ERROR;
+		PYWIN_MODULE_INIT_RETURN_ERROR;
 
 	if (PyType_Ready(&PyINPUT_RECORDType)==-1)
-		RETURN_ERROR;
+		PYWIN_MODULE_INIT_RETURN_ERROR;
 	if (PyDict_SetItemString(dict, "PyINPUT_RECORDType", (PyObject *)&PyINPUT_RECORDType) == -1)
-		RETURN_ERROR;
+		PYWIN_MODULE_INIT_RETURN_ERROR;
 
 	PyModule_AddIntConstant(module, "CONSOLE_TEXTMODE_BUFFER", CONSOLE_TEXTMODE_BUFFER);
 	PyModule_AddIntConstant(module, "CONSOLE_FULLSCREEN", CONSOLE_FULLSCREEN);
@@ -2194,7 +2162,5 @@ PyObject *PyInit_win32console(void)
 	PyModule_AddIntConstant(module, "CONSOLE_FULLSCREEN_MODE", 1);
 	PyModule_AddIntConstant(module, "CONSOLE_WINDOWED_MODE", 2);
 
-#if (PY_VERSION_HEX >= 0x03000000)
-	return module;
-#endif
+	PYWIN_MODULE_INIT_RETURN_SUCCESS;
 }

@@ -603,45 +603,15 @@ static struct PyMethodDef win32trace_functions[] = {
     {NULL,			NULL}
 };
 
-extern "C" __declspec(dllexport)
-#if (PY_VERSION_HEX < 0x03000000)
-void initwin32trace(void)
-#else
-PyObject *PyInit_win32trace(void)
-#endif
+PYWIN_MODULE_INIT_FUNC(win32trace)
 {
-	PyObject *dict, *module;
-	PyWinGlobals_Ensure();
-
-#if (PY_VERSION_HEX < 0x03000000)
-	#define RETURN_ERROR return;
-	module = Py_InitModule("win32trace", win32trace_functions);
-	if (!module)
-		return;
-	dict = PyModule_GetDict(module);
-	if (!dict)
-		return;
-#else
-	#define RETURN_ERROR return NULL;
-	static PyModuleDef win32trace_def = {
-		PyModuleDef_HEAD_INIT,
-		"win32trace",
-		"Interface to the Windows Console functions for dealing with character-mode applications.",
-		-1,
-		win32trace_functions
-		};
-	module = PyModule_Create(&win32trace_def);
-	if (!module)
-		return NULL;
-	dict = PyModule_GetDict(module);
-	if (!dict)
-		return NULL;
-#endif
+	PYWIN_MODULE_INIT_PREPARE(win32trace, win32trace_functions,
+	                          "Interface to the Windows Console functions for dealing with character-mode applications.");
 
 	if (PyType_Ready(&PyTraceObjectType) == -1)
-		RETURN_ERROR;
+		PYWIN_MODULE_INIT_RETURN_ERROR;
 	if (PyDict_SetItemString(dict, "error", PyWinExc_ApiError) == -1)
-		RETURN_ERROR;
+		PYWIN_MODULE_INIT_RETURN_ERROR;
 
     // Allocate memory for the security descriptor.
 
@@ -696,21 +666,19 @@ PyObject *PyInit_win32trace(void)
     hMutex = CreateMutex(&sa, FALSE, FixupObjectName(MUTEX_OBJECT_NAME));
     if (hMutex==NULL) {
         PyWin_SetAPIError("CreateMutex");
-        RETURN_ERROR ;
+        PYWIN_MODULE_INIT_RETURN_ERROR;
     }
     assert (hEvent==NULL);
     hEvent = CreateEvent(&sa, FALSE, FALSE, FixupObjectName(EVENT_OBJECT_NAME));
     if (hEvent==NULL) {
         PyWin_SetAPIError("CreateEvent");
-        RETURN_ERROR;
+        PYWIN_MODULE_INIT_RETURN_ERROR;
     }
     assert (hEventEmpty==NULL);
     hEventEmpty = CreateEvent(&sa, FALSE, FALSE, FixupObjectName(EVENT_EMPTY_OBJECT_NAME));
     if (hEventEmpty==NULL) {
         PyWin_SetAPIError("CreateEvent");
-        RETURN_ERROR ;
+        PYWIN_MODULE_INIT_RETURN_ERROR;
     }
-#if (PY_VERSION_HEX >= 0x03000000)
-	return module;
-#endif
+    PYWIN_MODULE_INIT_RETURN_SUCCESS;
 }

@@ -6246,40 +6246,10 @@ static struct PyMethodDef win32api_functions[] = {
 	{NULL,			NULL}
 };
 
-extern "C" __declspec(dllexport)
-#if (PY_VERSION_HEX < 0x03000000)
-void initwin32api(void)
-#else
-PyObject *PyInit_win32api(void)
-#endif
+PYWIN_MODULE_INIT_FUNC(win32api)
 {
-	PyObject *dict, *module;
-	PyWinGlobals_Ensure();
-
-#if (PY_VERSION_HEX < 0x03000000)
-#define RETURN_ERROR return;
-	module = Py_InitModule("win32api", win32api_functions);
-	if (!module)
-		return;
-	dict = PyModule_GetDict(module);
-	if (!dict)
-		return;
-#else
-#define RETURN_ERROR return NULL;
-	static PyModuleDef win32api_def = {
-		PyModuleDef_HEAD_INIT,
-		"win32api",
-		"Wraps general API functions that are not subsumed in the more specific modules",
-		-1,
-		win32api_functions
-		};
-	module = PyModule_Create(&win32api_def);
-	if (!module)
-		return NULL;
-	dict = PyModule_GetDict(module);
-	if (!dict)
-		return NULL;
-#endif
+  PYWIN_MODULE_INIT_PREPARE(win32api, win32api_functions,
+                            "Wraps general API functions that are not subsumed in the more specific modules");
 
   PyDict_SetItemString(dict, "error", PyWinExc_ApiError);
   PyDict_SetItemString(dict,"STD_INPUT_HANDLE",
@@ -6291,8 +6261,7 @@ PyObject *PyInit_win32api(void)
 
   if (PyType_Ready(&PyDISPLAY_DEVICEType) == -1
 	  || PyDict_SetItemString(dict, "PyDISPLAY_DEVICEType", (PyObject *)&PyDISPLAY_DEVICEType) == -1)
-	  RETURN_ERROR;
-  
+	  PYWIN_MODULE_INIT_RETURN_ERROR;
 
   PyModule_AddIntConstant(module, "NameUnknown", NameUnknown);
   PyModule_AddIntConstant(module, "NameFullyQualifiedDN", NameFullyQualifiedDN);
@@ -6398,7 +6367,5 @@ PyObject *PyInit_win32api(void)
 	pfnRegOverridePredefKey=(RegOverridePredefKeyfunc)GetProcAddress(hmodule, "RegOverridePredefKey");
   }
 
-#if (PY_VERSION_HEX >= 0x03000000)
-  return module;
-#endif
-}  
+  PYWIN_MODULE_INIT_RETURN_SUCCESS;
+}
