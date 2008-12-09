@@ -76,17 +76,17 @@ class ShellExtension:
 
 def DllRegisterServer():
     import winreg
-    key = winreg.CreateKey(_winreg.HKEY_CLASSES_ROOT,
+    key = winreg.CreateKey(winreg.HKEY_CLASSES_ROOT,
                             "Python.File\\shellex")
     subkey = winreg.CreateKey(key, "ContextMenuHandlers")
     subkey2 = winreg.CreateKey(subkey, "PythonSample")
-    winreg.SetValueEx(subkey2, None, 0, _winreg.REG_SZ, ShellExtension._reg_clsid_)
+    winreg.SetValueEx(subkey2, None, 0, winreg.REG_SZ, ShellExtension._reg_clsid_)
     print(ShellExtension._reg_desc_, "registration complete.")
 
 def DllUnregisterServer():
     import winreg
     try:
-        key = winreg.DeleteKey(_winreg.HKEY_CLASSES_ROOT,
+        key = winreg.DeleteKey(winreg.HKEY_CLASSES_ROOT,
                                 "Python.File\\shellex\\ContextMenuHandlers\\PythonSample")
     except WindowsError as details:
         import errno

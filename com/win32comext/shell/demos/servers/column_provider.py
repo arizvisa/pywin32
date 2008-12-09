@@ -80,16 +80,16 @@ class ColumnProvider:
 def DllRegisterServer():
     import winreg
     # Special ColumnProvider key
-    key = winreg.CreateKey(_winreg.HKEY_CLASSES_ROOT,
+    key = winreg.CreateKey(winreg.HKEY_CLASSES_ROOT,
                         "Folder\\ShellEx\\ColumnHandlers\\" + \
                         str(ColumnProvider._reg_clsid_ ))
-    winreg.SetValueEx(key, None, 0, _winreg.REG_SZ, ColumnProvider._reg_desc_)
+    winreg.SetValueEx(key, None, 0, winreg.REG_SZ, ColumnProvider._reg_desc_)
     print(ColumnProvider._reg_desc_, "registration complete.")
 
 def DllUnregisterServer():
     import winreg
     try:
-        key = winreg.DeleteKey(_winreg.HKEY_CLASSES_ROOT,
+        key = winreg.DeleteKey(winreg.HKEY_CLASSES_ROOT,
                             "Folder\\ShellEx\\ColumnHandlers\\" + \
                             str(ColumnProvider._reg_clsid_) )
     except WindowsError as details:

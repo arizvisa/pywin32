@@ -812,26 +812,26 @@ class ScintillaShellView:
 
 def DllRegisterServer():
     import winreg
-    key = winreg.CreateKey(_winreg.HKEY_LOCAL_MACHINE,
+    key = winreg.CreateKey(winreg.HKEY_LOCAL_MACHINE,
                             "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\" \
                             "Explorer\\Desktop\\Namespace\\" + \
                             ShellFolderRoot._reg_clsid_)
-    winreg.SetValueEx(key, None, 0, _winreg.REG_SZ, ShellFolderRoot._reg_desc_)
+    winreg.SetValueEx(key, None, 0, winreg.REG_SZ, ShellFolderRoot._reg_desc_)
     # And special shell keys under our CLSID
-    key = winreg.CreateKey(_winreg.HKEY_CLASSES_ROOT,
+    key = winreg.CreateKey(winreg.HKEY_CLASSES_ROOT,
                         "CLSID\\" + ShellFolderRoot._reg_clsid_ + "\\ShellFolder")
     # 'Attributes' is an int stored as a binary! use struct
     attr = shellcon.SFGAO_FOLDER | shellcon.SFGAO_HASSUBFOLDER | \
            shellcon.SFGAO_BROWSABLE
     import struct
     s = struct.pack("i", attr)
-    winreg.SetValueEx(key, "Attributes", 0, _winreg.REG_BINARY, s)
+    winreg.SetValueEx(key, "Attributes", 0, winreg.REG_BINARY, s)
     print(ShellFolderRoot._reg_desc_, "registration complete.")
 
 def DllUnregisterServer():
     import winreg
     try:
-        key = winreg.DeleteKey(_winreg.HKEY_LOCAL_MACHINE,
+        key = winreg.DeleteKey(winreg.HKEY_LOCAL_MACHINE,
                             "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\" \
                             "Explorer\\Desktop\\Namespace\\" + \
                             ShellFolderRoot._reg_clsid_)

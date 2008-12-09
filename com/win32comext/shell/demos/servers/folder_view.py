@@ -681,24 +681,24 @@ def DllRegisterServer():
         print("This sample only works on Vista")
         sys.exit(1)
 
-    key = winreg.CreateKey(_winreg.HKEY_LOCAL_MACHINE,
+    key = winreg.CreateKey(winreg.HKEY_LOCAL_MACHINE,
                             "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\" \
                             "Explorer\\Desktop\\Namespace\\" + \
                             ShellFolder._reg_clsid_)
-    winreg.SetValueEx(key, None, 0, _winreg.REG_SZ, ShellFolder._reg_desc_)
+    winreg.SetValueEx(key, None, 0, winreg.REG_SZ, ShellFolder._reg_desc_)
     # And special shell keys under our CLSID
-    key = winreg.CreateKey(_winreg.HKEY_CLASSES_ROOT,
+    key = winreg.CreateKey(winreg.HKEY_CLASSES_ROOT,
                         "CLSID\\" + ShellFolder._reg_clsid_ + "\\ShellFolder")
     # 'Attributes' is an int stored as a binary! use struct
     attr = shellcon.SFGAO_FOLDER | shellcon.SFGAO_HASSUBFOLDER | \
            shellcon.SFGAO_BROWSABLE
     import struct
     s = struct.pack("i", attr)
-    winreg.SetValueEx(key, "Attributes", 0, _winreg.REG_BINARY, s)
+    winreg.SetValueEx(key, "Attributes", 0, winreg.REG_BINARY, s)
     # register the context menu handler under the FolderViewSampleType type.
     keypath = "%s\\shellex\\ContextMenuHandlers\\%s" % (ContextMenu._context_menu_type_, ContextMenu._reg_desc_)
-    key = winreg.CreateKey(_winreg.HKEY_CLASSES_ROOT, keypath)
-    winreg.SetValueEx(key, None, 0, _winreg.REG_SZ, ContextMenu._reg_clsid_)
+    key = winreg.CreateKey(winreg.HKEY_CLASSES_ROOT, keypath)
+    winreg.SetValueEx(key, None, 0, winreg.REG_SZ, ContextMenu._reg_clsid_)
     propsys.PSRegisterPropertySchema(get_schema_fname())
     print(ShellFolder._reg_desc_, "registration complete.")
 
@@ -710,7 +710,7 @@ def DllUnregisterServer():
     ]
     for path in paths:
         try:
-            winreg.DeleteKey(_winreg.HKEY_LOCAL_MACHINE, path)
+            winreg.DeleteKey(winreg.HKEY_LOCAL_MACHINE, path)
         except WindowsError as details:
             import errno
             if details.errno != errno.ENOENT:

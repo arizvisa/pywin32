@@ -283,8 +283,8 @@ def DllRegisterServer():
     # register toolbar with IE
     try:
         print("Trying to register Toolbar.\n")
-        hkey = winreg.CreateKey( _winreg.HKEY_LOCAL_MACHINE, "SOFTWARE\\Microsoft\\Internet Explorer\\Toolbar" )
-        subKey = winreg.SetValueEx( hkey, comclass._reg_clsid_, 0, _winreg.REG_BINARY, "\0" )
+        hkey = winreg.CreateKey( winreg.HKEY_LOCAL_MACHINE, "SOFTWARE\\Microsoft\\Internet Explorer\\Toolbar" )
+        subKey = winreg.SetValueEx( hkey, comclass._reg_clsid_, 0, winreg.REG_BINARY, "\0" )
     except WindowsError:
         print("Couldn't set registry value.\nhkey: %d\tCLSID: %s\n" % ( hkey, comclass._reg_clsid_ ))
     else:
@@ -298,7 +298,7 @@ def DllUnregisterServer():
     # unregister toolbar from internet explorer
     try:
         print("Trying to unregister Toolbar.\n")
-        hkey = winreg.CreateKey( _winreg.HKEY_LOCAL_MACHINE, "SOFTWARE\\Microsoft\\Internet Explorer\\Toolbar" )
+        hkey = winreg.CreateKey( winreg.HKEY_LOCAL_MACHINE, "SOFTWARE\\Microsoft\\Internet Explorer\\Toolbar" )
         winreg.DeleteValue( hkey, comclass._reg_clsid_ )
     except WindowsError:
         print("Couldn't delete registry value.\nhkey: %d\tCLSID: %s\n" % ( hkey, comclass._reg_clsid_ ))

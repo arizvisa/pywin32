@@ -91,17 +91,17 @@ class OutlookAddin:
 
 def RegisterAddin(klass):
     import winreg
-    key = winreg.CreateKey(_winreg.HKEY_CURRENT_USER, "Software\\Microsoft\\Office\\Outlook\\Addins")
+    key = winreg.CreateKey(winreg.HKEY_CURRENT_USER, "Software\\Microsoft\\Office\\Outlook\\Addins")
     subkey = winreg.CreateKey(key, klass._reg_progid_)
-    winreg.SetValueEx(subkey, "CommandLineSafe", 0, _winreg.REG_DWORD, 0)
-    winreg.SetValueEx(subkey, "LoadBehavior", 0, _winreg.REG_DWORD, 3)
-    winreg.SetValueEx(subkey, "Description", 0, _winreg.REG_SZ, klass._reg_progid_)
-    winreg.SetValueEx(subkey, "FriendlyName", 0, _winreg.REG_SZ, klass._reg_progid_)
+    winreg.SetValueEx(subkey, "CommandLineSafe", 0, winreg.REG_DWORD, 0)
+    winreg.SetValueEx(subkey, "LoadBehavior", 0, winreg.REG_DWORD, 3)
+    winreg.SetValueEx(subkey, "Description", 0, winreg.REG_SZ, klass._reg_progid_)
+    winreg.SetValueEx(subkey, "FriendlyName", 0, winreg.REG_SZ, klass._reg_progid_)
 
 def UnregisterAddin(klass):
     import winreg
     try:
-        winreg.DeleteKey(_winreg.HKEY_CURRENT_USER, "Software\\Microsoft\\Office\\Outlook\\Addins\\" + klass._reg_progid_)
+        winreg.DeleteKey(winreg.HKEY_CURRENT_USER, "Software\\Microsoft\\Office\\Outlook\\Addins\\" + klass._reg_progid_)
     except WindowsError:
         pass
 
