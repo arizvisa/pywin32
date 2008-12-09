@@ -187,49 +187,20 @@ int AddConstants(PyObject *module)
   return 0;
 }
 
-extern "C" __declspec(dllexport)
-#if (PY_VERSION_HEX < 0x03000000)
-void initwin32uiole(void)
-#else
-PyObject *PyInit_win32uiole(void)
-#endif
+PYWIN_MODULE_INIT_FUNC(win32uiole)
 {
-	PyObject *dict, *module;
-	PyWinGlobals_Ensure();
-
-#if (PY_VERSION_HEX < 0x03000000)
-#define RETURN_ERROR return;
-	module = Py_InitModule("win32uiole", win32uiole_functions);
-#else
-
-#define RETURN_ERROR return NULL;
-	static PyModuleDef win32uiole_def = {
-		PyModuleDef_HEAD_INIT,
-		"win32uiole",
-		"A module, encapsulating the Microsoft Foundation Classes OLE functionality.",
-		-1,
-		win32uiole_functions
-		};
-	module = PyModule_Create(&win32uiole_def);
-#endif;
-
-	if (!module)
-		RETURN_ERROR;
-	dict = PyModule_GetDict(module);
-	if (!dict)
-		RETURN_ERROR;
+	PYWIN_MODULE_INIT_PREPARE(win32uiole, win32uiole_functions,
+	                          "A module, encapsulating the Microsoft Foundation Classes OLE functionality.");
 
 	if (AddConstants(module))
-		RETURN_ERROR;
+		PYWIN_MODULE_INIT_RETURN_ERROR;
 
 	if (PyType_Ready(&PyCCommonDialog::type) == - 1 ||
 		PyType_Ready(&PyCOleDialog::type) == -1 ||
 		PyType_Ready(&PyCOleInsertDialog::type) == -1 ||
 		PyType_Ready(&PyCOleDocument::type) == -1 ||
 		PyType_Ready(&PyCOleClientItem::type) == -1)
-		RETURN_ERROR;
+		PYWIN_MODULE_INIT_RETURN_ERROR;
 
-#if (PY_VERSION_HEX >= 0x03000000)
-	return module;
-#endif
+	PYWIN_MODULE_INIT_RETURN_SUCCESS;
 }

@@ -96,46 +96,14 @@ static struct PyMethodDef perfmon_functions[] = {
 };
 
 
-
-extern "C" __declspec(dllexport)
-#if (PY_VERSION_HEX < 0x03000000)
-void initperfmon(void)
+PYWIN_MODULE_INIT_FUNC(perfmon)
 {
-	PyObject *dict, *module;
-	module = Py_InitModule("perfmon", perfmon_functions);
-	if (!module) return;
-	dict = PyModule_GetDict(module);
-	if (!dict)
-		return;
-
+	PYWIN_MODULE_INIT_PREPARE(perfmon, perfmon_functions,
+	                          "Contains functions and objects wrapping the Performance Monitor APIs");
 	if (PyType_Ready(&PyPerfMonManager::type) == -1
 		|| PyType_Ready(&PyPERF_COUNTER_DEFINITION::type) == -1
 		|| PyType_Ready(&PyPERF_OBJECT_TYPE::type) == -1)
-		return;
+		PYWIN_MODULE_INIT_RETURN_ERROR;
+	PYWIN_MODULE_INIT_RETURN_SUCCESS;
 }
-
-#else
-PyObject *PyInit_perfmon(void)
-{
-	PyObject *dict, *module;
-	static PyModuleDef permon_def = {
-		PyModuleDef_HEAD_INIT,
-		"perfmon",
-		"Contains functions and objects wrapping the Performance Monitor APIs",
-		-1,
-		perfmon_functions
-		};
-	module = PyModule_Create(&permon_def);
-	if (!module)
-		return NULL;
-	dict = PyModule_GetDict(module);
-	if (!dict)
-		return NULL;
-	if (PyType_Ready(&PyPerfMonManager::type) == -1
-		|| PyType_Ready(&PyPERF_COUNTER_DEFINITION::type) == -1
-		|| PyType_Ready(&PyPERF_OBJECT_TYPE::type) == -1)
-		return NULL;
-	return module;
-}
-#endif
 

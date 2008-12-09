@@ -24,43 +24,17 @@ static const PyCom_InterfaceSupportInfo register_data[] =
 	PYCOM_INTERFACE_CLIENT_ONLY( ProvideTaskPage )
 };
 
-
-extern "C" __declspec(dllexport)
-#if (PY_VERSION_HEX < 0x03000000)
-void inittaskscheduler(void)
-#else
-PyObject *PyInit_taskscheduler(void)
-#endif
+PYWIN_MODULE_INIT_FUNC(taskscheduler)
 {
-	PyObject *dict, *module;
-	PyWinGlobals_Ensure();
+	PYWIN_MODULE_INIT_PREPARE(taskscheduler, taskscheduler_methods,
+	                          "Supports the Scheduled Tasks COM interfaces");
 
-#if (PY_VERSION_HEX < 0x03000000)
-#define RETURN_ERROR return;
-	module = Py_InitModule("taskscheduler", taskscheduler_methods);
-#else
-#define RETURN_ERROR return NULL;
-	static PyModuleDef taskscheduler_def = {
-		PyModuleDef_HEAD_INIT,
-		"taskscheduler",
-		"Supports the Scheduled Tasks COM interfaces",
-		-1,
-		taskscheduler_methods
-		};
-	module = PyModule_Create(&taskscheduler_def);
-#endif
-
-	if (!module)
-		RETURN_ERROR;
-	dict = PyModule_GetDict(module);
-	if (!dict)
-		RETURN_ERROR;
 	if (PyType_Ready(&PyTASK_TRIGGERType) == -1)
-		RETURN_ERROR;
+		PYWIN_MODULE_INIT_RETURN_ERROR;
 
 	// Register all of our interfaces, gateways and IIDs.
 	PyCom_RegisterExtensionSupport(dict, register_data, sizeof(register_data)/sizeof(PyCom_InterfaceSupportInfo));
-	
+
 	// trigger types
 	PyModule_AddIntConstant(module,"TASK_TIME_TRIGGER_ONCE", TASK_TIME_TRIGGER_ONCE);
 	PyModule_AddIntConstant(module,"TASK_TIME_TRIGGER_DAILY", TASK_TIME_TRIGGER_DAILY);
@@ -156,7 +130,5 @@ PyObject *PyInit_taskscheduler(void)
 	PyModule_AddIntConstant(module,"TASKPAGE_SCHEDULE", TASKPAGE_SCHEDULE);
 	PyModule_AddIntConstant(module,"TASKPAGE_SETTINGS", TASKPAGE_SETTINGS);
 
-#if (PY_VERSION_HEX >= 0x03000000)
-	return module;
-#endif
+	PYWIN_MODULE_INIT_RETURN_SUCCESS;
 }

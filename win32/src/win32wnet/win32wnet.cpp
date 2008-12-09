@@ -631,52 +631,20 @@ static PyMethodDef win32wnet_functions[] = {
 	{NULL,			NULL}
 };
 
-extern "C" __declspec(dllexport)
-#if (PY_VERSION_HEX < 0x03000000)
-void initwin32wnet(void)
-#else
-PyObject *PyInit_win32wnet(void)
-#endif
+PYWIN_MODULE_INIT_FUNC(win32wnet)
 {
-	PyObject *dict, *module;
-#if (PY_VERSION_HEX < 0x03000000)
-	module = Py_InitModule("win32wnet", win32wnet_functions);
-	if (!module)
-		return;
-	dict = PyModule_GetDict(module);
-	if (!dict)
-		return;
+	PYWIN_MODULE_INIT_PREPARE(win32wnet, win32wnet_functions,
+	                          "A module that exposes the Windows Networking API.");
 
-#else
-	static PyModuleDef win32wnet_def = {
-		PyModuleDef_HEAD_INIT,
-		"win32wnet",
-		"A module that exposes the Windows Networking API.",
-		-1,
-		win32wnet_functions
-		};
-	module = PyModule_Create(&win32wnet_def);
-	if (!module)
-		return NULL;
-	dict = PyModule_GetDict(module);
-	if (!dict)
-		return NULL;
-#endif
 
-	PyWinGlobals_Ensure();
-	Py_INCREF(PyWinExc_ApiError);
 	PyDict_SetItemString(dict, "error", PyWinExc_ApiError);
 
-#if (PY_VERSION_HEX >= 0x03000000)
 	if ((PyType_Ready(&PyNETRESOURCEType) == -1) ||
 		(PyType_Ready(&PyNCBType) == -1))
-		return NULL;
-#endif
+		PYWIN_MODULE_INIT_RETURN_ERROR;
 
 	PyDict_SetItemString(dict, "NETRESOURCEType", (PyObject *)&PyNETRESOURCEType);
 	PyDict_SetItemString(dict, "NCBType", (PyObject *)&PyNCBType);
 
-#if (PY_VERSION_HEX >= 0x03000000)
-  return module;
-#endif;
+	PYWIN_MODULE_INIT_RETURN_SUCCESS;
 }

@@ -282,35 +282,10 @@ static const PyCom_InterfaceSupportInfo g_interfaceSupportData[] =
 #define ADD_CONSTANT(tok) if (PyModule_AddIntConstant(module, #tok, tok) == -1) RETURN_ERROR;
 
 /* Module initialisation */
-extern "C" __declspec(dllexport)
-#if (PY_VERSION_HEX < 0x03000000)
-void initaxdebug(void)
-#else
-PyObject *PyInit_axdebug(void)
-#endif
+PYWIN_MODULE_INIT_FUNC(axdebug)
 {
-	PyObject *module, *dict;
-
-#if (PY_VERSION_HEX < 0x03000000)
-#define RETURN_ERROR return;
-	module = Py_InitModule("axdebug", axdebug_methods);
-#else
-#define RETURN_ERROR return NULL;
-	static PyModuleDef axdebug_def = {
-		PyModuleDef_HEAD_INIT,
-		"axdebug",
-		"A module, encapsulating the ActiveX Debugging interfaces",
-		-1,
-		axdebug_methods
-		};
-	module = PyModule_Create(&axdebug_def);
-#endif
-
-	if (!module)
-		RETURN_ERROR;
-	dict = PyModule_GetDict(module);
-	if (!dict)
-		RETURN_ERROR;
+	PYWIN_MODULE_INIT_PREPARE(axdebug, axdebug_methods,
+	                          "A module, encapsulating the ActiveX Debugging interfaces");
 
 	PyEval_InitThreads();
 
@@ -403,7 +378,5 @@ PyObject *PyInit_axdebug(void)
 
 	ADD_CONSTANT(TEXT_DOC_ATTR_READONLY); // @const axdebug|TEXT_DOC_ATTR_READONLY|Indicates that the document is read-only.
 
-#if (PY_VERSION_HEX >= 0x03000000)
-	return module;
-#endif
+	PYWIN_MODULE_INIT_RETURN_SUCCESS;
 }

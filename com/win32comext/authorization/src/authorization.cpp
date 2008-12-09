@@ -47,42 +47,10 @@ static struct PyMethodDef authorization_methods[]=
 };
 
 
-extern "C" __declspec(dllexport)
-#if (PY_VERSION_HEX < 0x03000000)
-void initauthorization(void)
-#else
-PyObject *PyInit_authorization(void)
-#endif
+PYWIN_MODULE_INIT_FUNC(authorization)
 {
-	PyObject *dict, *module;
-	PyWinGlobals_Ensure();
-
-#if (PY_VERSION_HEX < 0x03000000)
-	module = Py_InitModule("authorization", authorization_methods);
-	if (!module)
-		return;
-	dict = PyModule_GetDict(module);
-	if (!dict)
-		return;
-#else
-	static PyModuleDef authorization_def = {
-		PyModuleDef_HEAD_INIT,
-		"authorization",
-		"Module containing support for authorization COM interfaces.",
-		-1,
-		authorization_methods
-		};
-	module = PyModule_Create(&authorization_def);
-	if (!module)
-		return NULL;
-	dict = PyModule_GetDict(module);
-	if (!dict)
-		return NULL;
-#endif
-
-PyCom_RegisterExtensionSupport(dict, interface_info, sizeof(interface_info)/sizeof(PyCom_InterfaceSupportInfo));
-
-#if (PY_VERSION_HEX >= 0x03000000)
-	return module;
-#endif
+	PYWIN_MODULE_INIT_PREPARE(authorization, authorization_methods,
+	                          "Module containing support for authorization COM interfaces.");
+	PyCom_RegisterExtensionSupport(dict, interface_info, sizeof(interface_info)/sizeof(PyCom_InterfaceSupportInfo));
+	PYWIN_MODULE_INIT_RETURN_SUCCESS;
 }

@@ -1158,38 +1158,10 @@ static void AddConstant(PyObject *dict, char *name, long val)
   Py_XDECREF(nv);
 }
 
-extern "C" __declspec(dllexport)
-#if (PY_VERSION_HEX < 0x03000000)
-void initwin32net(void)
-#else
-PyObject *PyInit_win32net(void)
-#endif
+PYWIN_MODULE_INIT_FUNC(win32net)
 {
-  PyObject *module, *dict;
-  PyWinGlobals_Ensure();
-
-#if (PY_VERSION_HEX < 0x03000000)
-	module = Py_InitModule("win32net", win32net_functions);
-	if (!module)
-		return;
-	dict = PyModule_GetDict(module);
-	if (!dict)
-		return;
-#else
-	static PyModuleDef win32net_def = {
-		PyModuleDef_HEAD_INIT,
-		"win32net",
-		"A module encapsulating the Windows Network API.",
-		-1,
-		win32net_functions
-		};
-	module = PyModule_Create(&win32net_def);
-	if (!module)
-		return NULL;
-	dict = PyModule_GetDict(module);
-	if (!dict)
-		return NULL;
-#endif
+  PYWIN_MODULE_INIT_PREPARE(win32net, win32net_functions,
+                            "A module encapsulating the Windows Network API.");
 
   PyDict_SetItemString(dict, "error", PyWinExc_ApiError);
   PyDict_SetItemString(dict, "SERVICE_SERVER", PyUnicode_FromWideChar(SERVICE_SERVER,wcslen(SERVICE_SERVER)));
@@ -1214,8 +1186,5 @@ PyObject *PyInit_win32net(void)
 	  pfnNetValidatePasswordPolicyFree=(NetValidatePasswordPolicyFreefunc)GetProcAddress(hmodule, "NetValidatePasswordPolicyFree");
   }
 #endif
-
-#if (PY_VERSION_HEX >= 0x03000000)
-	return module;
-#endif
+  PYWIN_MODULE_INIT_RETURN_SUCCESS;
 }

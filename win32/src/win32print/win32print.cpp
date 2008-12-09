@@ -2638,38 +2638,10 @@ static void AddConstant(PyObject *dict, char *name, long val)
 }
 
 
-extern "C" __declspec(dllexport)
-#if (PY_VERSION_HEX < 0x03000000)
-void initwin32print(void)
-#else
-PyObject *PyInit_win32print(void)
-#endif
+PYWIN_MODULE_INIT_FUNC(win32print)
 {
-  PyObject *module, *dict;
-  PyWinGlobals_Ensure();
-
-#if (PY_VERSION_HEX < 0x03000000)
-	module = Py_InitModule("win32print", win32print_functions);
-	if (!module)
-		return;
-	dict = PyModule_GetDict(module);
-	if (!dict)
-		return;
-#else
-	static PyModuleDef win32print_def = {
-		PyModuleDef_HEAD_INIT,
-		"win32print",
-		"A module encapsulating the Windows printing API.",
-		-1,
-		win32print_functions
-		};
-	module = PyModule_Create(&win32print_def);
-	if (!module)
-		return NULL;
-	dict = PyModule_GetDict(module);
-	if (!dict)
-		return NULL;
-#endif
+  PYWIN_MODULE_INIT_PREPARE(win32print, win32print_functions,
+                            "A module encapsulating the Windows printing API.")
 
   AddConstant(dict, "PRINTER_INFO_1", 1);
   AddConstant(dict, "PRINTER_ENUM_LOCAL", PRINTER_ENUM_LOCAL);
@@ -2853,7 +2825,5 @@ PyObject *PyInit_win32print(void)
   }
   dummy_tuple=PyTuple_New(0);
 
-#if (PY_VERSION_HEX >= 0x03000000)
-	return module;
-#endif
+  PYWIN_MODULE_INIT_RETURN_SUCCESS;
 }

@@ -46,8 +46,6 @@ generates Windows .hlp files.
 extern "C" __declspec(dllimport) int PyCallable_Check(PyObject *);	// python - object.c
 extern DWORD DebuggerThreadFunc( LPDWORD lpdwWhatever );
 
-static char BASED_CODE uiModName[] = "win32ui";
-
 // We can't init exceptionHandler in initwin32ui because the application using
 // us could have called SetExceptionHandler earlier. We do a forward declaration
 // of DefaultExceptionHandler here and assign it to exceptionHandler.
@@ -2248,72 +2246,40 @@ int PyWinType_Ready(PyTypeObject *pT)
 		}
 	return 0;
 }
-			
+
 extern bool CheckGoodWinApp();
 extern HINSTANCE hWin32uiDll; // Handle to this DLL, from dllmain.cpp
 
 /* Initialize this module. */
-extern "C" __declspec(dllexport)
-#if (PY_VERSION_HEX < 0x03000000)
-void initwin32ui(void)
-#else
-PyObject *PyInit_win32ui(void)
-#endif
+PYWIN_MODULE_INIT_FUNC(win32ui)
 {
-  // XXX - hack alert!
-  // Win9x manages to wind up in here twice when used from a console - 
-  // CheckGoodWinApp() winds up re-initializing - so when we return
-  // we see if we already did init, and get out.
-  // Would be nice to solve this properly, but Win9x is a bitch to debug :(
+	// For various hysterical reasons, Win32uiApplicationInit also calls
+	// initwin32ui, meaning we need to deal with being called multiple
+	// times.
+	static PyObject *existing_module = NULL;
+	if (!CheckGoodWinApp()) {
+		PyErr_SetString(PyExc_RuntimeError, "The win32ui module could not initialize the application object.");
+		PYWIN_MODULE_INIT_RETURN_ERROR;
+	}
+	if (existing_module)
 #if (PY_VERSION_HEX < 0x03000000)
-#define RETURN_ERROR return;
-#define RETURN_MODULE return;
+		return;
 #else
-#define RETURN_ERROR return NULL;
-#define RETURN_MODULE return module;
-#endif;
-
-  static bool bInitialized = false;
-  static PyObject *dict, *module;
-  if (!CheckGoodWinApp()) {
-	  PyErr_SetString(PyExc_RuntimeError, "The win32ui module could not initialize the application object.");
-	  RETURN_ERROR;
-  }
-  if (bInitialized)
-	  RETURN_MODULE;
-	
-	if (PyWinGlobals_Ensure() == -1)
-		RETURN_ERROR;
-
-#if (PY_VERSION_HEX < 0x03000000)
-	module = Py_InitModule(uiModName, ui_functions);
-#else
-
-	static PyModuleDef win32ui_def = {
-		PyModuleDef_HEAD_INIT,
-		uiModName,
-		"A module, encapsulating the Microsoft Foundation Classes.",
-		-1,
-		ui_functions
-		};
-	module = PyModule_Create(&win32ui_def);
+		return existing_module;
 #endif
 
-	if (!module)
-		RETURN_ERROR;
-	dict = PyModule_GetDict(module);
-	if (!dict)
-		RETURN_ERROR;
+	PYWIN_MODULE_INIT_PREPARE(win32ui, ui_functions,
+	                    "A module, encapsulating the Microsoft Foundation Classes.");
 
 	ui_module_error = PyErr_NewException("win32ui.error", NULL, NULL);
 	if ((ui_module_error == NULL) || PyDict_SetItemString(dict, "error", ui_module_error) == -1)
-		RETURN_ERROR;
+		PYWIN_MODULE_INIT_RETURN_ERROR;
 
 	// drop email addy - too many ppl use it for support requests for other
 	// tools that simply embed Pythonwin...
 	PyObject *copyright = PyWinCoreString_FromString("Copyright 1994-2008 Mark Hammond");
 	if ((copyright == NULL) || PyDict_SetItemString(dict, "copyright", copyright) == -1)
-		RETURN_ERROR;
+		PYWIN_MODULE_INIT_RETURN_ERROR;
 	Py_XDECREF(copyright);
 
   PyObject *dllhandle = PyWinLong_FromHANDLE(hWin32uiDll);
@@ -2330,7 +2296,7 @@ PyObject *PyInit_win32ui(void)
 
   HookWindowsMessages();	// need to be notified of certain events...
   if (AddConstants(module) == -1)
-      RETURN_ERROR;
+      PYWIN_MODULE_INIT_RETURN_ERROR;
 
   // Add all the types.
   PyObject *typeDict = PyDict_New();
@@ -2340,26 +2306,20 @@ PyObject *PyInit_win32ui(void)
 	  ui_type_CObject *pT;
 	  ui_type_CObject::typemap->GetNextAssoc(pos, pRT, pT);
 
-#if (PY_VERSION_HEX < 0x03000000)
-		PyObject *typeName = PyString_FromString(pT->tp_name);
-#else
-		PyObject *typeName = PyUnicodeObject_FromString(pT->tp_name);
-#endif
+		PyObject *typeName = PyWinCoreString_FromString(pT->tp_name);
 		// PyType_Ready sets tp_mro for inheritance to work, so it *must* be called on the type objects now.
 		if ((typeName==NULL)
 			||(PyWinType_Ready(pT)==-1)
 			||(PyDict_SetItem(typeDict, typeName, (PyObject *)pT)==-1))
-			RETURN_ERROR;
+			PYWIN_MODULE_INIT_RETURN_ERROR;
 		Py_XDECREF(typeName);
   }
 
   PyDict_SetItemString(dict, "types", typeDict);
   Py_XDECREF(typeDict);
-  bInitialized = true;
+  existing_module = module;
 
-#if (PY_VERSION_HEX >= 0x03000000)
-	return module;
-#endif
+  PYWIN_MODULE_INIT_RETURN_SUCCESS;
 }
 
 // Utilities for glue support.

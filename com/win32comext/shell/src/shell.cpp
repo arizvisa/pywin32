@@ -3325,40 +3325,10 @@ static int AddIID(PyObject *dict, const char *key, REFGUID guid)
 
 
 /* Module initialisation */
-extern "C" __declspec(dllexport)
-#if (PY_VERSION_HEX < 0x03000000)
-void initshell(void)
-#else
-PyObject *PyInit_shell(void)
-#endif
+PYWIN_MODULE_INIT_FUNC(shell)
 {
-	PyObject *dict, *module;
-	PyWinGlobals_Ensure();
-
-#if (PY_VERSION_HEX < 0x03000000)
-#define RETURN_ERROR return;
-	module = Py_InitModule("shell", shell_methods);
-	if (!module)
-		return;
-	dict = PyModule_GetDict(module);
-	if (!dict)
-		return;
-#else
-#define RETURN_ERROR return NULL;
-	static PyModuleDef shell_def = {
-		PyModuleDef_HEAD_INIT,
-		"shell",
-		"A module wrapping Windows Shell functions and interfaces",
-		-1,
-		shell_methods
-		};
-	module = PyModule_Create(&shell_def);
-	if (!module)
-		return NULL;
-	dict = PyModule_GetDict(module);
-	if (!dict)
-		return NULL;
-#endif
+	PYWIN_MODULE_INIT_PREPARE(shell, shell_methods,
+	                          "A module wrapping Windows Shell functions and interfaces");
 
 	PyDict_SetItemString(dict, "error", PyWinExc_COMError);
 	// Register all of our interfaces, gateways and IIDs.
@@ -3522,7 +3492,5 @@ PyObject *PyInit_shell(void)
 #	pragma message("Please update your SDK headers - IE5 features missing!")
 #endif
 
-#if (PY_VERSION_HEX >= 0x03000000)
-	return module;
-#endif
+	PYWIN_MODULE_INIT_RETURN_SUCCESS;
 }

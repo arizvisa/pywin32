@@ -237,7 +237,7 @@ static struct PyMethodDef directsound_methods[]=
 };
 
 
-#define ADD_CONSTANT(tok) if (PyModule_AddIntConstant(module, #tok, tok) == -1) RETURN_ERROR;
+#define ADD_CONSTANT(tok) if (PyModule_AddIntConstant(module, #tok, tok) == -1) PYWIN_MODULE_INIT_RETURN_ERROR;
 
 static const PyCom_InterfaceSupportInfo g_interfaceSupportData[] =
 {
@@ -249,36 +249,10 @@ static const PyCom_InterfaceSupportInfo g_interfaceSupportData[] =
 };
 
 /* Module initialisation */
-extern "C" __declspec(dllexport)
-#if (PY_VERSION_HEX < 0x03000000)
-void initdirectsound(void)
-#else
-PyObject *PyInit_directsound(void)
-#endif
+PYWIN_MODULE_INIT_FUNC(directsound)
 {
-	PyObject *dict, *module;
-	PyWinGlobals_Ensure();
-
-#if (PY_VERSION_HEX < 0x03000000)
-#define RETURN_ERROR return;
-	module = Py_InitModule("directsound", directsound_methods);
-#else
-#define RETURN_ERROR return NULL;
-	static PyModuleDef directsound_def = {
-		PyModuleDef_HEAD_INIT,
-		"directsound",
-		"A module encapsulating the DirectSound interfaces.",
-		-1,
-		directsound_methods
-		};
-	module = PyModule_Create(&directsound_def);
-#endif
-
-	if (!module)
-		RETURN_ERROR;
-	dict = PyModule_GetDict(module);
-	if (!dict)
-		RETURN_ERROR;
+	PYWIN_MODULE_INIT_PREPARE(directsound, directsound_methods,
+	                          "A module encapsulating the DirectSound interfaces.");
 
 
 	// Register all of our interfaces, gateways and IIDs.
@@ -416,11 +390,9 @@ PyObject *PyInit_directsound(void)
 		||PyDict_SetItemString(dict, "DSCCAPSType", (PyObject *)&PyDSCCAPSType) == -1
 		||PyDict_SetItemString(dict, "DSCBCAPSType", (PyObject *)&PyDSCBCAPSType) == -1
 		||PyDict_SetItemString(dict, "DSCBUFFERDESCType", (PyObject *)&PyDSCBUFFERDESCType) == -1)
-		RETURN_ERROR;
+		PYWIN_MODULE_INIT_RETURN_ERROR;
 
-#if (PY_VERSION_HEX >= 0x03000000)
-	return module;
-#endif
+	PYWIN_MODULE_INIT_RETURN_SUCCESS;
 }
 
 /* @topic DirectSound examples|
