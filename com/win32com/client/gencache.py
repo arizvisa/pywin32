@@ -48,10 +48,7 @@ is_readonly = hasattr(win32com, "__loader__")
 # Keyed by usual clsid, lcid, major, minor
 demandGeneratedTypeLibraries = {}
 
-try:
-	import cPickle as pickle
-except ImportError:
-	import pickle
+import pickle as pickle
 
 def __init__():
 	# Initialize the module.  Called once explicitly at module import below.
