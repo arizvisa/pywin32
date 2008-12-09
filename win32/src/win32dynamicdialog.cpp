@@ -280,10 +280,6 @@ static PyObject *MakeResName(WCHAR **val)
 }
 
 // Given a pointer to a dialog hdr template, return a Python list to match it
-// ??? This leaks refs all over the place ???  markh: where?  It looks OK
-// to me - MakeResName creates a new reference, but its always immediately
-// placed in the new list, or the list is DECREF'd on error.
-// It could be simplified with a goto error handler though...
 /* Also need to handle extended templates (DLGTEMPLATEEX), quoting from MSDN:
 	To distinguish between a standard template and an extended template,
 	check the first 16-bits of a dialog box template.
