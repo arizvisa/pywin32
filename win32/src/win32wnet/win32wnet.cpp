@@ -128,45 +128,70 @@ BOOL PyNETENUMHANDLE::Close(void)
 
 // @pymethod |win32wnet|WNetAddConnection2|Creates a connection to a network resource. The function can redirect 
 // a local device to the network resource.
-// @comm This function previously accepted separate parameters to construct a <o PyNETRESOURCE>.  It has been
-//	changed to accept a NETRESOURCE object instead of the individual elements.
+// @comm This function also accepts backwards-compatible, positional-only
+// arguments of (dwType, lpLocalName, lpRemoteName[, lpProviderName, Username, Password, flags])
 // @comm Accepts keyword arguments.
 // @pyseeapi WNetAddConnection2
 static PyObject *PyWNetAddConnection2 (PyObject *self, PyObject *args, PyObject *kwargs)
 {
 	LPTSTR	Username = NULL;
-	LPTSTR	Password = NULL; 
+	LPTSTR	Password = NULL;
+	// values used for b/w compat args.
+	DWORD	Type;
+	PyObject *obLocalName, *obRemoteName, *obProviderName = Py_None;
+
 	PyObject *obnr, *obPassword=Py_None, *obUsername=Py_None, *ret=NULL;
 	DWORD	ErrorNo;		// holds the returned error number, if any
 	DWORD	flags = 0;
-	NETRESOURCE  * pNetResource;
+	NETRESOURCE  *pNetResource;
+	NETRESOURCE  tempNetResource;
+	memset(&tempNetResource, 0, sizeof(tempNetResource));
 
-	static char *keywords[] = {"NetResource","Password","UserName","Flags", NULL};
-	if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|OOk", keywords,
-		&obnr,			// @pyparm <o PyNETRESOURCE>|NetResource||Describes the network resource for the connection.
-		&obPassword,	// @pyparm str|Password|None|The password to use.  Use None for default credentials.
-		&obUsername,	// @pyparm str|UserName|None|The user name to connect as.  Use None for default credentials.
-		&flags))		// @pyparm int|Flags|0|Combination win32netcon.CONNECT_* flags
-		return NULL;
-	if (PyWinObject_AsNETRESOURCE(obnr, &pNetResource, FALSE)
-		&& PyWinObject_AsTCHAR(obPassword, &Password, TRUE)
-		&& PyWinObject_AsTCHAR(obUsername, &Username, TRUE)){
-		Py_BEGIN_ALLOW_THREADS
-		#ifdef _WIN32_WCE_	// Windows CE only has the #3 version...use NULL for HWND to simulate #2
-			ErrorNo = WNetAddConnection3(NULL, pNetResource, Password, Username, flags);
-		#else
-			ErrorNo = WNetAddConnection2(pNetResource, Password, Username, flags);
-		#endif
-		Py_END_ALLOW_THREADS
-		if (ErrorNo != NO_ERROR)
-			ReturnNetError("WNetAddConnection2", ErrorNo);
-		else{
-			Py_INCREF(Py_None);
-			ret = Py_None;
-			}
-		}
+	if (PyArg_ParseTuple(args,"iOO|OOOi",&Type,&obLocalName,&obRemoteName,&obProviderName,&obUsername,&obPassword, &flags)) {
+		// the b/w compat args have been used - build the NETRESOURCE structure
+		memset((void *)&tempNetResource, '\0', sizeof(NETRESOURCE));
+		tempNetResource.dwType = Type;
+		if (!PyWinObject_AsTCHAR(obLocalName, &tempNetResource.lpLocalName, TRUE)
+		    || !PyWinObject_AsTCHAR(obRemoteName, &tempNetResource.lpRemoteName, FALSE)
+		    || !PyWinObject_AsTCHAR(obProviderName, &tempNetResource.lpProvider, TRUE))
+			goto done;
+		pNetResource = &tempNetResource;
+	} else {
+		PyErr_Clear();
+		static char *keywords[] = {"NetResource","Password","UserName","Flags", NULL};
+		if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|OOk", keywords,
+			&obnr,			// @pyparm <o PyNETRESOURCE>|NetResource||Describes the network resource for the connection.
+			&obPassword,	// @pyparm str|Password|None|The password to use.  Use None for default credentials.
+			&obUsername,	// @pyparm str|UserName|None|The user name to connect as.  Use None for default credentials.
+			&flags))		// @pyparm int|Flags|0|Combination win32netcon.CONNECT_* flags
+			return NULL;
+		if (!PyWinObject_AsNETRESOURCE(obnr, &pNetResource, FALSE))
+			return NULL;
+	}
+
+	if (!PyWinObject_AsTCHAR(obPassword, &Password, TRUE)
+	    || !PyWinObject_AsTCHAR(obUsername, &Username, TRUE))
+		goto done;
+
+	Py_BEGIN_ALLOW_THREADS
+	#ifdef _WIN32_WCE_	// Windows CE only has the #3 version...use NULL for HWND to simulate #2
+		ErrorNo = WNetAddConnection3(NULL, pNetResource, Password, Username, flags);
+	#else
+		ErrorNo = WNetAddConnection2(pNetResource, Password, Username, flags);
+	#endif
+	Py_END_ALLOW_THREADS
+	if (ErrorNo != NO_ERROR)
+		ReturnNetError("WNetAddConnection2", ErrorNo);
+	else{
+		Py_INCREF(Py_None);
+		ret = Py_None;
+	}
+done:
 	PyWinObject_FreeTCHAR(Password);
 	PyWinObject_FreeTCHAR(Username);
+	PyWinObject_FreeTCHAR(tempNetResource.lpLocalName);
+	PyWinObject_FreeTCHAR(tempNetResource.lpRemoteName);
+	PyWinObject_FreeTCHAR(tempNetResource.lpProvider);
 	return ret;
 };
 
@@ -600,10 +625,8 @@ PyObject *PyWNetGetResourceParent(PyObject *self, PyObject *args)
 
 // @module win32wnet|A module that exposes the Windows Networking API.
 static PyMethodDef win32wnet_functions[] = {
-	// @pymeth NETRESOURCE|Creates a new <o NETRESOURCE> object
-	{"NETRESOURCE",				PyWinMethod_NewNETRESOURCE,	1,	"NETRESOURCE Structure Object. x=NETRESOURCE() to instantiate"},
-	// @pymeth NCB|Creates a new <o NCB> object
-	{"NCB",						PyWinMethod_NewNCB,			1,	"NCB Netbios command structure Object"},
+	// @pymeth NETRESOURCE|The <o PyNETRESOURCE> type - can be used to create a new <o PyNETRESOURCE> object.
+	// @pymeth NCB|The <o PyNCB> type - can be used to create a new <o PyNCB> object.
 	// @pymeth NCBBuffer|Creates a new buffer
 	{"NCBBuffer",					PyWinMethod_NCBBuffer,			1,	"Creates a memory buffer"},
 	// @pymeth Netbios|Executes a Netbios call.
@@ -636,15 +659,18 @@ PYWIN_MODULE_INIT_FUNC(win32wnet)
 	PYWIN_MODULE_INIT_PREPARE(win32wnet, win32wnet_functions,
 	                          "A module that exposes the Windows Networking API.");
 
-
 	PyDict_SetItemString(dict, "error", PyWinExc_ApiError);
 
 	if ((PyType_Ready(&PyNETRESOURCEType) == -1) ||
 		(PyType_Ready(&PyNCBType) == -1))
 		PYWIN_MODULE_INIT_RETURN_ERROR;
 
+	// old "deprecated" names, before types could create instances.
 	PyDict_SetItemString(dict, "NETRESOURCEType", (PyObject *)&PyNETRESOURCEType);
 	PyDict_SetItemString(dict, "NCBType", (PyObject *)&PyNCBType);
+
+	PyDict_SetItemString(dict, "NETRESOURCE", (PyObject *)&PyNETRESOURCEType);
+	PyDict_SetItemString(dict, "NCB", (PyObject *)&PyNCBType);
 
 	PYWIN_MODULE_INIT_RETURN_SUCCESS;
 }

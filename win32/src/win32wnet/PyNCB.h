@@ -46,7 +46,4 @@ public:
 extern __declspec(dllexport) PyTypeObject PyNCBType;
 #define PyNCB_Check(ob)	((ob)->ob_type == &PyNCBType)
 
-__declspec(dllexport) PyObject *PyWinMethod_NewNCB(PyObject *self, PyObject *args);
-
-
 #endif // end of _WIN32_WCE exclude

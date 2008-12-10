@@ -35,13 +35,10 @@
 #include "netres.h"			// C++ header file for NETRESOURCE object
 
 
-/* Main PYTHON entry point for creating a new reference.  Registered by win32wnet module */
-
-// @pymethod <o PyNETRESOURCE>|win32wnet|NETRESOURCE|Creates a new <o NETRESOURCE> object.
-
-PyObject *PyWinMethod_NewNETRESOURCE(PyObject *self, PyObject *args)
+static PyObject *NETRESOURCE_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
-	if (!PyArg_ParseTuple(args, ":NETRESOURCE"))	// no arguments
+	static char *kwlist[] = {0};
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, ":NETRESOURCE", kwlist))	// no arguments
 		return NULL;
 	return new PyNETRESOURCE();	// call the C++ constructor
 }
@@ -121,7 +118,7 @@ PyTypeObject PyNETRESOURCEType =
 	0,						/* tp_dictoffset */
 	0,						/* tp_init */
 	0,						/* tp_alloc */
-	0,						/* tp_new */
+	NETRESOURCE_new,				/* tp_new */
 };
 
 #define OFF(e) offsetof(PyNETRESOURCE, e)
@@ -139,6 +136,10 @@ struct PyMemberDef PyNETRESOURCE::members[] =
 	{"lpComment",	T_STRING, OFF(m_nr.lpComment),	0},// @prop string|comment|
 	{"lpProvider",	T_STRING, OFF(m_nr.lpProvider),	0},// @prop string|provider|
 	{NULL}
+	// @comm Note that in pywin32-212 and earlier, the string attributes
+	// were always strings, but empty strings when the underlying Windows
+	// structure had NULL.  On later pywin32 builds, these string attributes will
+	// return None in such cases.
 };
 
 PyNETRESOURCE::PyNETRESOURCE(void)

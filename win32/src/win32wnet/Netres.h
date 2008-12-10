@@ -53,6 +53,5 @@ protected:
 extern __declspec(dllexport) PyTypeObject PyNETRESOURCEType;
 #define PyNETRESOURCE_Check(ob)	((ob)->ob_type == &PyNETRESOURCEType)
 
-__declspec(dllexport) PyObject *PyWinMethod_NewNETRESOURCE(PyObject *self, PyObject *args);
 __declspec(dllexport) BOOL PyWinObject_AsNETRESOURCE(PyObject *ob, NETRESOURCE **ppNetresource, BOOL bNoneOK = TRUE);
 __declspec(dllexport) PyObject *PyWinObject_FromNETRESOURCE(const NETRESOURCE *pNetresource);

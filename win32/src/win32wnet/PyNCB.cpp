@@ -36,6 +36,17 @@
 
 #include <crtdbg.h>
 
+/***************************************************************************
+** Create a new NCB Object
+***************************************************************************/
+static PyObject *NCB_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
+{
+	static char *kwlist[] = {0};
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, ":NCB", kwlist))	// no arguments
+		return NULL;
+	return new PyNCB();	// call the C++ constructor
+}
+
 
 __declspec(dllexport)PyTypeObject PyNCBType =
 {
@@ -76,7 +87,7 @@ __declspec(dllexport)PyTypeObject PyNCBType =
 	0,						/* tp_dictoffset */
 	0,						/* tp_init */
 	0,						/* tp_alloc */
-	0,						/* tp_new */
+	NCB_new,					/* tp_new */
 };
 
 static PyObject *PyNCB_Reset(PyObject *self, PyObject *args)
@@ -192,17 +203,6 @@ void PyNCB::deallocFunc(PyObject *ob)
 	delete (PyNCB *)ob;
 };
 
-/***************************************************************************
-** Create a new NCB Object
-***************************************************************************/
-// @pymethod <o NCB>|win32wnet|NCB|Creates a new <o NCB> object.
-PyObject *PyWinMethod_NewNCB(PyObject *self, PyObject *args)
-{
-	if (!PyArg_ParseTuple(args, ":NCB"))	// no arguments
-		return NULL;
-	return new PyNCB();	// call the C++ constructor
-}
-
 /*********************************************************************/
 PyObject *PyNCB::getattro(PyObject *self, PyObject *obname)
 {
@@ -210,22 +210,26 @@ PyObject *PyNCB::getattro(PyObject *self, PyObject *obname)
 	char *name=PYWIN_ATTR_CONVERT(obname);
 	if (name==NULL)
 		return NULL;
+	// Our string attributes still need special handling as the NCB isn't
+	// unicode aware.
+	// These 2 string attributes are logically "strings" rather than "bytes"
 	if (strcmp(name, "Callname") == 0)	// these "strings" are not null terminated so build
 										// a local representation of them and return
 										// the Pythonized version
 	{
 		char TempString[17];
 		TempString[16] = '\0';
-		return(PyString_FromString(strncpy((char *)TempString,(char *)This->m_ncb.ncb_callname,NCBNAMSZ)));
+		return(PyWinCoreString_FromString(strncpy((char *)TempString,(char *)This->m_ncb.ncb_callname,NCBNAMSZ)));
 	}
 	else if(strcmp(name, "Name") == 0)
 	{
 		char TempString[17];
 		TempString[16] = '\0';
-		return(PyString_FromString(strncpy((char *)TempString,(char *)This->m_ncb.ncb_name,NCBNAMSZ)));
+		return(PyWinCoreString_FromString(strncpy((char *)TempString,(char *)This->m_ncb.ncb_name,NCBNAMSZ)));
 	}
 	else if(strcmp(name, "Buffer") == 0)
 	{
+		// This is logically bytes
 		if (This->m_obuserbuffer != NULL) {
 			Py_INCREF(This->m_obuserbuffer);
 			return This->m_obuserbuffer;
@@ -253,8 +257,9 @@ int PyNCB::setattro(PyObject *self, PyObject *obname, PyObject *v)
 
 	if (strcmp(name, "Callname") == 0){
 		char *value;
-		Py_ssize_t valuelen;
-		if (PyString_AsStringAndSize(v, &value, &valuelen)==-1)
+		DWORD valuelen;
+
+		if (!PyWinObject_AsString(v, &value, FALSE, &valuelen))
 			return -1;
 		if (valuelen > NCBNAMSZ)	// cap string length at NCBNAMSZ(16)
 			valuelen = NCBNAMSZ;
@@ -263,13 +268,14 @@ int PyNCB::setattro(PyObject *self, PyObject *obname, PyObject *v)
 		strncpy ((char *)This->m_ncb.ncb_callname, value, valuelen);
 		if (valuelen == 0)	// source was null string
 			This->m_ncb.ncb_callname[0] = '\0';
+		PyWinObject_FreeString(value);
 		return 0;
 		}
 
 	if (strcmp(name, "Name") == 0){
 		char *value;
-		Py_ssize_t valuelen;
-		if (PyString_AsStringAndSize(v, &value, &valuelen)==-1)
+		DWORD valuelen;
+		if (!PyWinObject_AsString(v, &value, FALSE, &valuelen))
 			return -1;
 		if (valuelen > NCBNAMSZ)	// cap string length at NCBNAMSZ(16)
 			valuelen = NCBNAMSZ;
@@ -278,6 +284,7 @@ int PyNCB::setattro(PyObject *self, PyObject *obname, PyObject *v)
 		strncpy ((char *)This->m_ncb.ncb_name, value, valuelen);
 		if (valuelen == 0)	// source was null string
 			This->m_ncb.ncb_callname[0] = '\0';
+		PyWinObject_FreeString(value);
 		return 0;
 		}
 
