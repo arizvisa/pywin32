@@ -41,7 +41,7 @@ def ReadLog(computer, logType="Application", dumpEachRecord = 0):
         print("(Note that some other app may have written records while we were running!)")
     win32evtlog.CloseEventLog(h)
 
-def Usage():
+def usage():
     print("Writes an event to the event log.")
     print("-w : Dont write any test records.")
     print("-r : Dont read the event log")
@@ -74,7 +74,7 @@ def test():
         if opt == '-c':
             computer = val
         if opt in ['-h', '-?']:
-            Usage()
+            usage()
             return
         if opt=='-r':
             do_read = 0
