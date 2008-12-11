@@ -56,7 +56,7 @@ class TestCase(unittest.TestCase):
         for attr, typ in attrs:
             val = getattr(item, attr)
             if typ is int:
-                self.failUnless(type(val) in (int, int),
+                self.failUnless(type(val) in (int,),
                                 "Attr %r has value %r" % (attr, val))
                 new_val = val + 1
             elif typ is str:

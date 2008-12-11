@@ -253,12 +253,6 @@ PyObject *PyWinObject_FromHDEVNOTIFY(HGDIOBJ h)
 
 // Written to the module init function.
 %init %{
-#if (PY_VERSION_HEX < 0x03000000)
-	#define RETURN_ERROR return;
-#else
-	#define RETURN_ERROR return NULL;
-#endif
-
 PyEval_InitThreads(); /* Start the interpreter's thread-awareness */
 PyDict_SetItemString(d, "dllhandle", PyWinLong_FromVoidPtr(g_dllhandle));
 PyDict_SetItemString(d, "error", PyWinExc_ApiError);
@@ -266,7 +260,7 @@ PyDict_SetItemString(d, "error", PyWinExc_ApiError);
 if (PyType_Ready(&PyWNDCLASSType) == -1 ||
 	PyType_Ready(&PyBITMAPType) == -1 ||
 	PyType_Ready(&PyLOGFONTType) == -1)
-	RETURN_ERROR;
+	PYWIN_MODULE_INIT_RETURN_ERROR;
 
 // Expose the window procedure and window class dicts to aid debugging
 g_AtomMap = PyDict_New();
@@ -1607,15 +1601,19 @@ static PyObject *PyGetString(PyObject *self, PyObject *args)
 	if (addr==NULL){
 		PyErr_SetString(PyExc_ValueError, "PyGetString: NULL is not valid pointer");
 		return NULL;
-		}
+	}
 	if (len != -1){
 		if (IsBadReadPtr(addr, len)) {
 			PyErr_SetString(PyExc_ValueError, "The value is not a valid address for reading");
 			return NULL;
 			}
 		return PyString_FromStringAndSize(addr, len);
-		}
+	}
 	// This should probably be in a __try just in case.
+	if (IsBadStringPtrA(addr, (DWORD_PTR)-1)) {
+		PyErr_SetString(PyExc_ValueError, "The value is not a valid null-terminated string");
+		return NULL;
+	}
 	return PyString_FromString(addr);
 }
 %}
