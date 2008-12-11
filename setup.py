@@ -255,6 +255,7 @@ class WinExt (Extension):
                   depends=None,
                   platforms=None, # none means 'all platforms'
                   unicode_mode=None, # 'none'==default or specifically true/false.
+                  implib_name=None,
                  ):
         assert dsp_file or sources, "Either dsp_file or sources must be specified"
         libary_dirs = library_dirs,
@@ -281,6 +282,7 @@ class WinExt (Extension):
         self.is_regular_dll = is_regular_dll
         self.base_address = base_address
         self.platforms = platforms
+        self.implib_name = implib_name
         Extension.__init__ (self, name, sources,
                             include_dirs,
                             define_macros,
@@ -388,6 +390,10 @@ class WinExt (Extension):
             # it hurting
             self.extra_compile_args.append("/EHsc")
 
+            # If someone needs a specially named implib created, handle that
+            if self.implib_name:
+                implib = os.path.join(build_ext.build_temp, self.implib_name)
+                self.extra_link_args.append("/IMPLIB:%s" % implib)
             # Try and find the MFC source code, so we can reach inside for
             # some of the ActiveX support we need.  We need to do this late, so
             # the environment is setup correctly.
@@ -1065,31 +1071,36 @@ class my_build_ext(build_ext):
         try:
             build_ext.build_extension(self, ext)
             # XXX This has to be changed for mingw32
+            # Get the .lib files we need.  This is limited to pywintypes,
+            # pythoncom and win32ui - but the first 2 have special names
             extra = self.debug and "_d.lib" or ".lib"
             if ext.name in ("pywintypes", "pythoncom"):
                 # The import libraries are created as PyWinTypes23.lib, but
                 # are expected to be pywintypes.lib.
                 name1 = "%s%d%d%s" % (ext.name, sys.version_info[0], sys.version_info[1], extra)
                 name2 = "%s%s" % (ext.name, extra)
-            else:
+            elif ext.name in ("win32ui",):
                 name1 = name2 = ext.name + extra
-            # The compiler always creates 'pywintypes22.lib', whereas we
-            # actually want 'pywintypes.lib' - copy it over.
-            # Worse: 2.3+ MSVCCompiler constructs the .lib file in the same
-            # directory as the first source file's object file:
-            #    os.path.dirname(objects[0])
-            # rather than in the self.build_temp directory
-            if sys.version_info > (2,3):
-                # 2.3+ - Wrong dir, numbered name
-                src = os.path.join(old_build_temp,
-                               os.path.dirname(ext.sources[0]),
-                               name1)
             else:
-                # 2.2 it is in the right dir, just with the 'numbered' named.
-                src = os.path.join(self.build_temp, name1)
-            dst = os.path.join(old_build_temp, name2)
-            if os.path.abspath(src) != os.path.abspath(dst):
-                self.copy_file(src, dst)#, update=1)
+                name1 = name2 = None
+            if name1 is not None:
+                # The compiler always creates 'pywintypes22.lib', whereas we
+                # actually want 'pywintypes.lib' - copy it over.
+                # Worse: 2.3+ MSVCCompiler constructs the .lib file in the same
+                # directory as the first source file's object file:
+                #    os.path.dirname(objects[0])
+                # rather than in the self.build_temp directory
+                if sys.version_info > (2,3):
+                    # 2.3+ - Wrong dir, numbered name
+                    src = os.path.join(old_build_temp,
+                                   os.path.dirname(ext.sources[0]),
+                                   name1)
+                else:
+                    # 2.2 it is in the right dir, just with the 'numbered' named.
+                    src = os.path.join(self.build_temp, name1)
+                dst = os.path.join(old_build_temp, name2)
+                if os.path.abspath(src) != os.path.abspath(dst):
+                    self.copy_file(src, dst)#, update=1)
         finally:
             self.build_temp = old_build_temp
 
@@ -1675,7 +1686,9 @@ com_extensions += [
     WinExt_win32com('propsys', libraries='propsys',
                     sources=("""
                         %(propsys)s/propsys.cpp
-                        """ % dirs).split()),
+                        """ % dirs).split(),
+                    implib_name="pypropsys.lib",
+                    ),
 
 
     WinExt_win32com('taskscheduler', libraries='mstask',
