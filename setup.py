@@ -1934,9 +1934,7 @@ ext_modules = win32_extensions + com_extensions + pythonwin_extensions + \
 
 if is_py3k:
     py3k_skip_modules = \
-        """odbc win32evtlog win32print win32security win32inet adsi internet
-           mapi bits ifilter isapi PyISAPI_loader
-        """.split()
+        """win32security adsi mapi isapi PyISAPI_loader""".split()
     ext_modules = [e for e in ext_modules if e.name not in py3k_skip_modules]
 
 # Build a map of DLL base addresses.  According to Python's PC\dllbase_nt.txt,
