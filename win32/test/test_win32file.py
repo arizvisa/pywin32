@@ -64,9 +64,7 @@ class TestSimpleOps(unittest.TestCase):
             "Truncated file does not have the expected size! (%s)" %newSize)
     
         # GetFileAttributesEx/GetFileAttributesExW tests.
-        print (win32file.GetFileAttributesEx(testName), win32file.GetFileAttributesExW(testName))
         self.failUnlessEqual(win32file.GetFileAttributesEx(testName), win32file.GetFileAttributesExW(testName))
-                 ##       "ERROR: Expected GetFileAttributesEx and GetFileAttributesExW to return the same data")
     
         attr, ct, at, wt, size = win32file.GetFileAttributesEx(testName)
         self.failUnless(size==newSize, 
@@ -231,6 +229,8 @@ class TestOverlapped(unittest.TestCase):
         win32file.CreateIoCompletionPort(handle, port, 1, 0)
 
         t = threading.Thread(target=self._IOCPServerThread, args=(handle,port, test_overlapped_death))
+        # hrmph - markh is seeing failures here on x64 - and a hang!
+        t.setDaemon(True) # avoid hanging entire test suite on failure.
         t.start()
         try:
             time.sleep(0.1) # let thread do its thing.
@@ -242,7 +242,8 @@ class TestOverlapped(unittest.TestCase):
                     raise
         finally:
             handle.Close()
-            t.join()
+            t.join(3)
+            self.failIf(t.isAlive(), "thread didn't finish")
 
     def testCompletionPortsNonQueuedBadReference(self):
         self.testCompletionPortsNonQueued(True)
@@ -292,9 +293,10 @@ class TestSocketExtensions(unittest.TestCase):
         t = threading.Thread(target=self.acceptWorker, args=(port, running,stopped))
         t.start()
         running.wait(2)
-        if not running.is_set():
+        if not running.isSet():
             self.fail("AcceptEx Worker thread failed to start")
-        s = socket.create_connection(('127.0.0.1', port), 10)
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.connect(('127.0.0.1', port))
         win32file.WSASend(s, b"hello", None)
         overlapped = pywintypes.OVERLAPPED()
         overlapped.hEvent = win32event.CreateEvent(None, 0, 0, None)
@@ -395,14 +397,14 @@ class TestDirectoryChanges(unittest.TestCase):
         flags = win32con.FILE_NOTIFY_CHANGE_FILE_NAME
         while 1:
             try:
-                print ("waiting", dh)
+                print("waiting", dh)
                 changes = win32file.ReadDirectoryChangesW(dh,
                                                           8192,
                                                           False, #sub-tree
                                                           flags)
-                print ("got", changes)
+                print("got", changes)
             except:
-                traceback.print_exc()
+                raise
             changes.extend(changes)
 
     def _watcherThreadOverlapped(self, dn, dh, changes):
@@ -433,7 +435,7 @@ class TestDirectoryChanges(unittest.TestCase):
                     # print "looks like dir handle was closed!"
                     return
             else:
-                print ("ERROR: Watcher thread timed-out!")
+                print("ERROR: Watcher thread timed-out!")
                 return # kill the thread!
 
     def tearDown(self):
@@ -447,13 +449,13 @@ class TestDirectoryChanges(unittest.TestCase):
             try:
                 shutil.rmtree(dn)
             except OSError:
-                print ("FAILED to remove directory", dn)
+                print("FAILED to remove directory", dn)
 
         for t in self.watcher_threads:
             # closing dir handle should have killed threads!
             t.join(5)
-            if t.is_alive():
-                print ("FAILED to wait for thread termination")
+            if t.isAlive():
+                print("FAILED to wait for thread termination")
 
     def stablize(self):
         time.sleep(0.5)
@@ -491,7 +493,7 @@ class TestEncrypt(unittest.TestCase):
             except win32file.error as details:
                 if details.winerror != winerror.ERROR_ACCESS_DENIED:
                     raise
-                print ("It appears this is not NTFS - cant encrypt/decrypt")
+                print("It appears this is not NTFS - cant encrypt/decrypt")
             win32file.DecryptFile(fname)
         finally:
             if f is not None:

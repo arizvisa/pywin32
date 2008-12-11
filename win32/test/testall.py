@@ -30,9 +30,8 @@ class TestRunner:
             p = subprocess.Popen(self.argv,
                                  stdout=subprocess.PIPE,
                                  stderr=subprocess.STDOUT)
-            p.wait()
+            output, _ = p.communicate()
             rc = p.returncode
-            output = p.stdout.read()
         except ImportError:
             # py2.3?
             fin, fout, ferr = os.popen3(" ".join(self.argv))

@@ -1,5 +1,6 @@
-import win32evtlog, traceback
-import win32api, win32con
+import win32evtlog
+import win32api
+import win32con
 import win32security # To translate NT Sids to account names.
 
 import win32evtlogutil
