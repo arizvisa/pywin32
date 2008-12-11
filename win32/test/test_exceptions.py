@@ -41,12 +41,11 @@ class TestAPISimple(TestBase):
         try:
             win32api.CloseHandle(1)
             self.fail("expected exception!")
-        except win32api.error as xxx_todo_changeme:
-            (werror, func, msg) = xxx_todo_changeme.args
-            self.failUnlessEqual(werror, winerror.ERROR_INVALID_HANDLE)
-            self.failUnlessEqual(func, "CloseHandle")
+        except win32api.error as exc:
+            self.failUnlessEqual(exc.winerror, winerror.ERROR_INVALID_HANDLE)
+            self.failUnlessEqual(exc.funcname, "CloseHandle")
             expected_msg = win32api.FormatMessage(winerror.ERROR_INVALID_HANDLE).rstrip()
-            self.failUnlessEqual(msg, expected_msg)
+            self.failUnlessEqual(exc.strerror, expected_msg)
 
     def testAsStr(self):
         exc = self._getInvalidHandleException()

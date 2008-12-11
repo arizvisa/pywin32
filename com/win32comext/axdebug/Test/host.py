@@ -109,7 +109,7 @@ def TestSmartHelper():
 	
 	pydebugger.AttachApp(app)
 	cookie = pdm.AddApplication(app)
-	raw_input("Waiting...")
+	input("Waiting...")
 	ttest.test()
 
 	pdm.RemoveApplication(cookie)
@@ -125,7 +125,7 @@ def testdumb():
 
 	parentNode = None	
 	all_real_nodes = {}
-	raw_input("Waiting...")
+	input("Waiting...")
 	print("Done")
 
 def TestSmartProvider():
@@ -136,7 +136,7 @@ def TestSmartProvider():
 #	d.StartDebugger()
 #	d.Attach()
 	d.Break()
-	raw_input("Waiting...")
+	input("Waiting...")
 	ttest.test()
 	d.Close()
 	print("Done")

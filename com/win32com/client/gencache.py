@@ -73,10 +73,7 @@ def _SaveDicts():
 def _LoadDicts():
 	# Load the dictionary from a .zip file if that is where we live.
 	if hasattr(win32com, "__loader__"):
-		try:
-			import cStringIO as io
-		except ImportError:
-			import io
+		import io as io
 		loader = win32com.__loader__
 		arc_path = loader.archive
 		dicts_path = os.path.join(win32com.__gen_path__, "dicts.dat")

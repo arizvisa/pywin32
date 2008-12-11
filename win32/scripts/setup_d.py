@@ -4,7 +4,7 @@
 # or in the cwd.
 
 import win32api
-import _winreg
+import winreg
 import sys
 import shutil
 import os
@@ -59,16 +59,16 @@ def _docopy(src, dest):
 def _doregister(mod_name, dll_name):
     assert os.path.isfile(dll_name), "Shouldn't get here if the file doesn't exist!"
     try:
-        key = _winreg.OpenKey(_winreg.HKEY_LOCAL_MACHINE, "Software\\Python\\PythonCore\\%s\\Modules\\%s" % (sys.winver, mod_name))
-    except _winreg.error:
+        key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, "Software\\Python\\PythonCore\\%s\\Modules\\%s" % (sys.winver, mod_name))
+    except winreg.error:
         try:
-            key = _winreg.OpenKey(_winreg.HKEY_LOCAL_MACHINE, "Software\\Python\\PythonCore\\%s\\Modules\\%s" % (sys.winver, mod_name))
-        except _winreg.error:
+            key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, "Software\\Python\\PythonCore\\%s\\Modules\\%s" % (sys.winver, mod_name))
+        except winreg.error:
             print("Could not find the existing '%s' module registered in the registry" % (mod_name,))
             usage_and_die(4)
     # Create the debug key.
-    sub_key = _winreg.CreateKey(key, "Debug")
-    _winreg.SetValue(sub_key, None, _winreg.REG_SZ, dll_name)
+    sub_key = winreg.CreateKey(key, "Debug")
+    winreg.SetValue(sub_key, None, winreg.REG_SZ, dll_name)
     print("Registered '%s' in the registry" % (dll_name,))
 
 def _domodule(mod_name, release_mod_filename):

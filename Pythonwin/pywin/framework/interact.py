@@ -546,7 +546,7 @@ class InteractiveCore:
 		out_code=os.linesep.join(out_lines)
 		win32clipboard.OpenClipboard()
 		try:
-			win32clipboard.SetClipboardData(win32clipboard.CF_UNICODETEXT, out_code)
+			win32clipboard.SetClipboardData(win32clipboard.CF_UNICODETEXT, str(out_code))
 		finally:
 			win32clipboard.CloseClipboard()
 

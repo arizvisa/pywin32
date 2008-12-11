@@ -1,20 +1,15 @@
 import sys, os
-import winreg as _winreg
 import win32api
 import tempfile
 import unittest
 import gc
 import pythoncom
 import winerror
-
-try:
-    import cStringIO as StringIO
-except:
-    import io as StringIO
-
 from pythoncom import _GetInterfaceCount, _GetGatewayCount
 import win32com
 import logging
+import winreg
+import io as StringIO
 
 def CheckClean():
     # Ensure no lingering exceptions - Python should have zero outstanding
@@ -46,9 +41,9 @@ def RegisterPythonServer(filename, progids=None, verbose=0):
                 break
             # have a CLSID - open it.
             try:
-                HKCR = _winreg.HKEY_CLASSES_ROOT
-                hk = _winreg.OpenKey(HKCR, "CLSID\\%s" % clsid)
-                dll = _winreg.QueryValue(hk, "InprocServer32")
+                HKCR = winreg.HKEY_CLASSES_ROOT
+                hk = winreg.OpenKey(HKCR, "CLSID\\%s" % clsid)
+                dll = winreg.QueryValue(hk, "InprocServer32")
             except WindowsError:
                 # no CLSID or InProcServer32 - not good!
                 break

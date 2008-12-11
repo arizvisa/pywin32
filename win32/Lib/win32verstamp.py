@@ -47,7 +47,7 @@ def VS_FIXEDFILEINFO(maj, min, sub, build, debug=0, is_dll=1):
 
 def nullterm(s):
   # get raw bytes for a NULL terminated unicode string.
-  return (s + '\0').encode('unicode-internal')
+  return (str(s) + '\0').encode('unicode-internal')
 
 def pad32(s, extra=2):
   # extra is normally 2 to deal with wLength
@@ -151,7 +151,7 @@ def stamp(pathname, options):
   if is_debug is None:
     is_debug = os.path.splitext(pathname)[0].lower().endswith("_d")
   # convert None to blank strings
-  for k, v in sdata.items():
+  for k, v in list(sdata.items()):
     if v is None:
       sdata[k] = ""
   vs = VS_VERSION_INFO(vmaj, vmin, vsub, vbuild, sdata, vdata, is_debug, is_dll)

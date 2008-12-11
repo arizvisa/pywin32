@@ -1,5 +1,5 @@
 # Converted "manually" from EMSABTAG.H
-from mapitags import PT_UNSPECIFIED, PT_NULL, PT_I2, PT_LONG, PT_R4, \
+from .mapitags import PT_UNSPECIFIED, PT_NULL, PT_I2, PT_LONG, PT_R4, \
                      PT_DOUBLE, PT_CURRENCY, PT_APPTIME, PT_ERROR, \
                      PT_BOOLEAN, PT_OBJECT, PT_I8, PT_STRING8, PT_UNICODE, \
                      PT_SYSTIME, PT_CLSID, PT_BINARY, PT_SHORT, PT_I4, \

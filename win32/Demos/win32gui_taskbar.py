@@ -36,7 +36,6 @@ class MainWindow:
                 0, 0, hinst, None)
         win32gui.UpdateWindow(self.hwnd)
         self._DoCreateIcons()
-
     def _DoCreateIcons(self):
         # Try and find a custom icon
         hinst =  win32api.GetModuleHandle(None)
@@ -49,7 +48,7 @@ class MainWindow:
             iconPathName = os.path.abspath(os.path.join( os.path.split(sys.executable)[0], "..\\PC\\pyc.ico" ))
         if os.path.isfile(iconPathName):
             icon_flags = win32con.LR_LOADFROMFILE | win32con.LR_DEFAULTSIZE
-            hicon = LoadImage(hinst, iconPathName, win32con.IMAGE_ICON, 0, 0, icon_flags)
+            hicon = win32gui.LoadImage(hinst, iconPathName, win32con.IMAGE_ICON, 0, 0, icon_flags)
         else:
             print("Can't find a Python icon file - using default")
             hicon = win32gui.LoadIcon(0, win32con.IDI_APPLICATION)

@@ -63,9 +63,8 @@ def walk(arg, dirname, names):
           try:
             verstamp.stamp(vars, pathname, desc, is_dll=is_dll)
             numStamped = numStamped + 1
-          except win32api.error as xxx_todo_changeme:
-            (hr, func, desc) = xxx_todo_changeme.args
-            print("Could not stamp", pathname, "Error", hr, "-", desc)
+          except win32api.error as exc:
+            print("Could not stamp", pathname, "Error", exc.winerror, "-", exc.strerror)
         else:
           print('WARNING: description not provided for:', name)
           # skip branding this - assume already branded or handled elsewhere

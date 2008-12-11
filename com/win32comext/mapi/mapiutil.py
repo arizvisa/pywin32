@@ -3,8 +3,7 @@
 TupleType=tuple
 ListType=list
 IntType=int
-StringType=str
-from pywintypes import UnicodeType, TimeType
+from pywintypes import TimeType
 import pythoncom
 import mapi, mapitags
 
@@ -28,7 +27,7 @@ def GetPropTagName(pt):
 	except KeyError:
 		# god-damn bullshit hex() warnings: I don't see a way to get the
 		# old behaviour without a warning!!
-		ret = hex(long(pt))
+		ret = hex(int(pt))
 		# -0x8000000L -> 0x80000000
 		if ret[0]=='-': ret = ret[1:]
 		if ret[-1]=='L': ret = ret[:-1]
@@ -82,7 +81,7 @@ def GetProperties(obj, propList):
 		data = None
 		return None
 	if bRetList:
-		return map( lambda v: v[1], data )
+		return [v[1] for v in data]
 	else:
 		return data[0][1]
 
@@ -142,16 +141,16 @@ def SetProperties( msg, propDict):
 	newProps = []
 	# First pass over the properties we should get IDs for.
 	for key, val in propDict.items():
-		if type(key) in [StringType, UnicodeType]:
+		if type(key) in [str, str]:
 			newProps.append((mapi.PS_PUBLIC_STRINGS, key))
 	# Query for the new IDs
 	if newProps: newIds = msg.GetIDsFromNames(newProps, mapi.MAPI_CREATE)
 	newIdNo = 0
 	newProps = []
 	for key, val in propDict.items():
-		if type(key) in [StringType, UnicodeType]:
+		if type(key) in [str, str]:
 			type_val=type(val)
-			if type_val in [StringType, pywintypes.UnicodeType]:
+			if type_val in [str, str]:
 				tagType = mapitags.PT_UNICODE
 			elif type_val==IntType:
 				tagType = mapitags.PT_I4
