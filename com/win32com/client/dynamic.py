@@ -72,7 +72,9 @@ else:
 # get the type objects for IDispatch and IUnknown
 dispatchType = pythoncom.TypeIIDs[pythoncom.IID_IDispatch]
 iunkType = pythoncom.TypeIIDs[pythoncom.IID_IUnknown]
-_GoodDispatchTypes=[str, IIDType, str]
+
+## Py3k requires a tuple for isinstance
+_GoodDispatchTypes=(str, IIDType)
 _defaultDispatchItem=build.DispatchItem
 
 def _GetGoodDispatch(IDispatch, clsctx = pythoncom.CLSCTX_SERVER):
