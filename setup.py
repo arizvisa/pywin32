@@ -1440,7 +1440,7 @@ for info in (
               win32/src/win32net/win32netuser.cpp
               """),
         ("win32pdh", "", None),
-        ("win32pipe", "", None),
+        ("win32pipe", "", True, None, 'win32/src/win32pipe.i'),
         ("win32print", "winspool user32 gdi32", None, 0x0500),
         ("win32process", "advapi32 user32", None, 0x0500),
         ("win32profile", "Userenv", True, None, 'win32/src/win32profilemodule.cpp'),
@@ -1619,7 +1619,6 @@ com_extensions += [
                         %(mapi)s/PyIProfAdmin.i         %(mapi)s/PyIProfAdmin.cpp
                         %(mapi)s/PyIProfSect.i          %(mapi)s/PyIProfSect.cpp
                         %(mapi)s/PyIMAPIAdviseSink.cpp
-
                         %(mapi)s/mapiutil.cpp
                         %(mapi)s/mapiguids.cpp
                         """ % dirs).split()),
@@ -1934,7 +1933,7 @@ ext_modules = win32_extensions + com_extensions + pythonwin_extensions + \
 
 if is_py3k:
     py3k_skip_modules = \
-        """win32security adsi mapi isapi PyISAPI_loader""".split()
+        """adsi mapi isapi PyISAPI_loader""".split()
     ext_modules = [e for e in ext_modules if e.name not in py3k_skip_modules]
 
 # Build a map of DLL base addresses.  According to Python's PC\dllbase_nt.txt,
