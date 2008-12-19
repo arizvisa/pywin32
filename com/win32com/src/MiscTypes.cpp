@@ -48,7 +48,12 @@ PyComTypeObject::PyComTypeObject( const char *name, PyComTypeObject *pBase, int 
 		0,													/*tp_print*/
 		0, 													/*tp_getattr*/
 		0,													/*tp_setattr*/
+// For b/w compat, we still allow 'cmp()' to work with Py2k, but for Py3k only rich compare is supported.
+#if (PY_VERSION_HEX < 0x03000000)
 		PyIBase::cmp,										/*tp_compare*/
+#else
+		0,
+#endif
 		(reprfunc)PyIBase::repr,							/*tp_repr*/
     	0,													/*tp_as_number*/
 		0,			/*tp_as_sequence*/
@@ -63,14 +68,14 @@ PyComTypeObject::PyComTypeObject( const char *name, PyComTypeObject *pBase, int 
 		0,          /* tp_doc */
 		0,    /* tp_traverse */
 		0,                              /* tp_clear */
-		0,                              /* tp_richcompare */
+		PyIBase::richcmp,               /* tp_richcompare */
 		0,                              /* tp_weaklistoffset */
 		0,					/* tp_iter */
 		0,					/* tp_iternext */
 		0,					/* tp_methods */	
 		0,					/* tp_members */
 		0,					/* tp_getset */
-		0,	//	&PyInterfaceType_Type,	/* tp_base */
+		0, // setup to a real value below.	/* tp_base */
 	};
 
 	*((PyTypeObject *)this) = type_template;
@@ -83,7 +88,6 @@ PyComTypeObject::PyComTypeObject( const char *name, PyComTypeObject *pBase, int 
 	tp_methods=methodList;
 
 	// All interfaces are based on PyInterfaceType, so this type will inherit from it thru pBase
-	// tp_bases=Py_BuildValue("OO", &PyInterfaceType_Type, pBase);
 	if (pBase)
 		tp_base=pBase;
 	else

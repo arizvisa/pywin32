@@ -219,6 +219,8 @@ public:
 	static PyObject *getattro(PyObject *self, PyObject *name);
 	static int setattro(PyObject *op, PyObject *obname, PyObject *v);
 	static int cmp(PyObject *ob1, PyObject *ob2);
+	static PyObject *richcmp(PyObject *ob1, PyObject *ob2, int op);
+
 };
 
 /* Special Type objects */

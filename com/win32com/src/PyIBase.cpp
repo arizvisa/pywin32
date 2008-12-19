@@ -22,14 +22,6 @@ BOOL PyIBase::is_object(PyComTypeObject *which)
 /*static*/PyObject *
 PyIBase::getattro(PyObject *self, PyObject *name)
 {
-	/*
-	if (PyString_Check(name)) {
-		PyObject *rc = ((PyIBase *)self)->getattr(PyString_AsString(name));
-		if (rc)
-			return rc;
-		PyErr_Clear();
-	}
-	*/
 	// Using PyObject_GenericGetAttr allows some special type magic
 	// (ie, 
 	return PyObject_GenericGetAttr(self, name);
@@ -80,3 +72,23 @@ PyObject * PyIBase::repr()
 	return ((PyIBase *)ob1)->compare(ob2);
 }
 
+/*static*/ PyObject *PyIBase::richcmp(PyObject *ob1, PyObject *ob2, int op)
+{
+	// our 'compare' implementations don't assume ob2 is our type, so
+	// no additional checks are needed.
+	int c = cmp(ob1, ob2);
+	// BUT - it doesn't propogate exceptions correctly.
+	if (c==-1 && PyErr_Occurred())
+		return NULL;
+	assert(!PyErr_Occurred()); // should always have returned -1 on error.
+	BOOL ret;
+	if (op==Py_EQ)
+		ret = c == 0;
+	else if (op==Py_NE)
+		ret = c != 0;
+	else {
+		PyErr_SetString(PyExc_TypeError, "Interface pointers only compare equal or not equal");
+		return NULL;
+	}
+	return PyBool_FromLong(ret);
+}

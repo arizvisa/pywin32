@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "PythonCOM.h"
+#include "PyRecord.h"
 
 // @doc
 
@@ -97,28 +98,6 @@ public:
 	}
 	void *data;
 	long ref;
-};
-
-// @object PyRecord|An object that represents a COM User Defined Type.
-// @comm Once created or obtained from other methods, you can simply
-// get and set attributes.
-class PyRecord : public PyObject
-{
-public:
-	PyRecord(IRecordInfo *ri, PVOID data, PyRecordBuffer *owner);
-	~PyRecord();
-
-	static void tp_dealloc(PyObject *ob);
-	static PyObject *getattro(PyObject *self, PyObject *obname);
-	static int setattro(PyObject *self, PyObject *obname, PyObject *v);
-	static PyObject *tp_repr(PyObject *self);
-	static int tp_compare(PyObject *self, PyObject *other);
-	static struct PyMethodDef methods[];
-
-	static PyTypeObject Type;
-	IRecordInfo *pri;
-	void *pdata;
-	PyRecordBuffer *owner;
 };
 
 BOOL PyRecord_Check(PyObject *ob) {return ((ob)->ob_type == &PyRecord::Type);}
@@ -306,7 +285,7 @@ PyTypeObject PyRecord::Type =
 	0,						/* tp_print */
 	0,						/* tp_getattr */
 	0,						/* tp_setattr */
-	PyRecord::tp_compare,	/* tp_compare */
+	0,						/* tp_compare */
 	&PyRecord::tp_repr,		/* tp_repr */
 	0,						/* tp_as_number */
 	0,						/* tp_as_sequence */
@@ -321,7 +300,7 @@ PyTypeObject PyRecord::Type =
 	0,						/* tp_doc */
 	0,						/* tp_traverse */
 	0,						/* tp_clear */
-	0,						/* tp_richcompare */
+	PyRecord::tp_richcompare,			/* tp_richcompare */
 	0,						/* tp_weaklistoffset */
 	0,						/* tp_iter */
 	0,						/* tp_iternext */
@@ -437,6 +416,32 @@ static void _FreeFieldNames(BSTR *strings, ULONG num_names)
 	delete[] strings;
 }
 
+#if (PY_VERSION_HEX < 0x03000000)
+#define PyWinCoreString_ConcatAndDel PyString_ConcatAndDel
+#define PyWinCoreString_Concat PyString_Concat
+#else
+// Unicode versions of '_Concat' etc have different sigs.  Make them the
+// same here...
+void PyWinCoreString_Concat(register PyObject **pv, register PyObject *w)
+{
+	if (!w) { // hrm - string version doesn't do this, but I saw PyObject_Repr() return NULL...
+		Py_XDECREF(*pv);
+		*pv = NULL;
+		return;
+	}
+	PyObject *tmp = PyUnicode_Concat(*pv, w);
+	Py_DECREF(*pv);
+	*pv = tmp;
+}
+
+void PyWinCoreString_ConcatAndDel(register PyObject **pv, register PyObject *w)
+{
+	PyWinCoreString_Concat(pv, w);
+	Py_XDECREF(w);
+}
+
+#endif
+
 PyObject *PyRecord::tp_repr(PyObject *self)
 {
 	ULONG i;
@@ -447,82 +452,48 @@ PyObject *PyRecord::tp_repr(PyObject *self)
 		return NULL;
 	PyObject *obrepr=NULL, *obattrname;
 	BOOL bsuccess=FALSE;
+	PyObject *comma = PyWinCoreString_FromString(_T(", "));
+	PyObject *equals = PyWinCoreString_FromString(_T("="));
+	PyObject *closing_paren=PyWinCoreString_FromString(_T(")"));
+	obrepr = PyWinCoreString_FromString(_T("com_struct("));
 
-#if (PY_VERSION_HEX < 0x03000000)
-	static PyObject *comma = PyString_FromString(", ");
-	static PyObject *equals = PyString_FromString(" = ");
-	obrepr = PyString_FromString("com_struct{");
-	if (obrepr==NULL || comma==NULL || equals==NULL)
+	if (obrepr==NULL || comma==NULL || equals==NULL || closing_paren==NULL)
 		goto done;
 	for (i = 0; i < num_names && obrepr != NULL; i++) {
-		obattrname=PyString_FromUnicode(strings[i]);
+		obattrname=PyWinCoreString_FromString(strings[i]);
 		if (obattrname==NULL)
-			goto done;		// missing some cleanup here
+			goto done;
+		// must exit on error via loop_error from here...
 		if (i > 0){
-			PyString_Concat(&obrepr, comma);
+			PyWinCoreString_Concat(&obrepr, comma);
 			if (!obrepr)
-				goto done;
+				goto loop_error;
 			}
-		PyString_ConcatAndDel(&obrepr, obattrname);
+		PyWinCoreString_Concat(&obrepr, obattrname);
 		if (!obrepr)
-			goto done;
-		PyString_Concat(&obrepr, equals);
+			goto loop_error;
+		PyWinCoreString_Concat(&obrepr, equals);
 		if (!obrepr)
-			goto done;
+			goto loop_error;
 		PyObject *sub_object = PyRecord::getattro(self, obattrname);
 		if (!sub_object)
-			goto done;
-		PyString_ConcatAndDel(&obrepr, PyObject_Repr(sub_object));
-		}
-	PyString_ConcatAndDel(&obrepr, PyString_FromString("}"));
-
-#else
-	// Create unicode repr in py3k
-	static PyObject *comma = PyWinObject_FromWCHAR(L", ");
-	static PyObject *equals = PyWinObject_FromWCHAR(L" = ");
-	static PyObject *closing_paren=PyWinObject_FromWCHAR(L")");
-	obrepr = PyWinObject_FromWCHAR(L"com_struct{");
-	PyObject *tmp=NULL;
-	for (i = 0; i < num_names && obrepr != NULL; i++) {
-		obattrname=PyWinObject_FromWCHAR(strings[i]);
-		if (obattrname==NULL)
-			goto done;
-		if (i > 0){
-			tmp=PyUnicode_Concat(obrepr, comma);
-			if (!tmp)
-				goto done;
-			Py_DECREF(obrepr);
-			obrepr=tmp;
-			}
-		tmp=PyUnicode_Concat(obrepr, obattrname);
-		if (!tmp)
-			goto done;
-		Py_DECREF(obrepr);
-		obrepr=tmp;
+			goto loop_error;
+		PyWinCoreString_ConcatAndDel(&obrepr, PyObject_Repr(sub_object));
+		Py_DECREF(sub_object);
 		Py_DECREF(obattrname);
-		tmp=PyUnicode_Concat(obrepr, equals);
-		if (!tmp)
-			goto done;
-		Py_DECREF(obrepr);
-		obrepr=tmp;
-		PyObject *sub_object = PyRecord::getattro(self, obattrname);
-		if (!sub_object)
-			goto done;
-		tmp=PyUnicode_Concat(obrepr, PyObject_Repr(sub_object));
-		if (!tmp)
-			goto done;
-		Py_DECREF(obrepr);
-		obrepr=tmp;
-		Py_DECREF(sub_object);	// ??? still missing a DECREF for subobject's repr ???
-		}
-	tmp=PyUnicode_Concat(obrepr, closing_paren);
-	if (!tmp)
+		continue;
+
+		// loop error handler.
+		loop_error:
+		Py_DECREF(obattrname);
 		goto done;
-	Py_DECREF(obrepr);
-	obrepr=tmp;
-#endif
+		}
+	PyWinCoreString_Concat(&obrepr, closing_paren);
 	bsuccess=TRUE;
 done:
+	Py_XDECREF(comma);
+	Py_XDECREF(equals);
+	Py_XDECREF(closing_paren);
 	if (strings)
 		_FreeFieldNames(strings, num_names);
 	if (!bsuccess){
@@ -554,7 +525,7 @@ PyObject *PyRecord::getattro(PyObject *self, PyObject *obname)
 		}
 		res = PyList_New(cnames);
 		for (ULONG i=0;i<cnames && res != NULL;i++) {
-			PyObject *item = PyString_FromUnicode(strs[i]);
+			PyObject *item = PyWinCoreString_FromString(strs[i]);
 			SysFreeString(strs[i]);
 			if (item==NULL) {
 				Py_DECREF(res);
@@ -581,20 +552,21 @@ PyObject *PyRecord::getattro(PyObject *self, PyObject *obname)
 
 	PY_INTERFACE_PRECALL;
 	HRESULT hr = pyrec->pri->GetFieldNoCopy(pyrec->pdata, wname, &vret, &sub_data);
+	PyWinObject_FreeWCHAR(wname);
 	PY_INTERFACE_POSTCALL;
 
 	if (FAILED(hr)) {
 		if (hr == TYPE_E_FIELDNOTFOUND){
-			PyErr_Format(PyExc_AttributeError,
-				"This record has no field named '%s'", wname);
-			PyWinObject_FreeWCHAR(wname);
+			// This is slightly suspect - throwing a unicode
+			// object for an AttributeError in py2k - but this
+			// is the value we asked COM for, so it makes sense...
+			// (and PyErr_Format doesn't handle unicode in py2x)
+			PyErr_SetObject(PyExc_AttributeError, obname);
 			return NULL;
 			}
-		PyWinObject_FreeWCHAR(wname);
 		return PyCom_BuildPyException(hr, pyrec->pri, g_IID_IRecordInfo);
 	}
 
-	PyWinObject_FreeWCHAR(wname);
 	// Short-circuit sub-structs and arrays here, so we dont allocate a new chunk
 	// of memory and copy it - we need sub-structs to persist.
 	if (V_VT(&vret)==(VT_BYREF | VT_RECORD))
@@ -667,49 +639,65 @@ int PyRecord::setattro(PyObject *self, PyObject *obname, PyObject *v)
 	return 0;
 }
 
-int PyRecord::tp_compare(PyObject *self, PyObject *other)
+PyObject *PyRecord::tp_richcompare(PyObject *self, PyObject *other, int op)
 {
+	PyObject *ret = NULL;
+	if (op != Py_EQ && op != Py_NE) {
+		PyErr_SetString(PyExc_TypeError, "IIDs only compare equal or not equal");
+		return NULL;
+	}
+	int success = op == Py_EQ ? TRUE : FALSE;
+
+	if (self->ob_type != other->ob_type)
+		return PyBool_FromLong(!success);
 	PyRecord *pyself = (PyRecord *)self;
 	PyRecord *pyother = (PyRecord *)other;
 	if (!pyself->pri->IsMatchingType(pyother->pri)) {
-		// Not matching types - just compare the object addresses!
-		// (doesnt matter what we use here, as long as it is consistent)
-		return pyself->pdata < pyother->pdata ? -1 : 1;
+		// Not matching types, so must compare False.
+		return PyBool_FromLong(!success);
 	}
 	// Need to do a recursive compare, as some elements may be pointers
 	// (eg, strings, objects)
 	ULONG num_names;
 	BSTR *strings = _GetFieldNames(pyself->pri, &num_names);
 	if (strings==NULL) return NULL;
-	int ret;
 	for (ULONG i=0;i<num_names;i++) {
 		ret = 0;
 		PyObject *obattrname;
 		obattrname=PyWinCoreString_FromString(strings[i]);
 		if (obattrname==NULL)
-			return -2;
+			goto done;
 		// There appear to be several problems here.  This will leave an exception hanging
 		//	if an attribute is not found, and should probably return False if other does not
 		//	have an attr that self does ???
+		//	MarkH: but is that possible in practice?  For structures,
+		//	an attribute must be found, and the set must be identical
+		//	(we have already checked the 'type' is the same above)
+		//	(defense against COM errors etc would be nice though :)
 		PyObject *self_sub = PyRecord::getattro(self, obattrname);
-		if (self_sub) {
-			PyObject *other_sub = PyRecord::getattro(other, obattrname);
-			if (other_sub){
-				ret = PyObject_Compare(self_sub, other_sub);
-				Py_DECREF(other_sub);
-				}
-			else{
-				PyErr_Clear();
-				ret=1;
-				}
+		if (!self_sub) {
+			Py_DECREF(obattrname);
+			goto done;
+		}
+		PyObject *other_sub = PyRecord::getattro(other, obattrname);
+		if (!other_sub){
+			Py_DECREF(obattrname);
 			Py_DECREF(self_sub);
-			}
-		else
-			PyErr_Clear();
+			goto done;
+		}
+		int c = PyObject_RichCompareBool(self_sub, other_sub, op);
+		Py_DECREF(self_sub);
+		Py_DECREF(other_sub);
 		Py_DECREF(obattrname);
-		if (ret != 0)
-			break;
+		if (c == -1)
+			goto done;
+		if (c != success) {
+			ret = PyBool_FromLong(c);
+			goto done;
+		}
 	}
+	ret = PyBool_FromLong(success);
+done:
 	_FreeFieldNames(strings, num_names);
 	return ret;
 }
