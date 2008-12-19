@@ -17,12 +17,11 @@ class PerfMonQuery:
 	def Query(self, object, counter, instance = None, machine = None):
 		try:
 			return win32pdhutil.GetPerformanceAttributes(object, counter, instance, machine=machine)
-		except win32pdhutil.error as xxx_todo_changeme:
-			(rc, fn, desc) = xxx_todo_changeme.args
-			raise exception.Exception(desc=desc)
+		except win32pdhutil.error as exc:
+			raise exception.Exception(desc=exc.strerror)
 		except TypeError as desc:
 			raise exception.Exception(desc=desc,scode=winerror.DISP_E_TYPEMISMATCH)
-				
+
 if __name__=='__main__':
 	print("Registering COM server...")
 	register.UseCommandLine(PerfMonQuery)
