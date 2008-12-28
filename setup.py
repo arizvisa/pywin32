@@ -1136,7 +1136,10 @@ class my_build_ext(build_ext):
             swig = os.environ["SWIG"]
         else:
             # We know where our swig is
-            swig = os.path.abspath(r"swig\swig.exe")
+            if is_py3k:
+                swig = os.path.abspath(r"swig\swig_py3k.exe")
+            else:
+                swig = os.path.abspath(r"swig\swig.exe")
         lib = os.path.join(os.path.dirname(swig), "swig_lib")
         os.environ["SWIG_LIB"] = lib
         return swig
