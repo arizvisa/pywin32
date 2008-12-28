@@ -38,7 +38,6 @@ CGdiObject *PyCGdiObject::GetGdiObject (PyObject *self, DWORD gtype)
 
 PyCGdiObject::~PyCGdiObject()
 {
-  //DoKillAssoc(TRUE);
 }
 
 // @object PyCGdiObject|A class which encapsulates an MFC CGdiObject.

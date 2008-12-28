@@ -609,15 +609,9 @@ PyCWnd::~PyCWnd()
 		CWnd *pWnd = (CWnd *)this->assoc; // get pointer before killing it.
 		if (pWnd) {
 			if (bDidSubclass) {
-	//			pWnd->Detach();
 				pWnd->UnsubclassWindow();
 				bDidSubclass = FALSE;
 			}
-	// DONT detach - bDidSubclass is only logic needed.
-	//		if (pWnd->GetSafeHwnd()) {
-	//			TRACE("Warning - DoKillAssoc detaching from existing window\n");
-	//			pWnd->Detach();
-	//		}
 			if (bManualDelete) {
 				// Release the lock while we destroy the object.
 				GUI_BGN_SAVE;

@@ -22,7 +22,7 @@ class CAssocManager
 public:
 	CAssocManager();
 	~CAssocManager();
-	void Assoc(void *assoc, ui_assoc_object *PyObject, void *oldAssoc=NULL);
+	void Assoc(void *assoc, ui_assoc_object *PyObject);
 	ui_assoc_object *GetAssocObject(void * handle);
 
 	void cleanup(void);	// only to be called at the _very_ end
@@ -78,11 +78,10 @@ public:	// some probably shouldnt be, but...
 protected:
 	void *GetGoodCppObject(ui_type *ui_type_check=NULL) const;
 	virtual bool CheckCppObject(ui_type *ui_type_check) const {return true;}
-	// Does the actual killing.
-	virtual void DoKillAssoc( BOOL bDestructing = FALSE ); // does the actual work.
 	// Called during KillAssoc - normally zeroes association.
 	// Override to keep handle after destruction (eg, the association
 	// with a dialog is valid after the Window's window has closed).
+	// XXX?  bogus too?
 	virtual void SetAssocInvalid() { assoc = 0; }
 
 	ui_assoc_object(); // ctor/dtor

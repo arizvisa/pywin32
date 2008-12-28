@@ -174,22 +174,13 @@ PyCDialog::~PyCDialog()
 		GlobalFree(hSaved);
 	}
 
-	PyCWnd::DoKillAssoc(TRUE);
 	ui_assoc_object::SetAssocInvalid();	// must call this explicitely, as I ignore SetAssocInvalid
-	Py_XDECREF(ddlist);
-	Py_XDECREF(dddict);
-}
-void PyCDialog::DoKillAssoc(BOOL bDestructing /*=FALSE*/ )
-{
-	// we can not have the pointer deleted at window destruction time
+	Py_XDECREF(ddlist);	// we can not have the pointer deleted at window destruction time
 	// for a dialog (as MFC still needs it after the dialog has completed
 	BOOL bManDeleteSave = bManualDelete;
-	if (!bDestructing)
-		bManualDelete = FALSE;
-	PyCWnd::DoKillAssoc(bDestructing);
-	if (!bDestructing)
-		bManualDelete = bManDeleteSave;
+	Py_XDECREF(dddict);
 }
+
 PyObject *
 PyCDialog::getattro(PyObject *obname)
 {

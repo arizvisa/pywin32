@@ -14,8 +14,6 @@ public:	// some probably shouldnt be, but...
 	CMapWordToPtr *pOleEventHookList;
 	CMapWordToPtr *pCommandUpdateHookList;
 
-	virtual void DoKillAssoc( BOOL bDestructing = FALSE );
-
 	// virtuals for Python support
 	virtual CString repr();
 

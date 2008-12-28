@@ -20,7 +20,6 @@ public:
 protected:
 	PyCDialog();
 	virtual ~PyCDialog();
-	virtual void DoKillAssoc( BOOL bDestructing=FALSE);
 	virtual void SetAssocInvalid() {return;	}//ignore
 public:
 	virtual PyObject *getattro(PyObject *obname);

@@ -76,37 +76,31 @@ void CAssocManager::RemoveAssoc(void *handle)
 	lastLookup = 0;	// set cache invalid.
 }
 
-void CAssocManager::Assoc(void *handle, ui_assoc_object *object, void *oldHandle)
+void CAssocManager::Assoc(void *handle, ui_assoc_object *object)
 {
 	m_critsec.Lock();
-	if (oldHandle) {
-		// if window previously closed, this may fail when the Python object
-		// destructs - but this is not a problem.
-		RemoveAssoc(oldHandle);
-	}
-	if (handle) {
+	ASSERT(handle);
 #ifdef DEBUG
-		// overwriting an existing entry probably means we are failing to
-		// detect the death of the old object and its address has been reused.
-		if (object) { // might just be nuking ours, so we expect to find outself!
-			PyObject *existing_weakref;
-			if (map.Lookup(handle, (void *&)existing_weakref)) {
-				TRACE("CAssocManager::Assoc overwriting existing assoc\n");
-	//			DebugBreak();
-			}
+	// overwriting an existing entry probably means we are failing to
+	// detect the death of the old object and its address has been reused.
+	if (object) { // might just be nuking ours, so we expect to find outself!
+		PyObject *existing_weakref;
+		if (map.Lookup(handle, (void *&)existing_weakref)) {
+			TRACE("CAssocManager::Assoc overwriting existing assoc\n");
+			DebugBreak();
 		}
+	}
 #endif
-		RemoveAssoc(handle);
-		if (object) {
-			PyObject *weakref = PyWeakref_NewRef(object, NULL);
-			if (weakref)
-				// reference owned by the map.
-				map.SetAt(handle, weakref);
-			else {
-				TRACE("Failed to create weakref\n");
-				gui_print_error();
-				DebugBreak();
-			}
+	RemoveAssoc(handle);
+	if (object) {
+		PyObject *weakref = PyWeakref_NewRef(object, NULL);
+		if (weakref)
+			// reference owned by the map.
+			map.SetAt(handle, weakref);
+		else {
+			TRACE("Failed to create weakref\n");
+			gui_print_error();
+			DebugBreak();
 		}
 	}
 	m_critsec.Unlock();
@@ -272,35 +266,10 @@ void ui_assoc_object::KillAssoc()
 	const char *szRep = rep;
 	TRACE("Destroying association with %p and %s",this,szRep);
 #endif
-	// note that _any_ of these may cause this to be deleted, as the reference
-	// count may drop to zero.  If any one dies, and later ones will fail.  Therefore
-	// I incref first, and decref at the end.
-	// Note that this _always_ recurses when this happens as the destructor also
-	// calls us to cleanup.  Forcing an INCREF/DODECREF in that situation causes death
-	// by recursion, as each dec back to zero causes a delete.
-	// (*sob* - but in that case, the INCREF of the object shouldn't be necessary -
-	// if anyone touches a refcount of our dead object we will end up crashing - and
-	// if noone does touch the refcount, we should not need to bump it for the duration.)
-	BOOL bDestructing = ob_refcnt==0;
-	if (!bDestructing)
-		Py_INCREF(this);
-	DoKillAssoc(bDestructing);	// kill all map entries, etc.
-	SetAssocInvalid();			// let child do whatever to detect
-	if (!bDestructing)
-		DODECREF(this);
-}
-// the virtual version...
-// ASSUMES WE HOLD THE PYTHON LOCK as for all Python object destruction.
-void ui_assoc_object::DoKillAssoc( BOOL bDestructing /*= FALSE*/ )
-{
-	// In Python debug builds, this can get recursive -
-	// Python temporarily increments the refcount of the dieing
-	// object - this object death will attempt to use the dieing object.
-	PyObject *vi = virtualInst;
-	virtualInst = NULL;
-	Py_XDECREF(vi);
+	Py_CLEAR(virtualInst);
 //	virtuals.DeleteAll();
-	handleMgr.Assoc(0,this,assoc);
+	handleMgr.Assoc(assoc, 0);
+	SetAssocInvalid();			// let child do whatever to detect
 }
 
 PyObject *ui_assoc_object::GetGoodRet()
