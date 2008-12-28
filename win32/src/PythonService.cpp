@@ -541,49 +541,16 @@ static struct PyMethodDef servicemanager_functions[] = {
 };
 
 
-#define ADD_CONSTANT(tok) if (PyModule_AddIntConstant(module, #tok, tok) == -1) RETURN_ERROR;
+#define ADD_CONSTANT(tok) if (PyModule_AddIntConstant(module, #tok, tok) == -1) PYWIN_MODULE_INIT_RETURN_ERROR;
 
-extern "C" __declspec(dllexport)
-#if (PY_VERSION_HEX < 0x03000000)
-void initservicemanager(void)
-#else
-PyObject *PyInit_servicemanager(void)
-#endif
+PYWIN_MODULE_INIT_FUNC(servicemanager)
 {
-
-	PyObject *dict, *module;
-	PyWinGlobals_Ensure();
-
-#if (PY_VERSION_HEX < 0x03000000)
-#define RETURN_ERROR return;
-	  module = Py_InitModule("servicemanager", servicemanager_functions);
-	if (!module)
-		return;
-	dict = PyModule_GetDict(module);
-	if (!dict)
-		return;
-#else
-
-#define RETURN_ERROR return NULL;
-	static PyModuleDef servicemanager_def = {
-		PyModuleDef_HEAD_INIT,
-		"servicemanager",
-		"A module that interfaces with the Windows Service Control Manager.",
-		-1,
-		servicemanager_functions
-		};
-	module = PyModule_Create(&servicemanager_def);
-	if (!module)
-		return NULL;
-	dict = PyModule_GetDict(module);
-	if (!dict)
-		return NULL;
-#endif
-
+  PYWIN_MODULE_INIT_PREPARE(servicemanager, servicemanager_functions,
+        "A module that interfaces with the Windows Service Control Manager.");
   HMODULE advapi32_module;
   servicemanager_startup_error = PyErr_NewException("servicemanager.startup_error", NULL, NULL);
   if (servicemanager_startup_error == NULL)
-	  RETURN_ERROR;
+    PYWIN_MODULE_INIT_RETURN_ERROR;
 
   PyDict_SetItemString(dict, "startup_error", servicemanager_startup_error);
 
@@ -619,9 +586,7 @@ PyObject *PyInit_servicemanager(void)
       }
   }
 
-#if (PY_VERSION_HEX >= 0x03000000)
-	return module;
-#endif
+  PYWIN_MODULE_INIT_RETURN_SUCCESS;
 }
 
 // Couple of helpers for the service manager
