@@ -37,7 +37,7 @@ generates Windows .hlp files.
 
 class PyCRectType : public ui_type {
 public:
-	PyCRectType( const char *name, ui_type *pBaseType, int typeSize, struct PyMethodDef* methodList, ui_base_class * (* thector)() );
+	PyCRectType( const char *name, ui_type *pBaseType, int typeSize, int pyobjOffset, struct PyMethodDef* methodList, ui_base_class * (* thector)() );
 };
 // @object PyCRect|A Python interface the the MFC CRect class.
 class PyCRect : public ui_base_class
@@ -170,8 +170,8 @@ PyCRect_methods[] =
 	{ NULL,			NULL }
 };
 
-PyCRectType::PyCRectType( const char *name, ui_type *pBaseType, int typeSize, struct PyMethodDef* methodList, ui_base_class * (* thector)() ) :
-	  ui_type(name, pBaseType, typeSize, methodList, thector)
+PyCRectType::PyCRectType( const char *name, ui_type *pBaseType, int typeSize, int pyobjOffset, struct PyMethodDef* methodList, ui_base_class * (* thector)() ) :
+	  ui_type(name, pBaseType, typeSize, pyobjOffset, methodList, thector)
 {
 		  tp_as_sequence = &PyCRect_Sequence;
 }
@@ -179,6 +179,7 @@ PyCRectType::PyCRectType( const char *name, ui_type *pBaseType, int typeSize, st
 PyCRectType PyCRect::type("PyCRect",
 							 &ui_base_class::type,
 							 sizeof(PyCRect),
+							 PYOBJ_OFFSET(PyCRect),
 							 PyCRect_methods,
 							 NULL);
 

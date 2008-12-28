@@ -66,7 +66,7 @@ Python_OnCmdMsg (CCmdTarget *obj, UINT nID, int nCode,
 			// everything's fine
 
 			CWnd *control = ((CWnd *)obj)->GetDlgItem(nID);
-			PyCCmdTarget *pObj = (PyCCmdTarget *) ui_assoc_CObject::GetPyObject(control);
+			PyCCmdTarget *pObj = (PyCCmdTarget *) ui_assoc_CObject::GetAssocObject(control);
 			if (pObj && pObj->pOleEventHookList && 
 				pObj->pOleEventHookList->Lookup ((unsigned short)pEvent->m_dispid, (void *&)method)) {
 					CEnterLeavePython _celp;
@@ -76,21 +76,26 @@ Python_OnCmdMsg (CCmdTarget *obj, UINT nID, int nCode,
 
 						ASSERT(pfnMakeOlePythonCall);
 					}
-					if (pfnMakeOlePythonCall==NULL) 
+					if (pfnMakeOlePythonCall==NULL) {
+						Py_DECREF(pObj);
 						return FALSE;
+					}
 					VARIANT result;
 					VariantInit(&result);
 					(*pfnMakeOlePythonCall)(method, pEvent->m_pDispParams, &result, pEvent->m_pExcepInfo, pEvent->m_puArgError, NULL);
 					VariantClear(&result);
 					if (PyErr_Occurred())	// if any Python exception, pretend it was OK
 						gui_print_error();
+					Py_DECREF(pObj);
 					return TRUE;
 			}
+			Py_XDECREF(pObj);
 		}
 	}
 #endif // !_AFX_NO_OCC_SUPPORT
 
-	PyCCmdTarget *pObj = (PyCCmdTarget *) ui_assoc_CObject::GetPyObject(obj);
+	PyCCmdTarget *pObj = (PyCCmdTarget *) ui_assoc_CObject::GetAssocObject(obj);
+	// Must exit via 'exit' from here...
 	BOOL rc = FALSE; // default not handled.
 	// Give Python code the chance to handle other stuff.
 	if (pObj != NULL &&
@@ -106,7 +111,7 @@ Python_OnCmdMsg (CCmdTarget *obj, UINT nID, int nCode,
 				PyObject *ob = ui_assoc_object::make( PyCCmdUI::type, pUI );
 				if (ob==NULL) {
 					OutputDebugString(_T("Could not make object for CCmdUI handler"));
-					return FALSE;
+					goto done;
 				}
 				{
 					CEnterLeavePython _celp;
@@ -156,6 +161,8 @@ Python_OnCmdMsg (CCmdTarget *obj, UINT nID, int nCode,
 			}
 		}
 	}
+done:
+	Py_XDECREF(pObj);
 	return rc;
 }
 
@@ -306,6 +313,7 @@ PyCCmdUI::getattro(PyObject *obname)
 ui_type PyCCmdUI::type("PyCCmdUI", 
 					   &ui_assoc_object::type, 
 					   sizeof(PyCCmdUI), 
+					   PYOBJ_OFFSET(PyCCmdUI), 
 					   PyCCmdUI_methods, 
 					   GET_PY_CTOR(PyCCmdUI));
 

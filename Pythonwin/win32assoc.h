@@ -23,13 +23,16 @@ public:
 	CAssocManager();
 	~CAssocManager();
 	void Assoc(void *assoc, ui_assoc_object *PyObject, void *oldAssoc=NULL);
-	ui_assoc_object *GetAssocObject(const void * handle);
+	ui_assoc_object *GetAssocObject(void * handle);
 
 	void cleanup(void);	// only to be called at the _very_ end
 private:
+	void RemoveAssoc(void *handle);
+	// A "map" of weak-references to Python objects.  Now we use weakrefs
+	// this really should be a regular Python dict...
 	CMapPtrToPtr map;
 	const void *lastLookup;
-	ui_assoc_object *lastObject;
+	PyObject *lastObjectWeakRef;
 	CCriticalSection m_critsec;
 #ifdef _DEBUG
 	int cacheLookups;
@@ -46,7 +49,9 @@ public:	// some probably shouldnt be, but...
 	static ui_assoc_object *make( ui_type &makeType, void * search, bool skipLookup=false );
 
 	// Given a C++ object, return a PyObject associated (map lookup)
-	static ui_assoc_object *GetPyObject(void *search);
+	static ui_assoc_object *GetAssocObject(void *search) {
+		return ui_assoc_object::handleMgr.GetAssocObject(search);
+	}
 
 	// Return the C++ object associated with this Python object.
 	// Do as much type checking as possible.

@@ -122,7 +122,9 @@ BOOL HookWindowsMessages()
 // ui_type object
 //
 //////////////////////////////////////////////////////////////////////
-ui_type::ui_type( const char *name, ui_type *pBase, int typeSize, struct PyMethodDef* methodList, ui_base_class * (* thector)() )
+ui_type::ui_type( const char *name, ui_type *pBase, int typeSize,
+		 int pyobjOffset, // number of bytes difference between a (PyObject *) and a (ui_base_class *)
+		 struct PyMethodDef* methodList, ui_base_class * (* thector)() )
 {
 // originally, this copied the typeobject of the parent, but as it is impossible
 // to guarantee order of static object construction, I went this way.  This is 
@@ -147,12 +149,12 @@ ui_type::ui_type( const char *name, ui_type *pBase, int typeSize, struct PyMetho
 		ui_base_class::sui_getattro,	/* tp_getattro */
 		ui_base_class::sui_setattro,	/* tp_setattro */
 		0,						/* tp_as_buffer */
-		Py_TPFLAGS_DEFAULT,		/* tp_flags */
+		Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE, /* tp_flags */
 		0,						/* tp_doc */
 		0,						/* tp_traverse */
 		0,						/* tp_clear */
 		0,						/* tp_richcompare */
-		0,						/* tp_weaklistoffset */
+		offsetof(ui_base_class, weakreflist),/* tp_weaklistoffset */
 		0,						/* tp_iter */
 		0,						/* tp_iternext */
 		0,						/* tp_methods */
@@ -171,6 +173,13 @@ ui_type::ui_type( const char *name, ui_type *pBase, int typeSize, struct PyMetho
 	*((PyTypeObject *)this) = type_template;
 	((PyObject *)this)->ob_type=&PyType_Type;
 	tp_methods = methodList;
+	//#define funky_offsetof_weakreflist ((size_t) &((PyObject *)(ui_base_class *)0)->weakreflist)
+
+#if (PY_VERSION_HEX < 0x03000000)
+	tp_flags |= Py_TPFLAGS_HAVE_WEAKREFS; // flag doesn't exist in py3k
+#endif
+
+	tp_weaklistoffset -= pyobjOffset;
 	// cast away const, as Python doesnt use it.
 	tp_name = (char *)name;
 	tp_basicsize = typeSize;
@@ -187,8 +196,8 @@ ui_type::~ui_type()
 // ui_type_CObject
 ui_type_CObject::CRuntimeClassTypeMap *ui_type_CObject::typemap = NULL;
 
-ui_type_CObject::ui_type_CObject( const char *name, ui_type *pBaseType, CRuntimeClass *pRT, int typeSize, struct PyMethodDef* methodList, ui_base_class * (* thector)() )
-	: ui_type(name, pBaseType, typeSize, methodList, thector )
+ui_type_CObject::ui_type_CObject( const char *name, ui_type *pBaseType, CRuntimeClass *pRT, int typeSize, int pyobjOffset, struct PyMethodDef* methodList, ui_base_class * (* thector)() )
+	: ui_type(name, pBaseType, typeSize, pyobjOffset, methodList, thector )
 {
 	pCObjectClass = pRT;
 	if (pRT) {
@@ -220,6 +229,7 @@ IMPLEMENT_DYNAMIC(ui_base_class, CObject);
 ui_base_class::ui_base_class()
 {
 	strcpy(sig, SIG);
+	weakreflist = NULL;
 }
 ui_base_class::~ui_base_class()
 {
@@ -254,34 +264,48 @@ ui_base_class *ui_base_class::make( ui_type &makeTypeRef)
 	if (o==NULL || o==Py_None)
 		return FALSE;
 
-	/* Make sure GIL is held, called from several places where it's not */
+	/* Make sure GIL is held; we are called from several places where it's not */
 	CEnterLeavePython _celp;
-	/* MFC objects now use Python's own inheritance */
-	if (PyObject_IsInstance(o, (PyObject *)which))
-		return TRUE;
+	// Sadly this function is regularly called as objects are destructing
+	// (ie, their ob_refcnt==0.) PyObject_IsInstance dies in this case, so
+	// we walk tp_bases manually. This also allows us to maintain the old
+	// semantics of "only look for '_obj_' when not some base of ours" as
+	// a nice side-effect.
+	bool is_native = false;
+	PyTypeObject *thisType = o->ob_type;
+	while (thisType) {
+		if (thisType==&ui_base_class::type)
+			is_native = true; // is a c++ impl object.
+		if (which==thisType)
+			return TRUE;
+		thisType = thisType->tp_base;
+	}
 
 	assert (!PyErr_Occurred());
+	if (is_native)
+		// not python implemented...
+		return FALSE;
 	PyObject *obattr= PyObject_GetAttrString(o, "_obj_");
 	if (obattr==NULL){
 		PyErr_Clear();
 		TRACE("is_uiobject fails due to object being an instance without an _obj_ attribute!\n");
 		return FALSE;
-		}
+	}
 
-	// ??? I think this leaks a ref to obattr ???
-	// Right - we are *replacing* 'o' so the caller magically gets the
-	// _obj_ - so there is definately a leak here:  Either:
-	// * Callers do manage ref-counts correctly - in which case we must
-	//   decref the existing object before swapping the value.
-	// * Callers don't manage ref-counts correctly - they need to be fixed.
+	// ack - this sucks - the silly "*&" signature means the object can
+	// be changed 'underneath' the caller (to the _obj_ attribute) - but
+	// none of the callers hold a reference to 'o', so will not DECREF
+	// the result.
+	// As we expect the '_obj_' attribute to be a real held reference
+	// (rather than a temp or dynamic one), we simply check the refcount
+	// is 'safe' for us to decrement before returning.
+	if (obattr->ob_refcnt < 2) {
+		PyErr_SetString(PyExc_TypeError, "The _obj_ attribute is a temp object so can't be used");
+		return NULL;
+	}
+	Py_DECREF(obattr);
 	o = obattr;
 	return is_uiobject(o, which);
-}
-
-/*static*/BOOL ui_base_class::is_nativeuiobject(PyObject *ob, ui_type *which)
-{
-	// check for inheritance.
-	return PyObject_IsInstance(ob, (PyObject *)which);
 }
 
 BOOL ui_base_class::is_uiobject(ui_type *which)
@@ -346,9 +370,12 @@ void ui_base_class::cleanup()
 	TRACE("cleanup detected type %s, refcount = %d\n",szTyp,ob_refcnt);
 }
 
-/*static*/ void ui_base_class::sui_dealloc(PyObject *window)
+/*static*/ void ui_base_class::sui_dealloc(PyObject *ob)
 {
-	delete (ui_base_class *)window;
+	ui_base_class *b = (ui_base_class *)ob;
+	if (b->weakreflist != NULL)
+		PyObject_ClearWeakRefs(ob);
+	delete b;
 }
 
 struct PyMethodDef ui_base_class_methods[] = {
@@ -359,6 +386,7 @@ struct PyMethodDef ui_base_class_methods[] = {
 ui_type ui_base_class::type( "PyCBase", 
 							NULL, 
 							sizeof(ui_base_class), 
+							PYOBJ_OFFSET(ui_base_class), 
 							ui_base_class_methods, 
 							NULL);
 
@@ -378,6 +406,7 @@ void DumpAssocPyObject( CDumpContext &dc , void *object )
 		if (AfxIsValidAddress(py_bob, sizeof(ui_assoc_object))) {
 			dc << py_bob << " with refcounf " << 
 			py_bob->ob_refcnt;
+			Py_XDECREF(py_bob);
 		} else
 			dc  << "<at invalid address!>";
 	}
@@ -536,10 +565,15 @@ void Python_delete_assoc( void *ob )
 	CVirtualHelper helper ("OnAttachedObjectDeath", ob);
 	helper.call();
 	}
+	if (bInFatalShutdown) {
+		TRACE("Not destroying assoc - in fatal shutdown!\n");
+		return;
+	}
 	ui_assoc_object *pObj;
-	if ((pObj=ui_assoc_object::GetPyObject(ob)) && !bInFatalShutdown) {
+	if ((pObj=ui_assoc_object::GetAssocObject(ob))) {
 		CEnterLeavePython _celp; // KillAssoc requires it is held!
 		pObj->KillAssoc();
+		Py_DECREF(pObj);
 	}
 }
 
@@ -1420,7 +1454,7 @@ ui_is_object(PyObject *self, PyObject *args)
   // @pyparm object|o||The object to check.
   if (!PyArg_ParseTuple(args, "O:IsObject", &obj))
     return NULL;
-  return Py_BuildValue("i", ui_base_class::is_nativeuiobject(obj,&ui_base_class::type) ? 1 : 0 );
+  return PyBool_FromLong(PyObject_IsInstance(obj, (PyObject *)&ui_base_class::type));
 }
 
 // @pymethod <o PyDLL>|win32ui|GetResource|Retrieve the object associated with the applications resources.

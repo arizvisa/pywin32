@@ -242,6 +242,7 @@ int PyCDockContext::setattro(PyObject *obname, PyObject *value)
 ui_type PyCDockContext::type("PyCDockContext",
 							 &ui_assoc_object::type,
 							 sizeof(PyCDockContext),
+							 PYOBJ_OFFSET(PyCDockContext),
 							 PyCDockContext_methods,
 							 GET_PY_CTOR(PyCDockContext));
 
@@ -484,6 +485,7 @@ ui_type_CObject PyCControlBar::type ("PyCControlBar",
 					&PyCWnd::type, 
 					RUNTIME_CLASS(CControlBar),
 					sizeof(PyCControlBar),
+					PYOBJ_OFFSET(PyCControlBar),
 					PyCControlBar_methods,
 					GET_PY_CTOR(PyCControlBar));
 
@@ -877,6 +879,7 @@ ui_type_CObject PyCToolBar::type ("PyCToolBar",
 					&PyCControlBar::type, 
 					RUNTIME_CLASS(CToolBar),
 					sizeof(PyCToolBar),
+					PYOBJ_OFFSET(PyCToolBar),
 					PyCToolBar_methods,
 					GET_PY_CTOR(PyCToolBar));
 
@@ -1449,6 +1452,7 @@ ui_type_CObject PyCToolBarCtrl::type ("PyCToolBarCtrl",
 				      &PyCWnd::type,
 				      RUNTIME_CLASS(CToolBarCtrl),
 				      sizeof(PyCToolBarCtrl),
+				      PYOBJ_OFFSET(PyCToolBarCtrl),
 				      PyCToolBarCtrl_methods,
 				      GET_PY_CTOR(PyCToolBarCtrl));
 
@@ -1619,6 +1623,7 @@ ui_type_CObject PyCStatusBar::type ("PyCStatusBar",
 					&PyCControlBar::type, 
 					RUNTIME_CLASS(CStatusBar),
 					sizeof(PyCStatusBar),
+					PYOBJ_OFFSET(PyCStatusBar),
 					PyCStatusBar_methods,
 					GET_PY_CTOR(PyCStatusBar));
 

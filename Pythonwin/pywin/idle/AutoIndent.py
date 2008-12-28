@@ -498,7 +498,7 @@ class IndentSearcher:
         tokenize.tabsize = self.tabwidth
         try:
             try:
-                for (typ, token, start, end, line) in tokenize.tokenize(self.readline):
+                for (typ, token, start, end, line) in tokenize.generate_tokens(self.readline):
                     if typ == NAME and token in OPENERS:
                         self.blkopenline = line
                     elif type == INDENT and self.blkopenline:

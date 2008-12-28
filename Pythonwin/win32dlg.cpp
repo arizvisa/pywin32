@@ -215,15 +215,25 @@ static PyObject *set_exchange_error(const char *msg, int index)
 
 static PyObject *do_exchange_edit( int id, int index, char *type, PyObject *oldVal, PyObject *o1, PyObject *o2, CDataExchange *pDX )
 {
+	// Note use of funky exception handlers to ensure thread-state remains correct even when MFC exception is thrown.
 	PyObject *newOb;
 	switch (type[0]) {
 		case 'i': {
 			int intVal = 0;
 			if (oldVal) 
 				intVal = (int)PyInt_AsLong(oldVal);
-			GUI_BGN_SAVE;
-			DDX_Text(pDX, id, intVal);
-			GUI_END_SAVE;
+			PyThreadState *_save = PyEval_SaveThread();
+			TRY
+			{
+				DDX_Text(pDX, id, intVal);
+				PyEval_RestoreThread(_save);
+			}
+			CATCH_ALL(e)
+			{
+				PyEval_RestoreThread(_save);
+				THROW(e);
+			}
+			END_CATCH_ALL
 			if (o1 && o2) {
 				if (PyInt_Check(o1) && PyInt_Check(o2))
 					DDV_MinMaxInt(pDX, intVal, PyInt_AsLong(o1), PyInt_AsLong(o2));
@@ -244,9 +254,18 @@ static PyObject *do_exchange_edit( int id, int index, char *type, PyObject *oldV
 				PyErr_Clear();
 				csVal=_T("");
 				}
-			GUI_BGN_SAVE;
-			DDX_Text(pDX, id, csVal);
-			GUI_END_SAVE;
+			PyThreadState *_save = PyEval_SaveThread();
+			TRY
+			{
+				DDX_Text(pDX, id, csVal);
+				PyEval_RestoreThread(_save);
+			}
+			CATCH_ALL(e)
+			{
+				PyEval_RestoreThread(_save);
+				THROW(e);
+			}
+			END_CATCH_ALL
 			if (o1 && o2) {
 				if (PyInt_Check(o1) && o2==NULL)
 					DDV_MaxChars(pDX, csVal, PyInt_AsLong(o1));
@@ -399,7 +418,7 @@ static PyObject *do_exchange_button( CDialog *pDlg, int id, int index, char *typ
 void Python_do_exchange(CDialog *pDlg, CDataExchange *pDX)
 {
 	CEnterLeavePython _celp;
-	PyCDialog *dob = (PyCDialog *) ui_assoc_object::GetPyObject(pDlg);
+	PyCDialog *dob = (PyCDialog *) ui_assoc_object::GetAssocObject(pDlg);
 	if (!dob) {
 		TRACE("do_exchange called on dialog with no Python object!\n");
 		return ;	// dont print an exception
@@ -446,6 +465,7 @@ void Python_do_exchange(CDialog *pDlg, CDataExchange *pDX)
 	}
 	if (PyErr_Occurred())
 		gui_print_error();
+        Py_DECREF(dob);
 }
 
 // @pymethod <o PyCDialog>|win32ui|CreateDialog|Creates a dialog object.
@@ -731,6 +751,7 @@ ui_type_CObject PyCDialog::type("PyCDialog",
 								&PyCWnd::type, // @base PyCDialog|PyCWnd
 								RUNTIME_CLASS(CDialog), 
 								sizeof(PyCDialog), 
+								PYOBJ_OFFSET(PyCDialog), 
 								ui_dialog_methods, 
 								GET_PY_CTOR(PyCDialog));
 
@@ -743,6 +764,7 @@ ui_type_CObject PyCCommonDialog::type("PyCCommonDialog",
 									&PyCDialog::type, 
 									NULL, // CCommonDialog doesnt have RTTI???
 									sizeof(PyCCommonDialog), 
+									PYOBJ_OFFSET(PyCCommonDialog), 
 									ui_common_dialog_methods, 
 									NULL);
 
@@ -965,6 +987,7 @@ ui_type_CObject PyCFileDialog::type("PyCFileDialog",
 									&PyCCommonDialog::type, // @base PyCFileDialog|PyCCommonDialog
 									RUNTIME_CLASS(CFileDialog), 
 									sizeof(PyCFileDialog), 
+									PYOBJ_OFFSET(PyCFileDialog), 
 									ui_file_dialog_methods, 
 									GET_PY_CTOR(PyCFileDialog));
 
@@ -1174,6 +1197,7 @@ ui_type_CObject PyCFontDialog::type("PyCFontDialog",
 									&PyCCommonDialog::type, // @base PyCFontDialog|PyCCommonDialog
 									RUNTIME_CLASS(CFontDialog), 
 									sizeof(PyCFontDialog), 
+									PYOBJ_OFFSET(PyCFontDialog), 
 									ui_font_dialog_methods, 
 									GET_PY_CTOR(PyCFontDialog));
 
@@ -1331,6 +1355,7 @@ ui_type_CObject PyCColorDialog::type("PyCColorDialog",
 									 &PyCCommonDialog::type, // @base PyCColorDialog|PyCCommonDialog
 									 RUNTIME_CLASS(CColorDialog), 
 									 sizeof(PyCColorDialog), 
+									 PYOBJ_OFFSET(PyCColorDialog), 
 									 ui_color_dialog_methods, 
 									 GET_PY_CTOR(PyCColorDialog));
 
@@ -1435,5 +1460,6 @@ ui_type_CObject PyCPrintDialog::type("PyCPrintDialog",
                                            &PyCCommonDialog::type, // @base PyCPrintDialog|PyCCommonDialog
                                            RUNTIME_CLASS(CPrintDialog),
                                            sizeof(PyCPrintDialog), 
+                                           PYOBJ_OFFSET(PyCPrintDialog), 
                                            ui_print_dialog_methods, 
                                            GET_PY_CTOR(PyCPrintDialog));

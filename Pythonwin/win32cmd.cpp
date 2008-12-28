@@ -160,6 +160,7 @@ ui_type_CObject PyCCmdTarget::type("PyCCmdTarget",
 								   &ui_assoc_CObject::type, 
 								   RUNTIME_CLASS(CCmdTarget), 
 								   sizeof(PyCCmdTarget), 
+								   PYOBJ_OFFSET(PyCCmdTarget), 
 								   PyCCmdTarget_methods, 
 								   NULL);
 PyCCmdTarget::PyCCmdTarget()

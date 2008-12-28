@@ -409,6 +409,7 @@ ui_type_CObject PyCView::type("PyCView",
 							  &PyCWnd::type, // @base PyCView|PyCWnd
 							  RUNTIME_CLASS(CView), 
 							  sizeof(PyCView), 
+							  PYOBJ_OFFSET(PyCView), 
 							  PyCView_methods, 
 							  NULL);
 
@@ -625,6 +626,7 @@ ui_type_CObject PyCScrollView::type("PyCScrollView",
 							  &PyCView::type, // @base PyCScrollView|PyCView
 							  RUNTIME_CLASS(CScrollView), 
 							  sizeof(PyCScrollView), 
+							  PYOBJ_OFFSET(PyCScrollView), 
 							  PyCScrollView_methods, 
 							  GET_PY_CTOR(PyCScrollView));
 
@@ -683,6 +685,7 @@ PyCCtrlView_Type PyCCtrlView::type("PyCCtrlView",
 								&PyCWnd::type,
 								RUNTIME_CLASS(CCtrlView), 
 								sizeof(PyCCtrlView), 
+								PYOBJ_OFFSET(PyCCtrlView), 
 								PyCCtrlView_methods, 
 								GET_PY_CTOR(PyCCtrlView));
 
@@ -941,7 +944,14 @@ static struct PyMethodDef ui_edit_window_methods[] = {
 };
 
 // @base PyCEditView|PyCCtrlView
-PyCCtrlView_Type PyCEditView::type("PyCEditView", &PyCCtrlView::type, &PyCEdit::type, RUNTIME_CLASS(CEditView), sizeof(PyCEditView), ui_edit_window_methods, GET_PY_CTOR(PyCEditView));
+PyCCtrlView_Type PyCEditView::type("PyCEditView",
+				   &PyCCtrlView::type,
+				   &PyCEdit::type,
+				   RUNTIME_CLASS(CEditView),
+				   sizeof(PyCEditView),
+				   PYOBJ_OFFSET(PyCEditView),
+				   ui_edit_window_methods,
+				   GET_PY_CTOR(PyCEditView));
 
 /////////////////////////////////////////////////////////////////////
 //
@@ -1022,6 +1032,7 @@ PyCCtrlView_Type PyCListView::type("PyCListView",
 								   &PyCListCtrl::type,
 								   RUNTIME_CLASS(CListView), 
 								   sizeof(PyCListView), 
+								   PYOBJ_OFFSET(PyCListView), 
 								   ui_list_view_methods, 
 								   GET_PY_CTOR(PyCListView));
 
@@ -1103,6 +1114,7 @@ PyCCtrlView_Type PyCTreeView::type("PyCTreeView",
 								   &PyCTreeCtrl::type,
 								   RUNTIME_CLASS(CTreeView), 
 								   sizeof(PyCTreeView), 
+								   PYOBJ_OFFSET(PyCTreeView), 
 								   ui_tree_view_methods, 
 								   GET_PY_CTOR(PyCTreeView));
 
@@ -1164,6 +1176,7 @@ ui_type_CObject PyCFormView::type("PyCFormView",
 								&PyCView::type, // @base PyCFormView|PyCView
 								RUNTIME_CLASS(CFormView), 
 								sizeof(PyCFormView), 
+								PYOBJ_OFFSET(PyCFormView), 
 								PyCFormView_methods, 
 								GET_PY_CTOR(PyCFormView));
 
