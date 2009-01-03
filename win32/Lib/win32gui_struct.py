@@ -288,7 +288,7 @@ def PackTVITEM(hitem, state, stateMask, text, image, selimage, citems, param):
     if text is None:
         text_addr = text_len = 0
     else:
-        if isinstance(text, unicode):
+        if isinstance(text, str):
             text = text.encode("mbcs")
         text_buffer = array.array("c", text+"\0")
         extra.append(text_buffer)
@@ -389,7 +389,7 @@ def PackLVITEM(item=None, subItem=None, state=None, stateMask=None, text=None, i
         text_addr = text_len = 0
     else:
         mask |= commctrl.LVIF_TEXT
-        if isinstance(text, unicode):
+        if isinstance(text, str):
             text = text.encode("mbcs")
         text_buffer = array.array("c", text+"\0")
         extra.append(text_buffer)
@@ -472,7 +472,7 @@ def PackLVCOLUMN(fmt=None, cx=None, text=None, subItem=None, image=None, order=N
     if text is None:
         text_addr = text_len = 0
     else:
-        if isinstance(text, unicode):
+        if isinstance(text, str):
             text = text.encode("mbcs")
         text_buffer = array.array("c", text+"\0")
         extra.append(text_buffer)
@@ -549,7 +549,7 @@ def PackHDITEM(cxy = None, text = None, hbm = None, fmt = None,
     if text is None:
         text_addr = text_len = 0
     else:
-        if isinstance(text, unicode):
+        if isinstance(text, str):
             text = text.encode("mbcs")
         text_buffer = array.array("c", text+"\0")
         extra.append(text_buffer)
@@ -577,7 +577,7 @@ def PackDEV_BROADCAST(devicetype, rest_fmt, rest_data, extra_data=''):
 
 def PackDEV_BROADCAST_HANDLE(handle, hdevnotify=0, guid="\0"*16, name_offset=0, data="\0"):
     return PackDEV_BROADCAST(win32con.DBT_DEVTYP_HANDLE, "PP16sl",
-                             (long(handle), long(hdevnotify), str(buffer(guid)), name_offset),
+                             (int(handle), int(hdevnotify), str(buffer(guid)), name_offset),
                              data)
 
 def PackDEV_BROADCAST_DEVICEINTERFACE(classguid, name=""):
