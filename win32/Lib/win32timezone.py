@@ -231,7 +231,7 @@ class TimeZoneInfo(datetime.tzinfo):
 		timeZoneName = zoneNames.get(self.timeZoneName, self.timeZoneName)
 		tzRegKeyPath = os.path.join(self.tzRegKey, timeZoneName)
 		try:
-			key = winreg.OpenKeyEx(_winreg.HKEY_LOCAL_MACHINE, tzRegKeyPath)
+			key = winreg.OpenKeyEx(winreg.HKEY_LOCAL_MACHINE, tzRegKeyPath)
 		except:
 			raise ValueError('Timezone Name %s not found.' % timeZoneName)
 		return key
@@ -346,7 +346,7 @@ class TimeZoneInfo(datetime.tzinfo):
 	# helper methods for accessing the timezone info from the registry
 	def _get_time_zone_key(subkey=None):
 		"Return the registry key that stores time zone details"
-		key = winreg.OpenKeyEx(_winreg.HKEY_LOCAL_MACHINE, TimeZoneInfo.tzRegKey)
+		key = winreg.OpenKeyEx(winreg.HKEY_LOCAL_MACHINE, TimeZoneInfo.tzRegKey)
 		if subkey:
 			key = winreg.OpenKeyEx(key, subkey)
 		return key
@@ -454,7 +454,7 @@ def GetLocalTimeZone():
 	True
 	"""
 	tzRegKey = r'SYSTEM\CurrentControlSet\Control\TimeZoneInformation'
-	key = winreg.OpenKeyEx(_winreg.HKEY_LOCAL_MACHINE, tzRegKey)
+	key = winreg.OpenKeyEx(winreg.HKEY_LOCAL_MACHINE, tzRegKey)
 	local = _RegKeyDict(key)
 	# if the user has not checked "Automatically adjust clock for daylight
 	# saving changes" in the Date and Time Properties control, the standard
