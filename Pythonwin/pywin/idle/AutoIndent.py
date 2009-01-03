@@ -1,7 +1,18 @@
+import sys
 import string, tokenize
 from . import PyParse
 from pywin import default_scintilla_encoding
 
+if sys.version_info < (3,):
+    # in py2k, tokenize() takes a 'token eater' callback, while
+    # generate_tokens is a generator that works with str objects.
+    token_generator = tokenize.generate_tokens
+else:
+    # in py3k tokenize() is the generator working with 'byte' objects, and
+    # token_generator is the 'undocumented b/w compat' function that
+    # theoretically works with str objects - but actually seems to fail)
+    token_generator = tokenize.tokenize
+    
 class AutoIndent:
 
     menudefs = [
@@ -487,6 +498,10 @@ class IndentSearcher:
                 val = ""
             else:
                 val = self.text.get(mark, mark + " lineend+1c")
+        # hrm - not sure this is correct in py3k - the source code may have
+        # an encoding declared, but the data will *always* be in
+        # default_scintilla_encoding - so if anyone looks at the encoding decl
+        # in the source they will be wrong.  I think.  Maybe.  Or something...
         return val.encode(default_scintilla_encoding)
 
     def run(self):
@@ -498,7 +513,7 @@ class IndentSearcher:
         tokenize.tabsize = self.tabwidth
         try:
             try:
-                for (typ, token, start, end, line) in tokenize.generate_tokens(self.readline):
+                for (typ, token, start, end, line) in token_generator(self.readline):
                     if typ == NAME and token in OPENERS:
                         self.blkopenline = line
                     elif type == INDENT and self.blkopenline:

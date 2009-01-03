@@ -204,6 +204,7 @@ void CPythonPropertySheet::BuildPropPageArray()
         m_customizeFont = FALSE;
 	if (bInFatalShutdown)
 		return;
+	CEnterLeavePython _celp;
 	ui_assoc_object *py_bob = ui_assoc_object::handleMgr.GetAssocObject(this);
 	if (py_bob==NULL)
 		return;
@@ -213,7 +214,6 @@ void CPythonPropertySheet::BuildPropPageArray()
 		return;
 	}
 	if (py_bob->virtualInst) {
-		CEnterLeavePython _celp;
 		PyObject *t, *v, *tb;
 		PyErr_Fetch(&t,&v,&tb);
 		PyObject *attr = PyObject_GetAttrString(py_bob->virtualInst, "customizeFont");

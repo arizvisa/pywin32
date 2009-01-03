@@ -14,6 +14,12 @@ generates Windows .hlp files.
 */
 #include "stdafx.h"
 
+#ifdef DEBUG
+#define ASSERT_GIL_HELD {PyGILState_STATE s=PyGILState_Ensure();ASSERT(s==PyGILState_LOCKED);PyGILState_Release(s);}
+#else
+#define ASSERT_GIL_HELD
+#endif
+
 CAssocManager ui_assoc_object::handleMgr;
 
 CAssocManager::CAssocManager()
@@ -47,13 +53,11 @@ void CAssocManager::cleanup(void)
 	void *assoc;
 	ASSERT_VALID(&map);
 	TRACE("CAssocManager cleaning up %d objects\n", map.GetCount());
-	m_critsec.Lock();
 	CEnterLeavePython _celp;
 	for(pos=map.GetStartPosition();pos;) {
 		map.GetNextAssoc(pos, (void *&)assoc, (void *&)ob);
 		RemoveAssoc(assoc);
 	}
-	m_critsec.Unlock();
 }
 
 void CAssocManager::RemoveAssoc(void *handle)
@@ -78,7 +82,7 @@ void CAssocManager::RemoveAssoc(void *handle)
 
 void CAssocManager::Assoc(void *handle, ui_assoc_object *object)
 {
-	m_critsec.Lock();
+	ASSERT_GIL_HELD;  // we rely on the GIL to serialize access to our map...
 	ASSERT(handle);
 #ifdef DEBUG
 	// overwriting an existing entry probably means we are failing to
@@ -103,7 +107,6 @@ void CAssocManager::Assoc(void *handle, ui_assoc_object *object)
 			DebugBreak();
 		}
 	}
-	m_critsec.Unlock();
 }
 
 //
@@ -112,8 +115,8 @@ void CAssocManager::Assoc(void *handle, ui_assoc_object *object)
 ui_assoc_object *CAssocManager::GetAssocObject(void * handle)
 {
 	if (handle==NULL) return NULL; // no possible association for NULL!
+	ASSERT_GIL_HELD; // we rely on the GIL to serialize access to our map...
 	PyObject *weakref;
-	m_critsec.Lock();
 #ifdef _DEBUG
 	cacheLookups++;
 #endif
@@ -130,7 +133,6 @@ ui_assoc_object *CAssocManager::GetAssocObject(void * handle)
 		lastLookup = handle;
 		lastObjectWeakRef = weakref;
 	}
-	m_critsec.Unlock();
 	if (weakref==NULL)
 		return NULL;
 	// convert the weakref object into a real object.
@@ -254,13 +256,6 @@ ui_assoc_object::ui_assoc_object()
 }
 ui_assoc_object::~ui_assoc_object()
 {
-	KillAssoc();
-}
-
-// handle is invalid - therefore release all refs I am holding for it.
-// ASSUMES WE HOLD THE PYTHON LOCK as for all Python object destruction.
-void ui_assoc_object::KillAssoc()
-{
 #ifdef TRACE_ASSOC
 	CString rep = repr();
 	const char *szRep = rep;
@@ -268,8 +263,10 @@ void ui_assoc_object::KillAssoc()
 #endif
 	Py_CLEAR(virtualInst);
 //	virtuals.DeleteAll();
-	handleMgr.Assoc(assoc, 0);
-	SetAssocInvalid();			// let child do whatever to detect
+	if (assoc) {
+		handleMgr.Assoc(assoc, 0);
+		SetAssocInvalid();			// let child do whatever to detect
+	}
 }
 
 PyObject *ui_assoc_object::GetGoodRet()
@@ -287,6 +284,7 @@ PyObject *ui_assoc_object::GetGoodRet()
 /*static*/ ui_assoc_object *ui_assoc_object::make( ui_type &makeType, void *search, bool skipLookup )
 {
 	ASSERT(search); // really only a C++ problem.
+	CEnterLeavePython _celp;
 	ui_assoc_object* ret=NULL;
 	if (!skipLookup)
 		ret = (ui_assoc_object*) handleMgr.GetAssocObject(search);
@@ -375,7 +373,7 @@ ui_assoc_CObject::~ui_assoc_CObject()
 	if (bManualDelete) {
 		bManualDelete = FALSE;
 		CObject *pO = (CObject *)GetGoodCppObject(&type);	// get pointer before killing it.
-		KillAssoc(); // stop recursion - disassociate now.
+		ASSERT(!PyErr_Occurred()); // PyErr_Clear() is bogus?????
 		if (!pO)
 			PyErr_Clear();
 		else

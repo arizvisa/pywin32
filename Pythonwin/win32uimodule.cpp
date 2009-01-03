@@ -560,21 +560,18 @@ BOOL DisplayPythonTraceback(PyObject *exc_type, PyObject *exc_val, PyObject *exc
 // Requires the Python thread state be NOT acquired.
 void Python_delete_assoc( void *ob )
 {
-	// Notify Python object of my attached object removal.
-	{
-	CVirtualHelper helper ("OnAttachedObjectDeath", ob);
-	helper.call();
-	}
 	if (bInFatalShutdown) {
 		TRACE("Not destroying assoc - in fatal shutdown!\n");
 		return;
 	}
-	ui_assoc_object *pObj;
-	if ((pObj=ui_assoc_object::GetAssocObject(ob))) {
-		CEnterLeavePython _celp; // KillAssoc requires it is held!
-		pObj->KillAssoc();
-		Py_DECREF(pObj);
+	{
+	// Notify Python object of my attached object removal.
+	CVirtualHelper helper ("OnAttachedObjectDeath", ob);
+	helper.call();
 	}
+	// and remove the object from the map
+	CEnterLeavePython _celp;
+	ui_assoc_object::handleMgr.Assoc(ob, NULL);
 }
 
 int Python_run_command_with_log(const char *command)

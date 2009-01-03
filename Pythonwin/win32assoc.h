@@ -33,7 +33,6 @@ private:
 	CMapPtrToPtr map;
 	const void *lastLookup;
 	PyObject *lastObjectWeakRef;
-	CCriticalSection m_critsec;
 #ifdef _DEBUG
 	int cacheLookups;
 	int cacheHits;
@@ -59,9 +58,6 @@ public:	// some probably shouldnt be, but...
 	// auto conversion from Instance to Object.
 	static void *GetGoodCppObject(PyObject *&self, ui_type *ui_type_check);
 
-	// Call this when the C++ object dies, or otherwise becomes invalid.
-	void KillAssoc();	// maps to a virtual with some protection wrapping.
-
 	// virtuals for Python support
 	virtual CString repr();
 
@@ -78,11 +74,7 @@ public:	// some probably shouldnt be, but...
 protected:
 	void *GetGoodCppObject(ui_type *ui_type_check=NULL) const;
 	virtual bool CheckCppObject(ui_type *ui_type_check) const {return true;}
-	// Called during KillAssoc - normally zeroes association.
-	// Override to keep handle after destruction (eg, the association
-	// with a dialog is valid after the Window's window has closed).
-	// XXX?  bogus too?
-	virtual void SetAssocInvalid() { assoc = 0; }
+	virtual void SetAssocInvalid() { assoc = 0; } // XXX - bogus - called during destruction???
 
 	ui_assoc_object(); // ctor/dtor
 	virtual ~ui_assoc_object();

@@ -32,6 +32,9 @@ if dllid is None:
 	# Still not there - lets see if Windows can find it by searching?
 	dllid = win32api.LoadLibrary("Scintilla.DLL")
 
+# null_byte is str in py2k, bytes on py3k
+null_byte = "\0".encode('ascii')
+
 ## These are from Richedit.h - need to add to win32con or commctrl
 EM_GETTEXTRANGE = 1099
 EM_EXLINEFROMCHAR = 1078
@@ -69,8 +72,6 @@ class ScintillaControlInterface:
 			text = ''.join(text)
 		self.SendMessage(scintillacon.SCI_ADDSTYLEDTEXT, text.encode(default_scintilla_encoding))
 	def SCIInsertText(self, text, pos=-1):
-		## sma = array.array('u', text+"\0")
-		## (a,l) = sma.buffer_info()
 		buff=(text+'\0').encode(default_scintilla_encoding)
 		self.SendScintilla(scintillacon.SCI_INSERTTEXT, pos, buff)
 	def SCISetSavePoint(self):
@@ -110,7 +111,6 @@ class ScintillaControlInterface:
 		return self.SendScintilla(scintillacon.SCI_STYLESETEOLFILLED, num, v)
 	def SCIStyleSetFont(self, num, name, characterset=0):
 		buff = (name + "\0").encode(default_scintilla_encoding)
-		## addressBuffer = buff.buffer_info()[0]
 		self.SendScintilla(scintillacon.SCI_STYLESETFONT, num, buff)
 		self.SendScintilla(scintillacon.SCI_STYLESETCHARACTERSET, num, characterset)
 	def SCIStyleSetBold(self, num, bBold):
@@ -300,10 +300,18 @@ class CScintillaEditInterface(ScintillaControlInterface):
 
 	def GetSelText(self):
 		start, end = self.GetSel()
-		txtBuf = array.array('u', " " * ((end-start)+1))
+		txtBuf = array.array('b', null_byte * (end-start+1))
 		addressTxtBuf = txtBuf.buffer_info()[0]
+		# EM_GETSELTEXT is documented as returning the number of chars
+		# not including the NULL, but scintilla includes the NULL.  A
+		# quick glance at the scintilla impl doesn't make this
+		# obvious - the NULL is included in the 'selection' object
+		# and reflected in the length of that 'selection' object.
+		# I expect that is a bug in scintilla and may be fixed by now,
+		# but we just blindly assume that the last char is \0 and
+		# strip it.
 		self.SendScintilla(EM_GETSELTEXT, 0, addressTxtBuf)
-		return txtBuf.tostring().decode(default_scintilla_encoding)
+		return txtBuf.tostring()[:-1].decode(default_scintilla_encoding)
 
 	def SetSel(self, start=0, end=None):
 		if type(start)==type(()):
@@ -347,14 +355,13 @@ class CScintillaEditInterface(ScintillaControlInterface):
 		assert end>=start, "Negative index requested (%d/%d)" % (start, end)
 		assert start >= 0 and start <= self.GetTextLength(), "The start postion is invalid"
 		assert end >= 0 and end <= self.GetTextLength(), "The end postion is invalid"
-		initer = "=" * (end - start + 1)
-		buff = array.array('u', initer)
+		initer = null_byte * (end - start + 1)
+		buff = array.array('b', initer)
 		addressBuffer = buff.buffer_info()[0]
 		tr = struct.pack('llP', start, end, addressBuffer)
 		trBuff = array.array('b', tr)
 		addressTrBuff = trBuff.buffer_info()[0]
 		numChars = self.SendScintilla(EM_GETTEXTRANGE, 0, addressTrBuff)
-		## return buff.tounicode()[:numChars]
 		return buff.tostring()[:numChars].decode(default_scintilla_encoding)
 
 	def ReplaceSel(self, str):

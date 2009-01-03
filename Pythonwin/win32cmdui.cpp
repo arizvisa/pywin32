@@ -66,10 +66,10 @@ Python_OnCmdMsg (CCmdTarget *obj, UINT nID, int nCode,
 			// everything's fine
 
 			CWnd *control = ((CWnd *)obj)->GetDlgItem(nID);
+			CEnterLeavePython _celp;
 			PyCCmdTarget *pObj = (PyCCmdTarget *) ui_assoc_CObject::GetAssocObject(control);
 			if (pObj && pObj->pOleEventHookList && 
 				pObj->pOleEventHookList->Lookup ((unsigned short)pEvent->m_dispid, (void *&)method)) {
-					CEnterLeavePython _celp;
 					if (pfnMakeOlePythonCall==NULL) {
 						pfnMakeOlePythonCall = (BOOL (*)(PyObject *, DISPPARAMS FAR* , VARIANT FAR* ,EXCEPINFO FAR* , UINT FAR*, PyObject * ))
 								GetPythonOleProcAddress("PyCom_MakeOlePythonCall");
@@ -94,6 +94,7 @@ Python_OnCmdMsg (CCmdTarget *obj, UINT nID, int nCode,
 	}
 #endif // !_AFX_NO_OCC_SUPPORT
 
+	CEnterLeavePython _celp;
 	PyCCmdTarget *pObj = (PyCCmdTarget *) ui_assoc_CObject::GetAssocObject(obj);
 	// Must exit via 'exit' from here...
 	BOOL rc = FALSE; // default not handled.
@@ -114,7 +115,6 @@ Python_OnCmdMsg (CCmdTarget *obj, UINT nID, int nCode,
 					goto done;
 				}
 				{
-					CEnterLeavePython _celp;
 					Python_callback (method, ob);
 					if (PyErr_Occurred())	// if any Python exception, pretend it was OK
 						// XXX - Python_callback always calls
@@ -144,7 +144,6 @@ Python_OnCmdMsg (CCmdTarget *obj, UINT nID, int nCode,
 			}
 			if (method) {
 					// perform the callback.
-				CEnterLeavePython _celp;
 				rc = Python_callback (method, nID, nCode);
 				// This is dodgy - we have to rely on -1 and can't check PyErr_Occurred(),
 				// as Python_callback will have called gui_print_error() which clears

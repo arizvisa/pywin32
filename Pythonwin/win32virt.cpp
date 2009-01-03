@@ -27,10 +27,10 @@ CVirtualHelper::CVirtualHelper(const char *iname, void *iassoc, EnumVirtualError
 	vehErrorHandling = veh;
 	if (bInFatalShutdown)
 		return;
+	CEnterLeavePython _celp;
 	ui_assoc_object *py_bob = ui_assoc_object::handleMgr.GetAssocObject( iassoc );
 	if (py_bob==NULL)
 		return;
-	CEnterLeavePython _celp;
 	if (!py_bob->is_uiobject( &ui_assoc_object::type)) {
 		TRACE("CVirtualHelper::CVirtualHelper Error: Call object is not of required type\n");
 		Py_DECREF(py_bob);

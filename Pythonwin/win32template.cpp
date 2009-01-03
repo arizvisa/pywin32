@@ -42,8 +42,6 @@ PyCDocTemplate::~PyCDocTemplate()
 	if (pTemp==NULL)
 		return;	// no more to do.
 	RemoveDocTemplateFromApp(pTemp);
-	delete pTemp;
-	SetAssocInvalid();
 }
 
 void PyCDocTemplate::cleanup()
