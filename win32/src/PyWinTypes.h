@@ -218,8 +218,6 @@ PYWINTYPES_EXPORT void PyWinObject_FreeWCHAR(WCHAR *pResult);
 // Its not clear how to resolve this, but while VS2003 is the default
 // compiler, that is what must work.
 // py2.5 on x64 also needs it, and that is min x64 we support
-
-/*
 #if (PY_VERSION_HEX >= 0x02060000) || defined(_WIN64)
 inline BOOL PyWinObject_AsWCHAR(PyObject *stringObject, unsigned short **pResult, BOOL bNoneOK = FALSE, DWORD *pResultLen = NULL)
 {
@@ -230,7 +228,6 @@ inline void PyWinObject_FreeWCHAR(unsigned short *pResult)
     PyWinObject_FreeWCHAR((WCHAR *)pResult);
 }
 #endif
-*/
 
 // Given a PyObject (string, Unicode, etc) create a "char *" with the value
 // if pResultLen != NULL, it will be set to the result size NOT INCLUDING 
