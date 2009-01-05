@@ -26,8 +26,6 @@
 #define __PyHFC_H
 
 #include "FilterContext.h"
-
-#include "structmember.h"
 #include "tupleobject.h"
 
 
