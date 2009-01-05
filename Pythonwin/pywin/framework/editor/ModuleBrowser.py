@@ -23,7 +23,7 @@ class HierListCLBRModule(hierlist.HierListItem):
                 ret.append(HierListCLBRFunction( item ) )
             else:
                 ret.append(HierListCLBRClass( item) )
-        ret.sort(key=lambda i:i.GetText())
+        ret.sort()
         return ret
     def IsExpandable(self):
         return 1
@@ -78,7 +78,7 @@ class HierListCLBRClass(HierListCLBRItem):
         r2=[]
         for meth, lineno in self.methods.items():
             r2.append(HierListCLBRMethod(meth, self.file, lineno))
-        r2.sort(key=lambda m:m.GetText())
+        r2.sort()
         return r1+r2
     def IsExpandable(self):
         return len(self.methods) + len(self.super)

@@ -93,7 +93,7 @@ class AutoIndent:
         self.text = editwin.text
 
     def config(self, **options):
-        for key, value in list(options.items()):
+        for key, value in options.items():
             if key == 'usetabs':
                 self.usetabs = value
             elif key == 'indentwidth':
@@ -209,7 +209,7 @@ class AutoIndent:
             if i == n:
                 # the cursor is in or at leading indentation; just inject
                 # an empty line at the start
-                text.insert("insert linestart", '\r\n')
+                text.insert("insert linestart", '\n')
                 return "break"
             indent = line[:i]
             # strip whitespace before insert point
@@ -223,8 +223,7 @@ class AutoIndent:
             while text.get("insert") in " \t":
                 text.delete("insert")
             # start new line
-            ## Line ending needs to be configured somewhere instead of hardcoded
-            text.insert("insert", '\r\n')
+            text.insert("insert", '\n')
 
             # adjust indentation for continuations and block
             # open/close first need to find the last stmt

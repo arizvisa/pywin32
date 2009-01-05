@@ -147,10 +147,9 @@ class BindingsManager:
 				else:
 					rc = 1
 		except:
-			traceback.print_exc(chain=False)
 			message = "Firing event '%s' failed." % event
 			print(message)
-			
+			traceback.print_exc()
 			self.report_error(message)
 			rc = 1 # Let any default handlers have a go!
 		return rc

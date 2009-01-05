@@ -328,16 +328,13 @@ def RunScript(defName=None, defArgs=None, bShowDialog = 1, debuggingType=None):
 			interact.edit.currentView.AppendToPrompt([])
 		bWorked = 1
 	except:
-		## ??? sys.exc_info is reset to (None, None, None) after some function calls -
-		##	Is this a 'feature' of py3k, or are we clearing an error somewhere ???
-		exc_type, exc_value, exc_traceback=sys.exc_info()
 		if interact.edit and interact.edit.currentView:
 			interact.edit.currentView.EnsureNoPrompt()
-		traceback.print_exception(exc_type, exc_value, exc_traceback)
+		traceback.print_exc()
 		if interact.edit and interact.edit.currentView:
 			interact.edit.currentView.AppendToPrompt([])
 		if debuggingType == RS_DEBUGGER_PM:
-			debugger.pm(exc_traceback)
+			debugger.pm()
 	sys.argv = oldArgv
 	if insertedPath0:
 		del sys.path[0]

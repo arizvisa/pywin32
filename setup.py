@@ -1,4 +1,4 @@
-build_id="212.5" # may optionally include a ".{patchno}" suffix.
+build_id="212.6" # may optionally include a ".{patchno}" suffix.
 # Putting buildno at the top prevents automatic __doc__ assignment, and
 # I *want* the build number at the top :)
 __doc__="""This is a distutils setup-script for the pywin32 extensions
@@ -75,9 +75,9 @@ is_py3k = sys.version_info > (3,) # get this out of the way early on...
 # We have special handling for _winreg so our setup3.py script can avoid
 # using the 'imports' fixer and therefore start much faster...
 if is_py3k:
-    import winreg as _winreg
+    import winreg as winreg
 else:
-    import _winreg
+    import winreg
 
 # The rest of our imports.
 from distutils.core import setup, Extension, Command
@@ -147,7 +147,6 @@ def find_platform_sdk_dir():
     # dead ends so we only consider the job done if we find the "windows.h"
     # landmark.
     DEBUG = False # can't use log.debug - not setup yet
-    HKLM = _winreg.HKEY_LOCAL_MACHINE # ack - 2to3 error - see http://bugs.python.org/issue3994
     landmark = "include\\windows.h"
     # 1. The use might have their current environment setup for the
     #    SDK, in which case the "MSSdk" env var is set.
@@ -162,9 +161,9 @@ def find_platform_sdk_dir():
     #    sometimes points to the right thing. However, after upgrading to
     #    the "Platform SDK for Windows Server 2003 SP1" this is dead end.
     try:
-        key = _winreg.OpenKey(HKLM,
+        key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE,
                               r"Software\Microsoft\MicrosoftSDK\Directories")
-        sdkdir, ignore = _winreg.QueryValueEx(key, "Install Dir")
+        sdkdir, ignore = winreg.QueryValueEx(key, "Install Dir")
     except EnvironmentError:
         pass
     else:
@@ -178,14 +177,14 @@ def find_platform_sdk_dir():
     #    it *looks* like the latest installed Platform SDK will be the
     #    only one with an "Install Dir" sub-value.
     try:
-        key = _winreg.OpenKey(HKLM,
+        key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE,
                               r"Software\Microsoft\MicrosoftSDK\InstalledSDKs")
         i = 0
         while True:
-            guid = _winreg.EnumKey(key, i)
-            guidkey = _winreg.OpenKey(key, guid)
+            guid = winreg.EnumKey(key, i)
+            guidkey = winreg.OpenKey(key, guid)
             try:
-                sdkdir, ignore = _winreg.QueryValueEx(guidkey, "Install Dir")
+                sdkdir, ignore = winreg.QueryValueEx(guidkey, "Install Dir")
             except EnvironmentError:
                 pass
             else:
@@ -200,9 +199,9 @@ def find_platform_sdk_dir():
         pass
     # 4.  Vista's SDK
     try:
-        key = _winreg.OpenKey(HKLM,
+        key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE,
                               r"Software\Microsoft\Microsoft SDKs\Windows")
-        sdkdir, ignore = _winreg.QueryValueEx(key, "CurrentInstallFolder")
+        sdkdir, ignore = winreg.QueryValueEx(key, "CurrentInstallFolder")
     except EnvironmentError:
         pass
     else:
@@ -475,11 +474,11 @@ class WinExt_win32com_mapi(WinExt_win32com):
         sdk_install_dir = None
         libs = kw.get("libraries", "")
         keyname = "SOFTWARE\Microsoft\Exchange\SDK"
-        for root in _winreg.HKEY_LOCAL_MACHINE, _winreg.HKEY_CURRENT_USER:
+        for root in winreg.HKEY_LOCAL_MACHINE, winreg.HKEY_CURRENT_USER:
             try:
-                keyob = _winreg.OpenKey(root, keyname)
-                value, type_id = _winreg.QueryValueEx(keyob, "INSTALLDIR")
-                if type_id == _winreg.REG_SZ:
+                keyob = winreg.OpenKey(root, keyname)
+                value, type_id = winreg.QueryValueEx(keyob, "INSTALLDIR")
+                if type_id == winreg.REG_SZ:
                     sdk_install_dir = value
                     break
             except WindowsError:
@@ -907,7 +906,7 @@ class my_build_ext(build_ext):
             else:
                 # On a 64bit host, the value we are looking for is actually in
                 # SysWow64Node - but that is only available on xp and later.
-                access = _winreg.KEY_READ
+                access = winreg.KEY_READ
                 if sys.getwindowsversion()[0] >= 5:
                     access = access | 512 # KEY_WOW64_32KEY
                 if self.plat_name == 'win-amd64':
@@ -915,11 +914,10 @@ class my_build_ext(build_ext):
                 else:
                     plat_dir = "x86"
                 # Find the redist directory.
-                HKLM = _winreg.HKEY_LOCAL_MACHINE
-                vckey = _winreg.OpenKey(HKLM,
+                vckey = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE,
                                         r"SOFTWARE\Microsoft\VisualStudio\9.0\Setup\VC",
                                         0, access)
-                val, val_typ = _winreg.QueryValueEx(vckey, "ProductDir")
+                val, val_typ = winreg.QueryValueEx(vckey, "ProductDir")
                 mfc_dir = os.path.join(val, "redist", plat_dir, "Microsoft.VC90.MFC")
                 if not os.path.isdir(mfc_dir):
                     raise RuntimeError("Can't find the redist dir at %r" % (mfc_dir))
@@ -1190,6 +1188,10 @@ class my_build_ext(build_ext):
             swig_cmd = [swig, "-python", "-c++"]
             swig_cmd.append("-dnone",) # we never use the .doc files.
             swig_cmd.extend(self.current_extension.extra_swig_commands)
+            if is_py3k:
+                swig_cmd.append("-DSWIG_PY3K")
+            else:
+                swig_cmd.append("-DSWIG_PY2K")
             target = swig_targets[source]
             try:
                 interface_parent = swig_interface_parents[
@@ -1240,7 +1242,7 @@ class my_install(install):
         # some 'no wait' executor - spawn seems fine!  We pass the PID of this
         # process so the child will wait for us.
         # XXX - hmm - a closer look at distutils shows it only uses win32api
-        # if winreg fails - and this never should.  Need to revisit this!
+        # if _winreg fails - and this never should.  Need to revisit this!
         # If self.root has a value, it means we are being "installed" into
         # some other directory than Python itself (eg, into a temp directory
         # for bdist_wininst to use) - in which case we must *not* run our
@@ -1308,7 +1310,7 @@ class my_compiler(base_compiler):
             msvccompiler.get_build_version = hack_get_build_version
             new_compiler = msvccompiler.MSVCCompiler()
             msvccompiler.get_build_version = gbv
-            for key in save_env.keys():
+            for key in list(save_env.keys()):
                 os.environ[key] = save_env[key]
 
             old_linker = self.linker
@@ -1341,7 +1343,6 @@ class my_compiler(base_compiler):
                 args = [sys.executable]
                 args.append(stamp_script)
                 args.append("--version=%s" % (pywin32_version,))
-                args.append("--description=Python extension module")
                 args.append("--comments=http://pywin32.sourceforge.net")
                 args.append("--original-filename=%s" % (os.path.basename(output_filename),))
                 args.append("--product=PyWin32")
@@ -1366,7 +1367,7 @@ class my_compiler(base_compiler):
         if sys.hexversion < 0x02040000:
             build_order = ".i .mc .rc .cpp".split()
             decorated = [(build_order.index(ext.lower()), obj, (src, ext))
-                         for obj, (src, ext) in build.items()]
+                         for obj, (src, ext) in list(build.items())]
             decorated.sort()
             items = [item[1:] for item in decorated]
             # The compiler itself only calls ".items" - leverage that, so that
@@ -1443,7 +1444,7 @@ for info in (
               win32/src/win32net/win32netuser.cpp
               """),
         ("win32pdh", "", None),
-        ("win32pipe", "", True, None, 'win32/src/win32pipe.i'),
+        ("win32pipe", "", None, None, 'win32/src/win32pipe.i win32/src/win32popen.cpp'),
         ("win32print", "winspool user32 gdi32", None, 0x0500),
         ("win32process", "advapi32 user32", None, 0x0500),
         ("win32profile", "Userenv", True, None, 'win32/src/win32profilemodule.cpp'),
@@ -1595,12 +1596,12 @@ com_extensions += [
     ),
     # ActiveDebugging is a mess.  See the comments in the docstring of this
     # module for details on getting it built.
-##    WinExt_win32com('axdebug',
-##            dsp_file=r"com\Active Debugging.dsp",
-##            libraries="axscript",
-##            pch_header = "stdafx.h",
-##            optional_headers = ["activdbg.h"],
-##    ),
+    WinExt_win32com('axdebug',
+            dsp_file=r"com\Active Debugging.dsp",
+            libraries="axscript",
+            pch_header = "stdafx.h",
+            optional_headers = ["activdbg.h"],
+    ),
     WinExt_win32com('internet'),
     WinExt_win32com('mapi', libraries="mapi32", pch_header="PythonCOM.h",
                     sources=("""

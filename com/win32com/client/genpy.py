@@ -204,9 +204,9 @@ class EnumerationItem(build.OleItem, WritableItem):
       if vdesc[4] == pythoncom.VAR_CONST:
         val = vdesc[1]
         if sys.version_info <= (2,4) and (isinstance(val, int) or isinstance(val, int)):
-          if val==0x80000000: # special case
+          if val==0x80000000-1+1: # special case for py2.3 (and avoid 'L' syntax for py3k)
             use = "0x80000000L" # 'L' for future warning
-          elif val > 0x80000000 or val < 0: # avoid a FutureWarning
+          elif val > 0x80000000-1+1 or val < 0: # avoid a FutureWarning
             use = int(val)
           else:
             use = hex(val)

@@ -21,8 +21,7 @@ import sys
 try:
     get_input_line = raw_input # py2x
 except NameError:
-    import code
-    get_input_line = code.InteractiveConsole.raw_input
+    get_input_line = input # py3k
 
 class Stdin:
     def __init__(self):
@@ -94,7 +93,7 @@ class Stdin:
                                                  or len(self.buffer) < desired_size):
             try:
                 self.__get_line()
-            except EOFError: # deal with cancellation of get_input_line dialog
+            except (EOFError, KeyboardInterrupt): # deal with cancellation of get_input_line dialog
                 desired_size = len(self.buffer) # Be satisfied!
 
         if desired_size < 0:

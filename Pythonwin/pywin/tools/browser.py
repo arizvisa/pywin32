@@ -12,7 +12,6 @@ from pywin.mfc import dialog
 from . import hierlist
 from types import *
 
-            
 special_names = [ '__doc__', '__name__', '__self__' ]
 
 #
@@ -23,11 +22,10 @@ class HLIPythonObject(hierlist.HierListItem):
 		self.myobject = myobject
 		self.knownExpandable = None
 		if name:
-			assert type(name)==str, repr(name) # encode to mbcs if necessary
 			self.name=name
 		else:
 			try:
-				self.name=str(myobject.__name__)
+				self.name=myobject.__name__
 			except (AttributeError, TypeError):
 				try:
 					r = repr(myobject)
@@ -58,7 +56,11 @@ class HLIPythonObject(hierlist.HierListItem):
 			ob = self.myobject.__doc__
 		except (AttributeError, TypeError):
 			pass
-		if ob:
+		# I don't quite grok descriptors enough to know how to
+		# best hook them up. Eg:
+		# >>> object.__getattribute__.__class__.__doc__
+		# <attribute '__doc__' of 'wrapper_descriptor' objects>
+		if ob and isinstance(ob, str):
 			lst.insert(0, HLIDocString( ob, "Doc" ))
 
 	def GetSubList(self):
@@ -260,14 +262,13 @@ TypeMap = { type : HLIClass,
             dict: HLIDict,
             list: HLIList,
             ModuleType: HLIModule,
-            ## InstanceType : HLIInstance,
             CodeType : HLICode,
             BuiltinFunctionType : HLIBuiltinFunction,
             FrameType : HLIFrame,
             TracebackType : HLITraceback,
             str : HLIString,
             int: HLIPythonObject,
-            ## LongType: HLIPythonObject,
+            ## LongType: HLIPythonObject, - hrm - fixme for py2k
             float: HLIPythonObject,
            }
 try:

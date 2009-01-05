@@ -31,6 +31,8 @@ class TypelibSpec:
 		if rc==0:
 			rc = cmp(self.major, other.minor)
 		return rc
+	def __lt__(self, other): # rich-cmp/py3k-friendly version
+		return self.__cmp__(other) < 0
 
 	def Resolve(self):
 		if self.dll is None:
@@ -138,9 +140,6 @@ def FindTlbsWithDescription(desc):
 			ret.append(item)
 	return ret
 
-def tlb_sort_key(tlb_item):
-	return tlb_item.ver_desc
-
 def SelectTlb(title="Select Library", excludeFlags = 0):
 	"""Display a list of all the type libraries, and select one.   Returns None if cancelled
 	"""
@@ -150,7 +149,7 @@ def SelectTlb(title="Select Library", excludeFlags = 0):
 	for i in items:
 		i.major = int(i.major, 16)
 		i.minor = int(i.minor, 16)
-	items.sort(key=tlb_sort_key)
+	items.sort()
 	rc = pywin.dialogs.list.SelectFromLists(title, items, ["Type Library"])
 	if rc is None:
 		return None

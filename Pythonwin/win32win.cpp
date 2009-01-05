@@ -2710,8 +2710,8 @@ PyObject *ui_window_begin_paint(PyObject *self, PyObject *args)
 	if (pTemp==NULL)
 		RETURN_ERR("BeginPaint failed");
 	PyObject *obDC = ui_assoc_object::make (ui_dc_object::type, pTemp)->GetGoodRet();
-	PyObject *obRet = Py_BuildValue("O(Ni(iiii)iiN)", obDC,
-		PyWinLong_FromHANDLE(ps.hdc),
+	PyObject *obRet = Py_BuildValue("O(ii(iiii)iiN)", obDC,
+		ps.hdc,
 		ps.fErase,
 		ps.rcPaint.left, ps.rcPaint.top, ps.rcPaint.right, ps.rcPaint.bottom,
 		ps.fRestore,
@@ -3702,10 +3702,10 @@ PyCFrameWnd_LoadBarState(PyObject *self, PyObject *args)
 	if (!PyWinObject_AsTCHAR(obprofileName, &profileName, FALSE))
 		return NULL;
 	GUI_BGN_SAVE;
-	try {
+	PYWINTYPES_TRY {
 		pFrame->LoadBarState(profileName); // @pyseemfc CFrameWnd|LoadBarState
 	}
-	catch (...) {
+	PYWINTYPES_EXCEPT {
 		GUI_BLOCK_THREADS;
 		PyWinObject_FreeTCHAR(profileName);
 		RETURN_ERR("LoadBarState failed (with win32 exception!)");

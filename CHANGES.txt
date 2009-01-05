@@ -8,6 +8,17 @@ However contributors are encouraged to add their own entries for their work.
 Since build 212:
 ----------------
 
+* Added win32wnet.WNetAddConnection3 allowing a HWND to be specified for
+  authentication.
+
+* isapi:
+  * Refactored isapi.install primarily to support installing extensions into 
+    the root of a site (Jason R. Coombs)
+  * New IIS6-only functionality HSE_REQ_EXEC_URL which avoids the need to use
+    a filter in most cases, including new demos for this.
+  * Other misc support functions (HSE_REQ_REPORT_UNHEALTHY, 
+    HSE_REQ_GET_ANONYMOUS_TOKEN, etc)
+
 * "Modernization" changes, instigated by py3k:
 
   - Many older modules now accept unicode arguments where previously they
@@ -62,7 +73,7 @@ Since build 212:
 
 * win32com.shell gets support for IContextMenu2 and IContextMenu3
 
-* add win32api.GetNativeSystemInfo()
+* add win32api.GetNativeSystemInfo(), win32api.GetKeyboardLayout()
 
 Since build 211:
 ----------------

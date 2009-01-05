@@ -355,10 +355,6 @@ class TkText:
 		except EmptyRange:
 			raise TextError("Empty range")
 		self.edit.SetSel((pos, pos))
-		self.edit.SCIAddText(text)
-
-		"""
-
 		# IDLE only deals with "\n" - we will be nicer
 
 		bits = text.split('\n')
@@ -366,8 +362,6 @@ class TkText:
 		for bit in bits[1:]:
 			self.edit.SCINewline()
 			self.edit.SCIAddText(bit)
-		"""
-
 
 	def delete(self, start, end=None):
 		try:

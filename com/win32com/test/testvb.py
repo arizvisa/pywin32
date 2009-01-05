@@ -3,12 +3,19 @@
 # This requires the PythonCOM VB Test Harness.
 #
 
+import sys
 import winerror
 import pythoncom, win32com.client, win32com.client.dynamic, win32com.client.gencache
 from win32com.server.util import NewCollection, wrap
 from win32com.test import util
 
 import traceback
+
+def string_to_buffer(s):
+    if sys.version_info < (3,0):
+        return buffer(s)
+    else:
+        return memoryview(s.encode("ascii"))
 
 # for debugging
 useDispatcher = None
@@ -66,11 +73,9 @@ def TestVB( vbtest, bUseGenerated ):
     vbtest.VariantProperty = 10
     if vbtest.VariantProperty != 10:
         raise error("Could not set the variant integer property correctly.")
-    vbtest.VariantProperty = b'raw\0data'
-    # FIX ME!!!
-    print("Skipping bytes/variant tests 'cos they don't work :(")
-    #if vbtest.VariantProperty != b'raw\0data':
-    #    raise error("Could not set the variant buffer property correctly: %r" % vbtest.VariantProperty)
+    vbtest.VariantProperty = string_to_buffer('raw\0data')
+    if vbtest.VariantProperty != string_to_buffer('raw\0data'):
+        raise error("Could not set the variant buffer property correctly.")
     vbtest.StringProperty = "Hello from Python"
     if vbtest.StringProperty != "Hello from Python":
         raise error("Could not set the string property correctly.")
@@ -81,8 +86,8 @@ def TestVB( vbtest, bUseGenerated ):
     if vbtest.VariantProperty != (1.0, 2.0, 3.0):
         raise error("Could not set the variant property to an array of floats correctly - '%s'." % (vbtest.VariantProperty,))
 
-    TestStructs(vbtest)
     TestArrays(vbtest, bUseGenerated)
+    TestStructs(vbtest)
     TestCollections(vbtest)
 
     assert vbtest.TakeByValObject(vbtest)==vbtest
@@ -396,7 +401,7 @@ def TestStructs(vbtest):
     except AttributeError:
         pass
     m = s.__members__
-    assert m[0]=="int_val" and m[1]=="str_val" and m[2]=="ob_val" and m[3]=="sub_val"
+    assert m[0]=="int_val" and m[1]=="str_val" and m[2]=="ob_val" and m[3]=="sub_val", m
 
     # Test attribute errors.
     try:
@@ -407,7 +412,6 @@ def TestStructs(vbtest):
 
     # test repr - it uses repr() of the sub-objects, so check it matches.
     expected = "com_struct(int_val=%r, str_val=%r, ob_val=%r, sub_val=%r)" % (s.int_val, s.str_val, s.ob_val, s.sub_val)
-    print("REPR is", repr(s))
     if repr(s) != expected:
         print("Expected repr:", expected)
         print("Actual repr  :", repr(s))
@@ -423,11 +427,36 @@ def TestVBInterface(ob):
     if t.getn() != 3:
         raise error("New value wrong")
 
+def TestObjectSemantics(ob):
+    # a convenient place to test some of our equality semantics
+    assert ob==ob._oleobj_
+    assert not ob!=ob._oleobj_
+    # same test again, but lhs and rhs reversed.
+    assert ob._oleobj_==ob
+    assert not ob._oleobj_!=ob
+    # same tests but against different pointers.  COM identity rules should
+    # still ensure all works
+    assert ob._oleobj_==ob._oleobj_.QueryInterface(pythoncom.IID_IUnknown)
+    assert not ob._oleobj_!=ob._oleobj_.QueryInterface(pythoncom.IID_IUnknown)
+
+    assert ob._oleobj_.QueryInterface(pythoncom.IID_IUnknown)==ob._oleobj_
+    assert not ob._oleobj_.QueryInterface(pythoncom.IID_IUnknown)!=ob._oleobj_
+
+    assert ob._oleobj_==ob._oleobj_.QueryInterface(pythoncom.IID_IDispatch)
+    assert not ob._oleobj_!=ob._oleobj_.QueryInterface(pythoncom.IID_IDispatch)
+
+    assert ob._oleobj_.QueryInterface(pythoncom.IID_IDispatch)==ob._oleobj_
+    assert not ob._oleobj_.QueryInterface(pythoncom.IID_IDispatch)!=ob._oleobj_
+
+    print("Object semantic tests passed")
+
 def DoTestAll():
     o = win32com.client.Dispatch("PyCOMVBTest.Tester")
+    TestObjectSemantics(o)
     TestVB(o,1)
 
     o = win32com.client.dynamic.DumbDispatch("PyCOMVBTest.Tester")
+    TestObjectSemantics(o)
     TestVB(o,0)
 
 def TestAll():
