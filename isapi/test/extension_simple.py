@@ -9,7 +9,7 @@
 from isapi import isapicon, threaded_extension, ExtensionError
 from isapi.simple import SimpleFilter
 import traceback
-import urllib
+import urllib.request, urllib.parse, urllib.error
 import winerror
 
 # If we have no console (eg, am running from inside IIS), redirect output
@@ -81,7 +81,7 @@ class Extension(threaded_extension.ThreadPoolExtension):
             return "This is IIS version %g - unicode only works in IIS6 and later" % ver
 
         us = ecb.GetServerVariable("UNICODE_SERVER_NAME")
-        if not isinstance(us, unicode):
+        if not isinstance(us, str):
             raise RuntimeError, "unexpected type!"
         if us != unicode(ecb.GetServerVariable("SERVER_NAME")):
             raise RuntimeError, "Unicode and non-unicode values were not the same"
