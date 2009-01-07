@@ -665,7 +665,14 @@ void DefaultExceptionHandler(int action, const TCHAR *context, const TCHAR *extr
 		// PyErr_Print will terminate then and there!  This is
 		// not good (and not what we want!?
 		PyErr_NormalizeException(&type, &value, &traceback);
-
+#ifdef DEBUG
+                // dump it to the debugger in debug builds.
+		char *msg = GetPythonTraceback(type, value, traceback);
+                if (msg) {
+                        OutputDebugString(msg);
+                        free(msg);
+                }
+#endif
 		if (type && PyErr_GivenExceptionMatches(type, PyExc_SystemExit)) {
 			// Replace it with a RuntimeError.
 			TRACE("WARNING!!  win32ui had a SystemError - Replacing with RuntimeError!!\n");
@@ -2388,6 +2395,8 @@ void Win32uiFinalize()
 {
 	// These are primarily here as a debugging aid.  Destroy what I created
 	// to help MFC detect useful memory leak reports
+	if (bInFatalShutdown)
+		return;
 	ui_assoc_object::handleMgr.cleanup();
 
 	if (threadStateSave)
