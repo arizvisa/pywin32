@@ -2710,8 +2710,8 @@ PyObject *ui_window_begin_paint(PyObject *self, PyObject *args)
 	if (pTemp==NULL)
 		RETURN_ERR("BeginPaint failed");
 	PyObject *obDC = ui_assoc_object::make (ui_dc_object::type, pTemp)->GetGoodRet();
-	PyObject *obRet = Py_BuildValue("O(ii(iiii)iiN)", obDC,
-		ps.hdc,
+	PyObject *obRet = Py_BuildValue("O(Ni(iiii)iiN)", obDC,
+		PyWinLong_FromHANDLE(ps.hdc),
 		ps.fErase,
 		ps.rcPaint.left, ps.rcPaint.top, ps.rcPaint.right, ps.rcPaint.bottom,
 		ps.fRestore,
