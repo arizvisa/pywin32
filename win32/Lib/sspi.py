@@ -217,9 +217,10 @@ if __name__=='__main__':
         err, sec_buffer = sspiserver.authorize(sec_buffer)
         if err==0:
             break
-    sig = sspiclient.sign(b"hello")
-    sspiserver.verify(b"hello", sig)
+    data = "hello".encode("ascii") # py3k-friendly
+    sig = sspiclient.sign(data)
+    sspiserver.verify(data, sig)
 
-    data, key = sspiclient.encrypt(b"hello")
-    assert sspiserver.decrypt(data, key) == b"hello"
+    data, key = sspiclient.encrypt(data)
+    assert sspiserver.decrypt(data, key) == data
     print("cool!")
