@@ -5,13 +5,11 @@ class Tools:
   _public_methods_ = [ 'reload', 'adddir', 'echo', 'sleep' ]
 
   def reload(self, module):
-    # XXX - need py3k work for 'reload'
     if module in sys.modules:
       try:
         from imp import reload
       except ImportError:
-        # builtin in py3k
-        pass
+        pass # builtin in py2k
       reload(sys.modules[module])
       return "reload succeeded."
     return "no reload performed."
