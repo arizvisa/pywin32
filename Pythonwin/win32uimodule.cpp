@@ -669,7 +669,7 @@ void DefaultExceptionHandler(int action, const TCHAR *context, const TCHAR *extr
                 // dump it to the debugger in debug builds.
 		char *msg = GetPythonTraceback(type, value, traceback);
                 if (msg) {
-                        OutputDebugString(msg);
+                        OutputDebugStringA(msg);
                         free(msg);
                 }
 #endif
