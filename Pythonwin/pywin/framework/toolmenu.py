@@ -122,6 +122,11 @@ def HandleToolCommand(cmd, code):
 import commctrl
 from pywin.mfc import dialog
 
+if win32ui.UNICODE:
+	LVN_ENDLABELEDIT = commctrl.LVN_ENDLABELEDITW
+else:
+	LVN_ENDLABELEDIT = commctrl.LVN_ENDLABELEDITA
+
 class ToolMenuPropPage(dialog.PropertyPage):
 	def __init__(self):
 		self.bImChangingEditControls = 0 # Am I programatically changing the controls?
@@ -136,7 +141,7 @@ class ToolMenuPropPage(dialog.PropertyPage):
 		self.HookCommand(self.OnCommandEditControls, win32ui.IDC_EDIT2)
 
 		self.HookNotify(self.OnNotifyListControl, commctrl.LVN_ITEMCHANGED)
-		self.HookNotify(self.OnNotifyListControlEndLabelEdit, commctrl.LVN_ENDLABELEDITW)
+		self.HookNotify(self.OnNotifyListControlEndLabelEdit, commctrl.LVN_ENDLABELEDIT)
 		
 		# Hook the button clicks.
 		self.HookCommand(self.OnButtonNew, win32ui.IDC_BUTTON3) # New Item

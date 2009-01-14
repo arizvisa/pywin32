@@ -204,9 +204,10 @@ class EnumerationItem(build.OleItem, WritableItem):
       if vdesc[4] == pythoncom.VAR_CONST:
         val = vdesc[1]
         if sys.version_info <= (2,4) and (isinstance(val, int) or isinstance(val, int)):
-          if val==0x80000000-1+1: # special case for py2.3 (and avoid 'L' syntax for py3k)
+          # in python 2.3, 0x80000000L == 2147483648
+          if val==2147483648: # == 0x80000000L - special case for 2.3...
             use = "0x80000000L" # 'L' for future warning
-          elif val > 0x80000000-1+1 or val < 0: # avoid a FutureWarning
+          elif val > 2147483648 or val < 0: # avoid a FutureWarning
             use = int(val)
           else:
             use = hex(val)
@@ -826,7 +827,7 @@ class Generator:
     print('makepy_version =', repr(makepy_version), file=self.file)
     print('python_version = 0x%x' % (sys.hexversion,), file=self.file)
     print(file=self.file)
-    print('import win32com.client.CLSIDToClass, pythoncom', file=self.file)
+    print('import win32com.client.CLSIDToClass, pythoncom, pywintypes', file=self.file)
     print('import win32com.client.util', file=self.file)
     print('from pywintypes import IID', file=self.file)
     print('from win32com.client import Dispatch', file=self.file)

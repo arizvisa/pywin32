@@ -30,7 +30,6 @@ class PYW_EXPORT PyCCtrlView : public PyCView {
 public:
 	MAKE_PY_CTOR(PyCCtrlView)
 	static PyCCtrlView_Type type;
-	// PyObject * getattr(char *name);
 	static PyObject *create(PyObject *self, PyObject *args);
 protected:
 	PyCCtrlView() {return;}

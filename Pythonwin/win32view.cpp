@@ -689,22 +689,6 @@ PyCCtrlView_Type PyCCtrlView::type("PyCCtrlView",
 								PyCCtrlView_methods, 
 								GET_PY_CTOR(PyCCtrlView));
 
-/* Inheritance from PyCView and control type is now done via tp_bases */
-/*
-PyObject *
-PyCCtrlView::getattr(char *name)
-{
-	// implement inheritance.
-	PyObject *retMethod = PyCView::getattr(name);
-	if (!retMethod) {
-		PyErr_Clear();
-		PyCCtrlView_Type *thisType = (PyCCtrlView_Type *)ob_type;
-		if (thisType)
-			retMethod = Py_FindMethod(thisType->control->methods, (PyObject *)this, name);
-	}
-	return retMethod;
-}
-*/
 
 /////////////////////////////////////////////////////////////////////
 //

@@ -107,8 +107,6 @@ BOOL PyCom_VariantFromPyObject(PyObject *obj, VARIANT *var)
 		V_VT(var) = VT_I4;
 		V_I4(var) = PyInt_AsLong(obj);
 	}
-	// PyInstance_Check had disappeared in py3k
-	// else if (PyInstance_Check(obj) && PyObject_HasAttrString(obj, "_oleobj_"))
 	else if (PyObject_HasAttrString(obj, "_oleobj_"))
 	{
 		if (PyCom_InterfaceFromPyInstanceOrObject(obj, IID_IDispatch, (void **)&V_DISPATCH(var), FALSE))
@@ -624,7 +622,6 @@ static BOOL PyCom_SAFEARRAYFromPyObjectEx(PyObject *obj, SAFEARRAY **ppSA, bool 
 				obItemCheck = PySequence_GetItem(obItemCheck,0);
 				Py_DECREF(obSave);
 				if (obItemCheck==NULL) {
-					// Py_XDECREF(obItemCheck);
 					delete [] pBounds;
 					return FALSE;
 				}

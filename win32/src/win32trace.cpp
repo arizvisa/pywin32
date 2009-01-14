@@ -650,7 +650,7 @@ PYWIN_MODULE_INIT_FUNC(win32trace)
             HANDLE h2 = CreateFileMapping((HANDLE)-1, &sa, PAGE_READWRITE,
                                           0, BUFFER_SIZE,
                                           FixupObjectName(MAP_OBJECT_NAME));
-            use_global_namespace = h2 != NULL && GetLastError() == ERROR_ACCESS_DENIED;
+            use_global_namespace = h2 != NULL;
             if (h2)
                 CloseHandle(h2);
         }

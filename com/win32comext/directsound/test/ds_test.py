@@ -5,6 +5,7 @@ import os
 import pywintypes
 import win32event, win32api
 import os
+from pywin32_testutil import str2bytes, TestSkipped
 import win32com.directsound.directsound as ds
 # next two lines are for for debugging:
 # import win32com
@@ -18,10 +19,10 @@ def wav_header_unpack(data):
      datarate, blockalign, bitspersample, data, datalength) \
      = struct.unpack('<4sl4s4slhhllhh4sl', data)
 
-    if riff != b'RIFF':
+    if riff != str2bytes('RIFF'):
         raise ValueError('invalid wav header')
     
-    if fmtsize != 16 or fmt != b'fmt ' or data != b'data':
+    if fmtsize != 16 or fmt != str2bytes('fmt ') or str2bytes(data) != 'data':
         # fmt chuck is not first chunk, directly followed by data chuck
         # It is nowhere required that they are, it is just very common
         raise ValueError('cannot understand wav header')
@@ -261,7 +262,22 @@ class DirectSoundTest(unittest.TestCase):
 
     def testPlay(self):
         '''Mesdames et Messieurs, la cour de Devin Dazzle'''
-        fname=os.path.join(os.path.dirname(sys.argv[0]), "01-Intro.wav")
+        # look for the test file in various places
+        candidates = [
+            os.path.dirname(__file__),
+            os.path.dirname(sys.argv[0]),
+            # relative to 'testall.py' in the win32com test suite.
+            os.path.join(os.path.dirname(sys.argv[0]),
+                         '../../win32comext/directsound/test'),
+            '.',
+        ]
+        for candidate in candidates:
+            fname=os.path.join(candidate, "01-Intro.wav")
+            if os.path.isfile(fname):
+                break
+        else:
+            raise TestSkipped("Can't find test .wav file to play")
+
         f = open(fname, 'rb')
         hdr = f.read(WAV_HEADER_SIZE)
         wfx, size = wav_header_unpack(hdr)

@@ -83,7 +83,7 @@ class Extension(threaded_extension.ThreadPoolExtension):
         us = ecb.GetServerVariable("UNICODE_SERVER_NAME")
         if not isinstance(us, str):
             raise RuntimeError, "unexpected type!"
-        if us != unicode(ecb.GetServerVariable("SERVER_NAME")):
+        if us != str(ecb.GetServerVariable("SERVER_NAME")):
             raise RuntimeError, "Unicode and non-unicode values were not the same"
         return "worked!"
 
