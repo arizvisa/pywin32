@@ -208,7 +208,7 @@ class HLIRegisteredTypeLibrary(HLICOM):
             extraDesc = ""
             if extraDescs: extraDesc = " (%s)" % ", ".join(extraDescs)
             ret.append(HLITypeLib(fname, "Type Library" + extraDesc))
-        ret.sort(key=lambda k:k.GetText())
+        ret.sort()
         return ret
 
 class HLITypeLibEntry(HLICOM):
@@ -467,7 +467,7 @@ class HLITypeLib(HLICOM):
                 ret.append(HLITypeKinds[tlb.GetTypeInfoType(i)][0]( (tlb, i) ) )
             except pythoncom.com_error:
                 ret.append(browser.MakeHLI("The type info can not be loaded!"))
-        ret.sort(key=lambda k:k.GetText())
+        ret.sort()
         return ret
 
 class HLIHeadingRegisterdTypeLibs(HLICOM):
@@ -513,7 +513,7 @@ class HLIHeadingRegisterdTypeLibs(HLICOM):
         finally:
             win32api.RegCloseKey(key)
             win32ui.DoWaitCursor(0)
-        ret.sort(key=lambda k:k.GetText())
+        ret.sort()
         return ret
 
 def main():

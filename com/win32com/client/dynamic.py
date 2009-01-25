@@ -94,11 +94,13 @@ def _GetGoodDispatchAndUserName(IDispatch, userName, clsctx):
 	if userName is None:
 		if isinstance(IDispatch, str):
 			userName = IDispatch
-		## elif type(IDispatch) == UnicodeType:
-		##	# We always want the displayed name to be a real string
-		##	userName = IDispatch.encode("ascii", "replace")
-	elif not isinstance(userName, str):
-
+		elif isinstance(IDispatch, str):
+			# We always want the displayed name to be a real string
+			userName = IDispatch.encode("ascii", "replace")
+	elif type(userName) == str:
+		# As above - always a string...
+		userName = userName.encode("ascii", "replace")
+	else:
 		userName = str(userName)
 	return (_GetGoodDispatch(IDispatch, clsctx), userName)
 
