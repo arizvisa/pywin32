@@ -12,7 +12,7 @@ and not Windows 95/98/Me.
 	This module may be tested using the doctest module.
 
 	Written by Jason R. Coombs (jaraco@jaraco.com).
-	Copyright © 2003-2008.
+	Copyright © 2003-2009.
 	All Rights Reserved.
 
 	This module is licenced for use in Mark Hammond's pywin32
@@ -23,8 +23,8 @@ the TimeZoneInfo object to the datetime constructor.  For example,
 
 >>> import win32timezone, datetime
 >>> assert 'Mountain Standard Time' in win32timezone.TimeZoneInfo.get_sorted_time_zone_names()
->>> tzi = win32timezone.TimeZoneInfo('Mountain Standard Time')
->>> now = datetime.datetime.now(tzi)
+>>> MST = win32timezone.TimeZoneInfo('Mountain Standard Time')
+>>> now = datetime.datetime.now(MST)
 
 	The now object is now a time-zone aware object, and daylight savings-
 aware methods may be called on it.
@@ -39,10 +39,10 @@ generated, unless standard time is always used)
 >>> now.utcoffset()
 datetime.timedelta(-1, 61200)
 
->>> aug2 = datetime.datetime(2003, 8, 2, tzinfo = tzi)
+>>> aug2 = datetime.datetime(2003, 8, 2, tzinfo = MST)
 >>> tuple(aug2.utctimetuple())
 (2003, 8, 2, 6, 0, 0, 5, 214, 0)
->>> nov2 = datetime.datetime(2003, 11, 25, tzinfo = tzi)
+>>> nov2 = datetime.datetime(2003, 11, 25, tzinfo = MST)
 >>> tuple(nov2.utctimetuple())
 (2003, 11, 25, 7, 0, 0, 1, 329, 0)
 
@@ -58,12 +58,12 @@ calling the displayName member will return the display name as set in the
 registry.
 
 >>> est = win32timezone.TimeZoneInfo('Eastern Standard Time')
->>> est.displayName
-u'(GMT-05:00) Eastern Time (US & Canada)'
+>>> str(est.displayName)
+'(GMT-05:00) Eastern Time (US & Canada)'
 
 >>> gmt = win32timezone.TimeZoneInfo('GMT Standard Time', True)
->>> gmt.displayName
-u'(GMT) Greenwich Mean Time : Dublin, Edinburgh, Lisbon, London'
+>>> str(gmt.displayName)
+'(GMT) Greenwich Mean Time : Dublin, Edinburgh, Lisbon, London'
 
 To get the complete list of available time zone keys,
 >>> zones = win32timezone.TimeZoneInfo.get_all_time_zones()
@@ -74,6 +74,12 @@ If you want to get them in an order that's sorted longitudinally
 TimeZoneInfo now supports being pickled and comparison
 >>> import pickle
 >>> tz = win32timezone.TimeZoneInfo('China Standard Time')
+>>> tz == pickle.loads(pickle.dumps(tz))
+True
+
+It's possible to construct a TimeZoneInfo from a TimeZoneDescription
+including the currently-defined zone.
+>>> tz = win32timezone.TimeZoneInfo(TimeZoneDefinition.current())
 >>> tz == pickle.loads(pickle.dumps(tz))
 True
 
@@ -97,18 +103,25 @@ True
 Microsoft now has a patch for handling time zones in 2007 (see
 http://support.microsoft.com/gp/cp_dst)
 
-As a result, the following test will fail in machines with the patch
-except for Vista and its succssors, which have dynamic time
-zone support.
-#>>> nov2 = datetime.datetime(2003, 11, 2, tzinfo = tzi)
-#>>> nov2.utctimetuple()
-(2003, 11, 2, 7, 0, 0, 6, 306, 0)
+As a result, patched systems will give an incorrect result for
+dates prior to the designated year except for Vista and its
+successors, which have dynamic time zone support.
+>>> nov2_pre_change = datetime.datetime(2003, 11, 2, tzinfo = MST)
+>>> old_response = (2003, 11, 2, 7, 0, 0, 6, 306, 0)
+>>> incorrect_patch_response = (2003, 11, 2, 6, 0, 0, 6, 306, 0)
+>>> pre_response = nov2_pre_change.utctimetuple()
+>>> pre_response in (old_response, incorrect_patch_response)
+True
 
-Note that is the correct response beginning in 2007
-This test will fail in Windows versions prior to Vista
-#>>> nov2 = datetime.datetime(2007, 11, 2, tzinfo = tzi)
-#>>> nov2.utctimetuple()
-(2007, 11, 2, 6, 0, 0, 4, 306, 0)
+Furthermore, unpatched systems pre-Vista will give an incorrect
+result for dates after 2007.
+>>> nov2_post_change = datetime.datetime(2007, 11, 2, tzinfo = MST)
+>>> incorrect_unpatched_response = (2007, 11, 2, 7, 0, 0, 4, 306, 0)
+>>> new_response = (2007, 11, 2, 6, 0, 0, 4, 306, 0)
+>>> post_response = nov2_post_change.utctimetuple()
+>>> post_response in (new_response, incorrect_unpatched_response)
+True
+
 
 There is a function you can call to get some capabilities of the time
 zone data.
@@ -118,6 +131,19 @@ True
 >>> 'MissingTZPatch' in caps
 True
 >>> 'DynamicTZSupport' in caps
+True
+
+>>> both_dates_correct = (pre_response == old_response and post_response == new_response)
+>>> old_dates_wrong = (pre_response == incorrect_patch_response)
+>>> new_dates_wrong = (post_response == incorrect_unpatched_response)
+
+>>> caps['DynamicTZSupport'] == both_dates_correct
+True
+
+>>> (not caps['DynamicTZSupport'] and caps['MissingTZPatch']) == new_dates_wrong
+True
+
+>>> (not caps['DynamicTZSupport'] and not caps['MissingTZPatch']) == old_dates_wrong
 True
 """
 from __future__ import generators
@@ -136,90 +162,228 @@ import re
 import sys
 import operator
 import warnings
+import pywintypes
+from itertools import count
 
 import logging
 log = logging.getLogger(__file__)
 
-class WinTZI(object):
-	format = '3l8h8h'
+# A couple of objects for working with objects as if they were native C-type
+# structures.
+class _SimpleStruct(object):
+	_fields_ = None # must be overridden by subclasses
+	def __init__(self, *args, **kw):
+		for i, (name, typ) in enumerate(self._fields_):
+			def_arg = None
+			if i < len(args):
+				def_arg = args[i]
+			if name in kw:
+				def_arg = kw[name]
+			if def_arg is not None:
+				if not isinstance(def_arg, tuple):
+					def_arg = (def_arg,)
+			else:
+				def_arg = ()
+			if len(def_arg)==1 and isinstance(def_arg[0], typ):
+				# already an object of this type.
+				# XXX - should copy.copy???
+				def_val = def_arg[0]
+			else:
+				def_val = typ(*def_arg)
+			setattr(self, name, def_val)
 
-	def __init__(self, key, name = None):
-		if(not name and len(key) == struct.calcsize(self.format)):
-			self.__init_from_bytes__(key)
-		else:
-			self.__init_from_reg_key__(key, name)
-		
-	def __init_from_reg_key__(self, key, name = None):
-		if not name:
-			key, name = os.path.split(key)
-		value, type = winreg.QueryValueEx(key, name) 
-		self.__init_from_bytes__(value)
-		
-	def __init_from_bytes__(self, bytes):
-		components = struct.unpack(self.format, bytes)
-		makeMinuteTimeDelta = lambda x: datetime.timedelta(minutes = x)
-		self.bias, self.standardBiasOffset, self.daylightBiasOffset = \
-				   map(makeMinuteTimeDelta, components[:3])
-		# daylightEnd and daylightStart are 8-tuples representing a Win32 SYSTEMTIME structure
-		self.daylightEnd, self.daylightStart = components[3:11], components[11:19]
+	def field_names(self):
+		return [f[0] for f in fields]
 
-	def LocateStartDay(self, year):
-		return self._LocateDay(year, self.daylightStart)
+	def __eq__(self, other):
+		if not hasattr(other, "_fields_"):
+			return False
+		if self._fields_ != other._fields_:
+			return False
+		for name, _ in self._fields_:
+			if getattr(self, name) != getattr(other, name):
+				return False
+		return True
 
-	def LocateEndDay(self, year):
-		return self._LocateDay(year, self.daylightEnd)
+	def __ne__(self, other):
+		return not self.__eq__(other)
 
-	def _LocateDay(self, year, win32SystemTime):
+class SYSTEMTIME(_SimpleStruct):
+	_fields_ = [
+		('year', int),
+		('month', int),
+		('day_of_week', int), 
+		('day', int), 
+		('hour', int), 
+		('minute', int), 
+		('second', int), 
+		('millisecond', int), 
+	]
+
+class TIME_ZONE_INFORMATION(_SimpleStruct):
+	_fields_ = [
+		('bias', int),
+		('standard_name', str),
+		('standard_start', SYSTEMTIME),
+		('standard_bias', int),
+		('daylight_name', str),
+		('daylight_start', SYSTEMTIME),
+		('daylight_bias', int),
+	]
+
+class DYNAMIC_TIME_ZONE_INFORMATION(_SimpleStruct):
+	_fields_ = TIME_ZONE_INFORMATION._fields_ + [
+		('key_name', str),
+		('dynamic_daylight_time_disabled', bool),
+	]
+
+
+class TimeZoneDefinition(DYNAMIC_TIME_ZONE_INFORMATION):
+	"""
+	A time zone definition class based on the win32
+	DYNAMIC_TIME_ZONE_INFORMATION structure.
+	
+	Describes a bias against UTC (bias), and two dates at which a separate
+	additional bias applies (standard_bias and daylight_bias).
+	"""
+
+	def __init__(self, *args, **kwargs):
 		"""
-		Takes a SYSTEMTIME structure as retrieved from a TIME_ZONE_INFORMATION
-		structure and interprets it based on the given year to identify the actual day.
+		Try to construct a TimeZoneDefinition from
+		a) [DYNAMIC_]TIME_ZONE_INFORMATION args
+		b) another TimeZoneDefinition
+		c) a byte structure (using _from_bytes)
+		"""
+		try:
+			super(TimeZoneDefinition, self).__init__(*args, **kwargs)
+			return
+		except (TypeError, ValueError):
+			pass
+
+		try:
+			self.__init_from_other(*args, **kwargs)
+			return
+		except TypeError:
+			pass
+			
+		try:
+			self.__init_from_bytes(*args, **kwargs)
+			return
+		except TypeError:
+			pass
+			
+		raise TypeError("Invalid arguments for %s" % self.__class__)
+
+	def __init_from_bytes(self, bytes, standard_name='', daylight_name='', key_name='', daylight_disabled=False):
+		format = '3l8h8h'
+		components = struct.unpack(format, bytes)
+		bias, standard_bias, daylight_bias = components[:3]
+		standard_start = SYSTEMTIME(*components[3:11])
+		daylight_start = SYSTEMTIME(*components[11:19])
+		super(TimeZoneDefinition, self).__init__(bias,
+			standard_name, standard_start, standard_bias,
+			daylight_name, daylight_start, daylight_bias,
+			key_name, daylight_disabled,)
+
+	def __init_from_other(self, other):
+		if not isinstance(other, TIME_ZONE_INFORMATION):
+			raise TypeError("Not a TIME_ZONE_INFORMATION")
+		for name in other.field_names():
+			# explicitly get the value from the underlying structure
+			value = super(TimeZoneDefinition, other).__getattribute__(other, name)
+			setattr(self, name, value)
+		# consider instead of the loop above just copying the memory directly
+		#size = max(ctypes.sizeof(DYNAMIC_TIME_ZONE_INFO), ctypes.sizeof(other))
+		#ctypes.memmove(ctypes.addressof(self), other, size)
+
+	def __getattribute__(self, attr):
+		value = super(TimeZoneDefinition, self).__getattribute__(attr)
+		if 'bias' in attr:
+			make_minute_timedelta = lambda m: datetime.timedelta(minutes = m)
+			value = make_minute_timedelta(value)
+		return value
+
+	@classmethod
+	def current(class_):
+		"Windows Platform SDK GetTimeZoneInformation"
+		code, tzi = win32api.GetTimeZoneInformation(True)
+		return code, class_(*tzi)
+
+	def set(self):
+		tzi = tuple(getattr(self, n) for n, t in self._fields_)
+		win32api.SetTimeZoneInformation(tzi)
+
+	def copy(self):
+		# XXX - this is no longer a copy!
+		return self.__class__(self)
+
+	def locate_daylight_start(self, year):
+		return self._locate_day(year, self.daylight_start)
+
+	def locate_standard_start(self, year):
+		return self._locate_day(year, self.standard_start)
+
+	@staticmethod
+	def _locate_day(year, cutoff):
+		"""
+		Takes a SYSTEMTIME object, such as retrieved from a TIME_ZONE_INFORMATION
+		structure or call to GetTimeZoneInformation and interprets it based on the given
+		year to identify the actual day.
 
 		This method is necessary because the SYSTEMTIME structure refers to a day by its
-		day of the week or week of the month (e.g. 4th saturday in April).
+		day of the week and week of the month (e.g. 4th saturday in March).
 
-		Refer to the Windows Platform SDK for more information on the SYSTEMTIME
-		and TIME_ZONE_INFORMATION structures.
+		>>> SATURDAY = 6
+		>>> MARCH = 3
+		>>> st = SYSTEMTIME(2000, MARCH, SATURDAY, 4, 0, 0, 0, 0)
+
+		# according to my calendar, the 4th Saturday in March in 2009 was the 28th
+		>>> expected_date = datetime.datetime(2009, 3, 28)
+		>>> TimeZoneDefinition._locate_day(2009, st) == expected_date
+		True
 		"""
-		month = win32SystemTime[1]
 		# MS stores Sunday as 0, Python datetime stores Monday as zero
-		targetWeekday = (win32SystemTime[2] + 6) % 7
-		# win32SystemTime[3] is the week of the month, so the following
-		#  is the first day of that week
-		day = (win32SystemTime[3] - 1) * 7 + 1
-		hour, min, sec, msec = win32SystemTime[4:]
-		result = datetime.datetime(year, month, day, hour, min, sec, msec)
+		target_weekday = (cutoff.day_of_week + 6) % 7
+		# For SYSTEMTIMEs relating to time zone inforamtion, cutoff.day
+		#  is the week of the month
+		week_of_month = cutoff.day
+		# so the following is the first day of that week
+		day = (week_of_month - 1) * 7 + 1
+		result = datetime.datetime(year, cutoff.month, day,
+			cutoff.hour, cutoff.minute, cutoff.second, cutoff.millisecond)
 		# now the result is the correct week, but not necessarily the correct day of the week
-		daysToGo = targetWeekday - result.weekday()
-		result += datetime.timedelta(daysToGo)
+		days_to_go = (target_weekday - result.weekday()) % 7
+		result += datetime.timedelta(days_to_go)
 		# if we selected a day in the month following the target month,
 		#  move back a week or two.
 		# This is necessary because Microsoft defines the fifth week in a month
 		#  to be the last week in a month and adding the time delta might have
 		#  pushed the result into the next month.
-		while result.month == month + 1:
+		while result.month == cutoff.month + 1:
 			result -= datetime.timedelta(weeks = 1)
 		return result
 
-	def __cmp__(self, other):
-		return cmp(self.__dict__, other.__dict__)
-
 class TimeZoneInfo(datetime.tzinfo):
 	"""
-	Main class for handling win32 time zones.
+	Main class for handling Windows time zones.
 	Usage:
 		TimeZoneInfo(<Time Zone Standard Name>, [<Fix Standard Time>])
-	If <Fix Standard Time> evaluates to True, daylight savings time is calculated in the same
-		way as standard time.
+
+	If <Fix Standard Time> evaluates to True, daylight savings time is
+	 calculated in the same
+	 way as standard time.
 	"""
 
 	# this key works for WinNT+, but not for the Win95 line.
 	tzRegKey = r'SOFTWARE\Microsoft\Windows NT\CurrentVersion\Time Zones'
-		
-	def __init__(self, timeZoneName, fixedStandardTime=False):
-		self.timeZoneName = timeZoneName
-		key = self._FindTimeZoneKey()
-		self._LoadInfoFromKey(key)
-		self.fixedStandardTime = fixedStandardTime
+
+	def __init__(self, param=None, fix_standard_time=False):
+		if isinstance(param, TimeZoneDefinition):
+			self._LoadFromTZI(param)
+		if isinstance(param, str):
+			self.timeZoneName = param
+			self._LoadInfoFromKey()
+		self.fixedStandardTime = fix_standard_time
 
 	def _FindTimeZoneKey(self):
 		"""Find the registry key for the time zone name (self.timeZoneName)."""
@@ -229,35 +393,39 @@ class TimeZoneInfo(datetime.tzinfo):
 		# Also match the time zone key name itself, to be compatible with
 		# English-based hard-coded time zones.
 		timeZoneName = zoneNames.get(self.timeZoneName, self.timeZoneName)
-		tzRegKeyPath = os.path.join(self.tzRegKey, timeZoneName)
+		key = _RegKeyDict.open(winreg.HKEY_LOCAL_MACHINE, self.tzRegKey)
 		try:
-			key = winreg.OpenKeyEx(winreg.HKEY_LOCAL_MACHINE, tzRegKeyPath)
+			result = key.subkey(timeZoneName)
 		except:
 			raise ValueError('Timezone Name %s not found.' % timeZoneName)
-		return key
+		return result
 
-	def __getinitargs__(self):
-		return (self.timeZoneName,)
-
-	def _LoadInfoFromKey(self, key):
+	def _LoadInfoFromKey(self):
 		"""Loads the information from an opened time zone registry key
 		into relevant fields of this TZI object"""
-		self.displayName = winreg.QueryValueEx(key, "Display")[0]
-		self.standardName = winreg.QueryValueEx(key, "Std")[0]
-		self.daylightName = winreg.QueryValueEx(key, "Dlt")[0]
-		self.staticInfo = WinTZI(key, "TZI")
+		key = self._FindTimeZoneKey()
+		self.displayName = key['Display']
+		self.standardName = key['Std']
+		self.daylightName = key['Dlt']
+		self.staticInfo = TimeZoneDefinition(key['TZI'])
 		self._LoadDynamicInfoFromKey(key)
+
+	def _LoadFromTZI(self, tzi):
+		self.timeZoneName = tzi.standard_name
+		self.displayName = 'Unknown'
+		self.standardName = tzi.standard_name
+		self.daylightName = tzi.daylight_name
+		self.staticInfo = tzi
 
 	def _LoadDynamicInfoFromKey(self, key):
 		try:
-			dkey = winreg.OpenKeyEx(key, 'Dynamic DST')
+			info = key.subkey('Dynamic DST')
 		except WindowsError:
 			return
-		info = _RegKeyDict(dkey)
 		del info['FirstEntry']
 		del info['LastEntry']
 		years = map(int, list(info.keys()))
-		values = map(WinTZI, list(info.values()))
+		values = map(TimeZoneDefinition, list(info.values()))
 		# create a range mapping that searches by descending year and matches
 		# if the target year is greater or equal.
 		self.dynamicInfo = RangeMap(zip(years, values), descending, operator.ge)
@@ -274,9 +442,9 @@ class TimeZoneInfo(datetime.tzinfo):
 
 	def tzname(self, dt):
 		winInfo = self.getWinInfo(dt)
-		if self.dst(dt) == winInfo.daylightBiasOffset:
+		if self.dst(dt) == winInfo.daylight_bias:
 			result = self.daylightName
-		elif self.dst(dt) == winInfo.standardBiasOffset:
+		elif self.dst(dt) == winInfo.standard_bias:
 			result = self.standardName
 		return result
 
@@ -290,11 +458,11 @@ class TimeZoneInfo(datetime.tzinfo):
 		
 	def _getStandardBias(self, dt):
 		winInfo = self.getWinInfo(dt.year)
-		return winInfo.bias + winInfo.standardBiasOffset
+		return winInfo.bias + winInfo.standard_bias
 
 	def _getDaylightBias(self, dt):
 		winInfo = self.getWinInfo(dt.year)
-		return winInfo.bias + winInfo.daylightBiasOffset
+		return winInfo.bias + winInfo.daylight_bias
 
 	def utcoffset(self, dt):
 		"Calculates the utcoffset according to the datetime.tzinfo spec"
@@ -309,9 +477,9 @@ class TimeZoneInfo(datetime.tzinfo):
 
 		winInfo = self.getWinInfo(dt.year)
 		if not self.fixedStandardTime and self._inDaylightSavings(dt):
-			result = winInfo.daylightBiasOffset
+			result = winInfo.daylight_bias
 		else:
-			result = winInfo.standardBiasOffset
+			result = winInfo.standard_bias
 		return result
 
 	def _inDaylightSavings(self, dt):
@@ -334,53 +502,100 @@ class TimeZoneInfo(datetime.tzinfo):
 
 	def GetDSTStartTime(self, year):
 		"Given a year, determines the time when daylight savings time starts"
-		return self.getWinInfo(year).LocateStartDay(year)
+		return self.getWinInfo(year).locate_daylight_start(year)
 
 	def GetDSTEndTime(self, year):
 		"Given a year, determines the time when daylight savings ends."
-		return self.getWinInfo(year).LocateEndDay(year)
+		return self.getWinInfo(year).locate_standard_start(year)
 	
 	def __cmp__(self, other):
 		return cmp(self.__dict__, other.__dict__)
 
+	def __eq__(self, other):
+		return self.__dict__==other.__dict__
+
+	def __ne__(self, other):
+		return self.__dict__!=other.__dict__
+
+	@classmethod
+	def local(class_):
+		"""Returns the local time zone as defined by the operating system in the
+		registry.
+		>>> localTZ = TimeZoneInfo.local()
+		>>> now_local = datetime.datetime.now(localTZ)
+		>>> now_UTC = datetime.datetime.utcnow()
+		>>> (now_UTC - now_local) < datetime.timedelta(seconds = 5)
+		Traceback (most recent call last):
+		  ...
+		TypeError: can't subtract offset-naive and offset-aware datetimes
+
+		>>> now_UTC = now_UTC.replace(tzinfo = TimeZoneInfo('GMT Standard Time', True))
+
+		Now one can compare the results of the two offset aware values	
+		>>> (now_UTC - now_local) < datetime.timedelta(seconds = 5)
+		True
+		"""
+		code, info = TimeZoneDefinition.current()
+		# code is 0 if daylight savings is disabled or not defined
+		#  code is 1 or 2 if daylight savings is enabled, 2 if currently active
+		fix_standard_time = not code
+		# note that although the given information is sufficient to construct a WinTZI object, it's
+		#  not sufficient to represent the time zone in which the current user is operating due
+		#  to dynamic time zones.
+		return class_(info, fix_standard_time)
+
+	@classmethod
+	def utc(class_):
+		"""Returns a time-zone representing UTC.
+
+		Same as TimeZoneInfo('GMT Standard Time', True) but caches the result
+		for performance.
+		
+		>>> isinstance(TimeZoneInfo.utc(), TimeZoneInfo)
+		True
+		"""
+		if not '_tzutc' in class_.__dict__:
+			setattr(class_, '_tzutc', class_('GMT Standard Time', True))
+		return class_._tzutc
+
 	# helper methods for accessing the timezone info from the registry
+	@staticmethod
 	def _get_time_zone_key(subkey=None):
 		"Return the registry key that stores time zone details"
-		key = winreg.OpenKeyEx(winreg.HKEY_LOCAL_MACHINE, TimeZoneInfo.tzRegKey)
+		key = _RegKeyDict.open(winreg.HKEY_LOCAL_MACHINE, TimeZoneInfo.tzRegKey)
 		if subkey:
-			key = winreg.OpenKeyEx(key, subkey)
+			key = key.subkey(subkey)
 		return key
-	_get_time_zone_key = staticmethod(_get_time_zone_key)
 
+	@staticmethod
 	def _get_time_zone_key_names():
 		"Returns the names of the (registry keys of the) time zones"
-		return _RegKeyEnumerator(TimeZoneInfo._get_time_zone_key())
-	_get_time_zone_key_names = staticmethod(_get_time_zone_key_names)
-
+		return TimeZoneInfo._get_time_zone_key().subkeys()
+	
+	@staticmethod
 	def _get_indexed_time_zone_keys(index_key='Index'):
 		"""
 		Get the names of the registry keys indexed by a value in that key.
 		"""
-		key_names = tuple(TimeZoneInfo._get_time_zone_key_names())
+		key_names = list(TimeZoneInfo._get_time_zone_key_names())
 		def get_index_value(key_name):
 			key = TimeZoneInfo._get_time_zone_key(key_name)
-			value, type = winreg.QueryValueEx(key, index_key)
-			return value
+			return key[index_key]
 		values = map(get_index_value, key_names)
 		return zip(values, key_names)
-	_get_indexed_time_zone_keys = staticmethod(_get_indexed_time_zone_keys)
 
+	@staticmethod
 	def get_sorted_time_zone_names():
 		"Return a list of time zone names that can be used to initialize TimeZoneInfo instances"
 		tzs = TimeZoneInfo.get_sorted_time_zones()
 		get_standard_name = lambda tzi: tzi.standardName
-		return map(get_standard_name, tzs)
-	get_sorted_time_zone_names = staticmethod(get_sorted_time_zone_names)
+		return [get_standard_name(tz) for tz in tzs]
 
+	@staticmethod
 	def get_all_time_zones():
 		return [TimeZoneInfo(n) for n in TimeZoneInfo._get_time_zone_key_names()]
-	get_all_time_zones = staticmethod(get_all_time_zones)
 
+	@staticmethod
 	def get_sorted_time_zones(key=None):
 		"""
 		Return the time zones sorted by some key.
@@ -393,28 +608,44 @@ class TimeZoneInfo(datetime.tzinfo):
 		zones = TimeZoneInfo.get_all_time_zones()
 		zones.sort(key=key)
 		return zones
-	get_sorted_time_zones = staticmethod(get_sorted_time_zones)
 
-def _RegKeyEnumerator(key):
-	return _RegEnumerator(key, winreg.EnumKey)
-
-def _RegValueEnumerator(key):
-	return _RegEnumerator(key, winreg.EnumValue)
-
-def _RegEnumerator(key, func):
-	"Enumerates an open registry key as an iterable generator"
-	index = 0
-	try:
-		while 1:
-			yield func(key, index)
-			index += 1
-	except WindowsError: pass
+class _RegKeyDict(dict):
+	def __init__(self, key):
+		dict.__init__(self)
+		self.key = key
+		self.__load_values()
 	
-def _RegKeyDict(key):
-	values = _RegValueEnumerator(key)
-	values = tuple(values)
-	return dict([(name, value) for name,value,type in values])
+	@classmethod
+	def open(cls, *args, **kargs):
+		return _RegKeyDict(winreg.OpenKeyEx(*args, **kargs))
+		
+	def subkey(self, name):
+		return _RegKeyDict(winreg.OpenKeyEx(self.key, name))
+	
+	def __load_values(self):
+		pairs = [(n, v) for (n, v, t) in self._enumerate_reg_values(self.key)]
+		self.update(pairs)
+	
+	def subkeys(self):
+		return self._enumerate_reg_keys(self.key)
 
+	@staticmethod
+	def _enumerate_reg_values(key):
+		return _RegKeyDict._enumerate_reg(key, winreg.EnumValue)
+
+	@staticmethod
+	def _enumerate_reg_keys(key):
+		return _RegKeyDict._enumerate_reg(key, winreg.EnumKey)
+		
+	@staticmethod
+	def _enumerate_reg(key, func):
+		"Enumerates an open registry key as an iterable generator"
+		try:
+			for index in count():
+				yield func(key, index)
+		except WindowsError: pass
+		
+		
 # for backward compatibility
 def deprecated(func, name='Unknown'):
 	"""This is a decorator which can be used to mark functions
@@ -434,50 +665,23 @@ GetIndexedTimeZoneNames = deprecated(TimeZoneInfo._get_indexed_time_zone_keys, '
 GetSortedTimeZoneNames = deprecated(TimeZoneInfo.get_sorted_time_zone_names, 'GetSortedTimeZoneNames')
 # end backward compatibility
 
-def GetLocalTimeZone():
-	"""Returns the local time zone as defined by the operating system in the
-	registry.
-	Note that this will only work if the TimeZone in the registry has not been
-	customized.  It should have been selected from the Windows interface.
-	>>> localTZ = GetLocalTimeZone()
-	>>> nowLoc = datetime.datetime.now(localTZ)
-	>>> nowUTC = datetime.datetime.utcnow()
-	>>> (nowUTC - nowLoc) < datetime.timedelta(seconds = 5)
-	Traceback (most recent call last):
-	  ...
-	TypeError: can't subtract offset-naive and offset-aware datetimes
-
-	>>> nowUTC = nowUTC.replace(tzinfo = TimeZoneInfo('GMT Standard Time', True))
-
-	Now one can compare the results of the two offset aware values	
-	>>> (nowUTC - nowLoc) < datetime.timedelta(seconds = 5)
-	True
+def utcnow():
 	"""
-	tzRegKey = r'SYSTEM\CurrentControlSet\Control\TimeZoneInformation'
-	key = winreg.OpenKeyEx(winreg.HKEY_LOCAL_MACHINE, tzRegKey)
-	local = _RegKeyDict(key)
-	# if the user has not checked "Automatically adjust clock for daylight
-	# saving changes" in the Date and Time Properties control, the standard
-	# and daylight values will be the same.  If this is the case, create a
-	# timezone object fixed to standard time.
-	fixStandardTime = local['StandardName'] == local['DaylightName'] and \
-					local['StandardBias'] == local['DaylightBias']
-	keyName = ['StandardName', 'TimeZoneKeyName'][sys.getwindowsversion() >= (6,)]
-	standardName = local[keyName]
-	standardName = __TimeZoneKeyNameWorkaround(standardName)
-	return TimeZoneInfo(standardName, fixStandardTime)
-
-def __TimeZoneKeyNameWorkaround(name):
-	"""It may be a bug in Vista, but in standard Windows Vista install
-	(both 32-bit and 64-bit), it appears the TimeZoneKeyName returns a
-	string with extraneous characters.
-	>>> __TimeZoneKeyNameWorkaround("foo\\0xxx")
-	'foo'
-	>>> __TimeZoneKeyNameWorkaround("foo")
-	'foo'
+	Return the UTC time now with timezone awareness as enabled
+	by this module
+	>>> now = utcnow()
 	"""
-	# remove anything after and including the first null character.
-	return name.split('\x00',1)[0]
+	now = datetime.datetime.utcnow()
+	now = now.replace(tzinfo=TimeZoneInfo.utc())
+	return now
+
+def now():
+	"""
+	Return the local time now with timezone awareness as enabled
+	by this module
+	>>> now_local = now()
+	"""
+	return datetime.datetime.now(TimeZoneInfo.local())
 
 def GetTZCapabilities():
 	"""Run a few known tests to determine the capabilities of the time zone database
@@ -503,9 +707,12 @@ DLLCache = DLLHandleCache()
 
 def resolveMUITimeZone(spec):
 	"""Resolve a multilingual user interface resource for the time zone name
+	>>> #some pre-amble for the doc-tests to be py2k and py3k aware)
+	>>> try: unicode and None
+	... except NameError: unicode=str
+	...
 	>>> result = resolveMUITimeZone('@tzres.dll,-110')
-	>>> str_type = type(''.encode('ascii').decode('ascii')) # 2to3 doesn't do docstrings yet!
-	>>> expectedResultType = [type(None),str_type][sys.getwindowsversion() >= (6,)]
+	>>> expectedResultType = [type(None),unicode][sys.getwindowsversion() >= (6,)]
 	>>> type(result) is expectedResultType
 	True
 	
@@ -572,9 +779,14 @@ class RangeMap(dict):
 		self.sort = keySortComparator
 		self.match = keyMatchComparator
 
-	def __getitem__(self, item):
+	def _get_sorted_keys(self):
 		sortedKeys = list(self.keys())
-		sortedKeys.sort(self.sort)
+		reverse = self.match != operator.le
+		sortedKeys.sort(reverse=reverse)
+		return sortedKeys
+
+	def __getitem__(self, item):
+		sortedKeys = self._get_sorted_keys()
 		if isinstance(item, RangeItem):
 			result = self.__getitem__(sortedKeys[item])
 		else:
@@ -586,14 +798,13 @@ class RangeMap(dict):
 	def _find_first_match_(self, keys, item):
 		is_match = lambda k: self.match(item, k)
 		# use of ifilter here would be more efficent
-		matches = filter(is_match, keys)
+		matches = [k for k in keys if is_match(k)]
 		if matches:
 			return matches[0]
 		raise KeyError(item)
 
 	def bounds(self):
-		sortedKeys = list(self.keys())
-		sortedKeys.sort(self.sort)
+		sortedKeys = self._get_sorted_keys()
 		return sortedKeys[RangeItemFirst()], sortedKeys[RangeItemLast()]
 
 class RangeValueUndefined(object): pass

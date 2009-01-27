@@ -50,6 +50,11 @@
 %include "pywin32.i"
 
 %{
+
+#ifdef PYWIN_HAVE_DATETIME_CAPI
+#include "datetime.h" // python's datetime header.
+#endif
+
 // older python version's don't get the PyCObject structure definition
 // exposed, and we need it to cleanly zap our handles (see
 // CloseEncryptedFileRaw below).
@@ -340,7 +345,6 @@ BOOLAPI DefineDosDeviceW(
 // @pyswig |DeleteFile|Deletes a file.
 BOOLAPI DeleteFile(TCHAR *fileName);
 // @pyparm <o PyUnicode>|fileName||The filename to delete
-
 
 %{
 // @pyswig str/buffer|DeviceIoControl|Sends a control code to a device or file system driver
@@ -668,13 +672,23 @@ DWORD GetFileAttributesW(
 // @comm Times are returned in UTC time.
 BOOLAPI GetFileTime(
     HANDLE handle, // @pyparm <o PyHANDLE>|handle||Handle to the file.
-	FILETIME *OUTPUT,
-	FILETIME *OUTPUT,
-	FILETIME *OUTPUT
+	FILETIME *OUTPUT, // @pyparm <o PyTime>|creationTime||
+	FILETIME *OUTPUT, // @pyparm <o PyTime>|accessTime||
+	FILETIME *OUTPUT // @pyparm <o PyTime>|writeTime||
 );
 
 
 %{
+// Helper for SetFileTime - see comments below.
+static BOOL PyWinTime_DateTimeCheck(PyObject *ob)
+{
+	return FALSE
+#ifdef PYWIN_HAVE_DATETIME_CAPI
+		|| (PyDateTimeAPI && PyDateTime_Check(ob))
+#endif
+		;
+}
+
 // @pyswig None|SetFileTime|Sets the date and time that a file was created, last accessed, or last modified.
 static PyObject *PySetFileTime (PyObject *self, PyObject *args)
 {
@@ -700,7 +714,13 @@ static PyObject *PySetFileTime (PyObject *self, PyObject *args)
 	{
 		if (!PyWinObject_AsFILETIME(obTimeCreated, &LocalFileTime))
 			return NULL;
-		LocalFileTimeToFileTime(&LocalFileTime, &TimeCreated);
+		// This sucks!  This code is the only code in pywin32 that
+		// blindly converted the result of AsFILETIME to a localtime.
+		// That doesn't make sense in a tz-aware datetime world...
+		if (PyWinTime_DateTimeCheck(obTimeCreated))
+			TimeCreated = LocalFileTime;
+		else
+			LocalFileTimeToFileTime(&LocalFileTime, &TimeCreated);
 		lpTimeCreated= &TimeCreated;
 	}
 	if (obTimeAccessed == Py_None)
@@ -709,7 +729,10 @@ static PyObject *PySetFileTime (PyObject *self, PyObject *args)
 	{
 		if (!PyWinObject_AsFILETIME(obTimeAccessed, &LocalFileTime))
 			return NULL;
-		LocalFileTimeToFileTime(&LocalFileTime, &TimeAccessed);
+		if (PyWinTime_DateTimeCheck(obTimeAccessed))
+			TimeAccessed = LocalFileTime;
+		else
+			LocalFileTimeToFileTime(&LocalFileTime, &TimeAccessed);
 		lpTimeAccessed= &TimeAccessed;
 	}
 	if (obTimeWritten == Py_None)
@@ -718,7 +741,10 @@ static PyObject *PySetFileTime (PyObject *self, PyObject *args)
 	{
 		if (!PyWinObject_AsFILETIME(obTimeWritten, &LocalFileTime))
 			return NULL;
-		LocalFileTimeToFileTime(&LocalFileTime, &TimeWritten);
+		if (PyWinTime_DateTimeCheck(obTimeWritten))
+			TimeWritten = LocalFileTime;
+		else
+			LocalFileTimeToFileTime(&LocalFileTime, &TimeWritten);
 		lpTimeWritten= &TimeWritten;
 	}
 	if (!::SetFileTime(hHandle, lpTimeCreated, lpTimeAccessed, lpTimeWritten))
@@ -1658,7 +1684,7 @@ static PyObject *py_TransmitFile( PyObject *self, PyObject *args, PyObject *kwar
 	PyObject *obHead=Py_None, *obTail=Py_None;
 	DWORD flags, bytes_to_write, bytes_per_send;
 	OVERLAPPED *pOverlapped;
-    int error, rc;
+	int error, rc;
 
 	static char *keywords[]={"Socket","File","NumberOfBytesToWrite", "NumberOfBytesPerSend",
 		"Overlapped","Flags","Head","Tail", NULL};
@@ -1698,18 +1724,18 @@ static PyObject *py_TransmitFile( PyObject *self, PyObject *args, PyObject *kwar
 		return NULL;
 	if (!PyWinObject_AsReadBuffer(obTail, &tf_buffers.Tail, &tf_buffers.TailLength, TRUE))
 		return NULL;
-		
+
 	if (tf_buffers.Head || tf_buffers.Tail)
 		ptf_buffers = &tf_buffers;
 	else
 		ptf_buffers = NULL;
-	
+
 	rc=0;
 	Py_BEGIN_ALLOW_THREADS;
 	if (!lpfnTransmitFile(s, hFile, bytes_to_write, bytes_per_send, pOverlapped, ptf_buffers, flags))
 		rc = WSAGetLastError();
 	Py_END_ALLOW_THREADS;
-		
+
 	if (rc == 0 || rc == ERROR_IO_PENDING || rc == WSA_IO_PENDING)
 		return PyInt_FromLong(rc);
 	return PyWin_SetAPIError("TransmitFile", rc);
@@ -1734,7 +1760,7 @@ static PyObject *py_ConnectEx( PyObject *self, PyObject *args, PyObject *kwargs 
 	void *buffer=NULL;
 	DWORD buffer_len=0; 
 	int rc, error;
-    DWORD sent=0;
+	DWORD sent=0;
 	static char *keywords[]={"s","name","Overlapped","SendBuffer", NULL};
 	if (!PyArg_ParseTupleAndKeywords(args, kwargs, "OOO|O:ConnectEx", keywords,
 		&obConnecting, // @pyparm <o PySocket>/int|s||A bound, unconnected socket that will be used to connect
@@ -1761,7 +1787,7 @@ static PyObject *py_ConnectEx( PyObject *self, PyObject *args, PyObject *kwargs 
 		return NULL;
 	}
 	// convert the address
-	// 	
+	//
 	char pbuf[30];
 	char *hptr, *pptr;
 	PyObject *hobj = NULL;
@@ -1809,12 +1835,12 @@ static PyObject *py_ConnectEx( PyObject *self, PyObject *args, PyObject *kwargs 
 		return NULL;
 	}
 	// done screwing with the address
-	
+
 	if (!PyWinObject_AsOVERLAPPED(obOverlapped, &pOverlapped))
 	{
 		return NULL;
 	}
-	
+
 	rc=0;
 	Py_BEGIN_ALLOW_THREADS;
 	if (!lpfnConnectEx(sConnecting, res->ai_addr, res->ai_addrlen, buffer, buffer_len, &sent, pOverlapped))
@@ -5239,6 +5265,10 @@ PyCFunction pfnpy_GetFullPathName=(PyCFunction)py_GetFullPathName;
 		PYWIN_MODULE_INIT_RETURN_ERROR;
 	if (PyDict_SetItemString(d, "INVALID_HANDLE_VALUE", PyWinLong_FromHANDLE(INVALID_HANDLE_VALUE)) == -1)
 		PYWIN_MODULE_INIT_RETURN_ERROR;
+
+#ifdef PYWIN_HAVE_DATETIME_CAPI
+	PyDateTime_IMPORT;
+#endif
 
 	for (PyMethodDef *pmd = win32fileMethods;pmd->ml_name;pmd++)
 		if   ((strcmp(pmd->ml_name, "CreateFileW")==0)

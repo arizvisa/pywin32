@@ -2,6 +2,7 @@ import unittest
 from pywin32_testutil import str2bytes
 import win32api, win32file, win32pipe, pywintypes, winerror, win32event
 import win32con, ntsecuritycon
+import win32timezone
 import sys
 import os
 import tempfile
@@ -10,6 +11,7 @@ import time
 import shutil
 import socket
 import datetime
+import random
 
 try:
     set
@@ -120,10 +122,37 @@ class TestSimpleOps(unittest.TestCase):
             f.Close()
             os.unlink(filename)
 
+    def testFileTimesTimezones(self):
+        if not issubclass(pywintypes.TimeType, datetime.datetime):
+            # maybe should report 'skipped', but that's not quite right as
+            # there is nothing you can do to avoid it being skipped!
+            return
+        filename = tempfile.mktemp("-testFileTimes")
+        now_utc = win32timezone.utcnow()
+        now_local = now_utc.astimezone(win32timezone.TimeZoneInfo.local())
+        h = win32file.CreateFile(filename,
+                                 win32file.GENERIC_READ|win32file.GENERIC_WRITE,
+                                 0, None, win32file.CREATE_ALWAYS, 0, 0)
+        try:
+            win32file.SetFileTime(h, now_utc, now_utc, now_utc)
+            ct, at, wt = win32file.GetFileTime(h)
+            self.failUnlessEqual(now_local, ct)
+            self.failUnlessEqual(now_local, at)
+            self.failUnlessEqual(now_local, wt)
+            # and the reverse - set local, check against utc
+            win32file.SetFileTime(h, now_local, now_local, now_local)
+            ct, at, wt = win32file.GetFileTime(h)
+            self.failUnlessEqual(now_utc, ct)
+            self.failUnlessEqual(now_utc, at)
+            self.failUnlessEqual(now_utc, wt)
+        finally:
+            h.close()
+            os.unlink(filename)
+
     def testFileTimes(self):
         if issubclass(pywintypes.TimeType, datetime.datetime):
-            from win32timezone import GetLocalTimeZone
-            now = datetime.datetime.now(tz=GetLocalTimeZone())
+            from win32timezone import TimeZoneInfo
+            now = datetime.datetime.now(tz=TimeZoneInfo.local())
             nowish = now + datetime.timedelta(seconds=1)
             later = now + datetime.timedelta(seconds=120)
         else:
@@ -296,7 +325,8 @@ class TestOverlapped(unittest.TestCase):
                 if not test_overlapped_death:
                     raise
         finally:
-            handle.Close()
+            if not test_overlapped_death:
+                handle.Close()
             t.join(3)
             self.failIf(t.isAlive(), "thread didn't finish")
 
@@ -554,6 +584,125 @@ class TestEncrypt(unittest.TestCase):
             if f is not None:
                 f.close()
             os.unlink(fname)
+
+class TestConnect(unittest.TestCase):
+    def test_connect_with_payload(self):
+        def runner():
+            s1 = socket.socket()
+            self.addr = ('localhost', random.randint(10000,64000))
+            s1.bind(self.addr)
+            s1.listen(1)
+            cli, addr = s1.accept()
+            self.request = cli.recv(1024)
+            cli.send(str2bytes('some expected response'))
+        t = threading.Thread(target=runner)
+        t.start()
+        time.sleep(0.1)
+        s2 = socket.socket()
+        ol = pywintypes.OVERLAPPED()
+        s2.bind(('0.0.0.0', 0)) # connectex requires the socket be bound beforehand
+        win32file.ConnectEx(s2, self.addr, ol, str2bytes("some expected request"))
+        win32file.GetOverlappedResult(s2.fileno(), ol, 1)
+        ol = pywintypes.OVERLAPPED()
+        buff = win32file.AllocateReadBuffer(1024)
+        win32file.WSARecv(s2, buff, ol, 0)
+        length = win32file.GetOverlappedResult(s2.fileno(), ol, 1)
+        self.response = buff[:length]
+        self.assertEqual(self.response, str2bytes('some expected response'))
+        self.assertEqual(self.request, str2bytes('some expected request'))
+        t.join(5)
+        self.failIf(t.isAlive(), "worker thread didn't terminate")
+
+    def test_connect_without_payload(self):
+        def runner():
+            s1 = socket.socket()
+            self.addr = ('localhost', random.randint(10000,64000))
+            s1.bind(self.addr)
+            s1.listen(1)
+            cli, addr = s1.accept()
+            cli.send(str2bytes('some expected response'))
+        t = threading.Thread(target=runner)
+        t.start()
+        time.sleep(0.1)
+        s2 = socket.socket()
+        ol = pywintypes.OVERLAPPED()
+        s2.bind(('0.0.0.0', 0)) # connectex requires the socket be bound beforehand
+        win32file.ConnectEx(s2, self.addr, ol)
+        win32file.GetOverlappedResult(s2.fileno(), ol, 1)
+        ol = pywintypes.OVERLAPPED()
+        buff = win32file.AllocateReadBuffer(1024)
+        win32file.WSARecv(s2, buff, ol, 0)
+        length = win32file.GetOverlappedResult(s2.fileno(), ol, 1)
+        self.response = buff[:length]
+        self.assertEqual(self.response, str2bytes('some expected response'))
+        t.join(5)
+        self.failIf(t.isAlive(), "worker thread didn't terminate")
+
+class TestTransmit(unittest.TestCase):
+    def test_transmit(self):
+        import binascii
+        val = binascii.hexlify(os.urandom(1024*1024))
+        val_length = len(val)
+        f = tempfile.TemporaryFile()
+        f.write(val)
+
+        def runner():
+            s1 = socket.socket()
+            self.addr = ('localhost', random.randint(10000,64000))
+            s1.bind(self.addr)
+            s1.listen(1)
+            cli, addr = s1.accept()
+            buf = 1
+            self.request = []
+            while buf:
+                buf = cli.recv(1024*100)
+                self.request.append(buf)
+
+        th = threading.Thread(target=runner)
+        th.start()
+        time.sleep(0.5)
+        s2 = socket.socket()
+        s2.connect(self.addr)
+        
+        length = 0
+        aaa = str2bytes("[AAA]")
+        bbb = str2bytes("[BBB]")
+        ccc = str2bytes("[CCC]")
+        ddd = str2bytes("[DDD]")
+        empty = str2bytes("")
+        ol = pywintypes.OVERLAPPED()
+        f.seek(0)
+        win32file.TransmitFile(s2, win32file._get_osfhandle(f.fileno()), val_length, 0, ol, 0)
+        length += win32file.GetOverlappedResult(s2.fileno(), ol, 1)
+        
+        ol = pywintypes.OVERLAPPED()
+        f.seek(0)
+        win32file.TransmitFile(s2, win32file._get_osfhandle(f.fileno()), val_length, 0, ol, 0, aaa, bbb)
+        length += win32file.GetOverlappedResult(s2.fileno(), ol, 1)
+        
+        ol = pywintypes.OVERLAPPED()
+        f.seek(0)
+        win32file.TransmitFile(s2, win32file._get_osfhandle(f.fileno()), val_length, 0, ol, 0, empty, empty)
+        length += win32file.GetOverlappedResult(s2.fileno(), ol, 1)
+        
+        ol = pywintypes.OVERLAPPED()
+        f.seek(0)
+        win32file.TransmitFile(s2, win32file._get_osfhandle(f.fileno()), val_length, 0, ol, 0, None, ccc)
+        length += win32file.GetOverlappedResult(s2.fileno(), ol, 1)
+        
+        ol = pywintypes.OVERLAPPED()
+        f.seek(0)
+        win32file.TransmitFile(s2, win32file._get_osfhandle(f.fileno()), val_length, 0, ol, 0, ddd)
+        length += win32file.GetOverlappedResult(s2.fileno(), ol, 1)
+        
+        s2.close()
+        th.join()
+        buf = str2bytes('').join(self.request)
+        self.assertEqual(length, len(buf))
+        expected = val + aaa + val + bbb + val + val + ccc + ddd + val
+        self.assertEqual(type(expected), type(buf))
+        self.assert_(expected == buf)
+
 
 if __name__ == '__main__':
     unittest.main()
