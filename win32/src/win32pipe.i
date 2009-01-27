@@ -36,6 +36,28 @@ static GetNamedPipeClientProcessIdfunc pfnGetNamedPipeServerSessionId = NULL;
 		}
 %}
 
+%ifdef SWIG_PY2K
+%{
+extern PyObject *PyPopen(PyObject *self, PyObject  *args);
+extern PyObject *PyPopen2(PyObject *self, PyObject  *args);
+extern PyObject *PyPopen3(PyObject *self, PyObject  *args);
+extern PyObject *PyPopen4(PyObject *self, PyObject  *args);
+
+%}
+// @pymeth popen|Version of popen that works in a GUI
+%native(popen) PyPopen;
+
+// @pymeth popen2|Variation on popen - returns 2 pipes
+%native(popen2) PyPopen2;
+
+// @pymeth popen3|Variation on popen - returns 3 pipes
+%native(popen3) PyPopen3;
+
+// @pymeth popen4|Like popen2, but stdout/err are combined.
+%native(popen4) PyPopen4;
+
+%endif // SWIG_PY2K
+
 %native(GetNamedPipeHandleState) MyGetNamedPipeHandleState;
 
 %native(SetNamedPipeHandleState) MySetNamedPipeHandleState;

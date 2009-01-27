@@ -955,6 +955,8 @@ int PyWinGlobals_Ensure()
 		)
 		return -1;
 
+	if (!_PyWinDateTime_Init())
+		return -1;
 	return 0;
 }
 

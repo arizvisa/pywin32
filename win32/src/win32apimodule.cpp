@@ -6064,7 +6064,6 @@ PyObject *PyWinObject_FromBATTERY_REPORTING_SCALE(PBATTERY_REPORTING_SCALE pbrs)
 		"Capacity", PyLong_FromUnsignedLong(pbrs->Capacity));
 }
 
-/*
 // @pymethod dict|win32api|GetPwrCapabilities|Retrieves system's power capabilities
 // @pyseeapi GetPwrCapabilities
 // @comm Requires Win2k or later.
@@ -6110,7 +6109,6 @@ PyObject *PyGetPwrCapabilities(PyObject *self, PyObject *args)
 		"MinDeviceWakeState", PyInt_FromLong(spc.MinDeviceWakeState),
 		"DefaultLowLatencyWake", PyInt_FromLong(spc.DefaultLowLatencyWake));
 }
-*/
 
 /* List of functions exported by this module */
 // @module win32api|A module, encapsulating the Windows Win32 API.
@@ -6210,9 +6208,7 @@ static struct PyMethodDef win32api_functions[] = {
 #endif
 	{"GetModuleFileNameW",	PyGetModuleFileNameW,1}, // @pymeth GetModuleFileNameW|Retrieves the unicode filename of the specified module.
 	{"GetModuleHandle",     PyGetModuleHandle,1},   // @pymeth GetModuleHandle|Returns the handle of an already loaded DLL.
-
-	//	{"GetPwrCapabilities",	PyGetPwrCapabilities, METH_NOARGS},	// @pymeth GetPwrCapabilities|Retrieves system's power capabilities
-
+	{"GetPwrCapabilities",	PyGetPwrCapabilities, METH_NOARGS},	// @pymeth GetPwrCapabilities|Retrieves system's power capabilities
 	{"GetProfileSection",	PyGetProfileSection,1}, // @pymeth GetProfileSection|Returns a list of entries in an INI file.
 	{"GetProcAddress",      PyGetProcAddress,1},    // @pymeth GetProcAddress|Returns the address of the specified exported dynamic-link library (DLL) function.
 	{"GetProfileVal",		PyGetProfileVal,    1}, // @pymeth GetProfileVal|Returns a value from an INI file.
