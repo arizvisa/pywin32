@@ -490,7 +490,7 @@ class DispatchItem(build.DispatchItem, WritableItem):
             print("\t\texcept pythoncom.com_error:", file=stream)
             print("\t\t\treturn repr(self)", file=stream)
             print("\tdef __str__(self, *args):", file=stream)
-            print("\t\treturn str(self.__call__(*args))", file=stream)
+            print("\t\treturn str(self.__unicode__(*args))", file=stream)
             print("\tdef __int__(self, *args):", file=stream)
             print("\t\treturn int(self.__call__(*args))", file=stream)
             

@@ -682,15 +682,8 @@ PyObject *PyTime::reprFunc(PyObject *ob)
 //
 ///////////////////////////////////////////////////////////////////////////
 #ifdef PYWIN_HAVE_DATETIME_CAPI
-// @object PyDateTime|A Python object, representing an instant in time.
-// @desc pywin32 builds for Python 3.0 use datetime objects instead of the
-// old PyTime object.
-// @desc PyDateTime is a sub-class of the regular datetime.datetime object.
-// It is subclassed so it can provide a somewhat backwards compatible
-// <om PyDateTime.Format> method, but is otherwise identical.
-
-// @method str|PyDateTime|Format|
-// @desc This method is an alias for the datetime strftime method, using
+// @pymethod str|PyDateTime|Format|
+// @comm This method is an alias for the datetime strftime method, using
 // %c as the default value for the format string.
 static PyObject *PyWinDateTimeType_Format(PyObject *self, PyObject *args)
 {
@@ -711,6 +704,13 @@ done:
 	Py_XDECREF(method);
 	return ret;
 }
+
+// @object PyDateTime|A Python object, representing an instant in time.
+// @comm pywin32 builds for Python 3.0 use datetime objects instead of the
+// old PyTime object.
+// @comm PyDateTime is a sub-class of the regular datetime.datetime object.
+// It is subclassed so it can provide a somewhat backwards compatible
+// <om PyDateTime.Format> method, but is otherwise identical.
 
 struct PyMethodDef PyWinDateTimeType_methods[] = {
 	{"Format",     PyWinDateTimeType_Format, 1}, 	// @pymeth Format|Formats the time value - an alias for strftime with a default param.
