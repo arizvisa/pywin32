@@ -44,7 +44,7 @@ import document_object
 
 def main():
   if len(sys.argv) != 2:
-    print("Invalid args")
+    print "Invalid args"
     sys.exit(1)
   file = sys.argv[1]
   input = open(file, "r")
