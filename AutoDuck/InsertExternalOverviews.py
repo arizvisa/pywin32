@@ -28,7 +28,7 @@ def genHTML(doc):
       dict = {}
       for item in  cat.overviewItems.items:
           dict[item.name] = item.href
-      keys = dict.keys()
+      keys = list(dict.keys())
       keys.sort()
       for k in keys:
         s = s + '<LI><A HREF="html/%s">%s</A>\n' % (dict[k], k)
@@ -44,7 +44,7 @@ import document_object
 
 def main():
   if len(sys.argv) != 2:
-    print "Invalid args"
+    print("Invalid args")
     sys.exit(1)
   file = sys.argv[1]
   input = open(file, "r")

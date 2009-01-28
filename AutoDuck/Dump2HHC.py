@@ -142,7 +142,7 @@ def parseTopics(cat, input):
                 raise RuntimeError, "What is '%s'" % (top.type,)
 
             if d.has_key(top.name):
-                print "Duplicate named %s detected: %s" % (top.type, top.name)
+                print("Duplicate named %s detected: %s" % (top.type, top.name))
 
             # Skip the property fields line for module/object
             line = input.readline()
@@ -215,7 +215,7 @@ def _urlescape(name):
     return name
 
 def _genCategoryHTMLFromDict(dict, output):
-    keys = dict.keys()
+    keys = list(dict.keys())
     keys.sort()
     for key in keys:
         topic = dict[key]
@@ -254,7 +254,7 @@ def genCategoryHTML(output_dir, cats):
 
 def _genItemsFromDict(dict, cat, output, target, do_children = 1):
     CHM = "mk:@MSITStore:%s.chm::/" % target
-    keys = dict.keys()
+    keys = list(dict.keys())
     keys.sort()
     for k in keys:
       context = dict[k].context
